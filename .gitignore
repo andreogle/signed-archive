@@ -1,0 +1,4 @@
+/node_modules/
+
+# The archive itself. Large and regenerable only from the day you start, so back it up rather than commit it.
+/data/
