@@ -31,6 +31,10 @@ describe('hasValidSignature', () => {
     expect(await hasValidSignature({ ...base, templateId: oev.templateId })).toBe(false);
     expect(await hasValidSignature({ ...base, airnode: '0x0000000000000000000000000000000000000001' })).toBe(false);
   });
+
+  test('rejects a well-formed but unrecoverable signature instead of throwing', async () => {
+    expect(await hasValidSignature({ ...base, signature: `0x${'00'.repeat(65)}` })).toBe(false);
+  });
 });
 
 describe('toSignedDatum', () => {

@@ -1,0 +1,12 @@
+[install]
+# Supply-chain hardening: refuse to install any package version published less
+# than 3 days ago, so a freshly-published malicious release can't be pulled in
+# before it's caught and yanked. 3 days = 259200 seconds.
+minimumReleaseAge = 259200
+
+[test]
+root = "test"
+coverageSkipTestFiles = true
+# Applied per source file the tests load. The polling loop and CLI talk to the
+# network and are exercised by a live run, not unit tests, so they aren't loaded.
+coverageThreshold = { lines = 0.9, functions = 0.9 }

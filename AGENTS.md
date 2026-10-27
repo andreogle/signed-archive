@@ -25,6 +25,11 @@ This file holds what is specific to this project and the invariants that must ne
 **Time**
 - Signed `timestamp` is unix seconds, set by the signer. `fetched_at` is unix milliseconds, set by us. Never mix the two units in a column or a comparison without converting
 
+**Logging**
+- Log through `log` in `src/logger.ts`, never `console`. Lines go to stderr as `14:15:23.917 [info] cycle done saved=2116 rejected=0`: local time, level, message, then logfmt fields. Stdout is for command output only
+- The message is a short, fixed, lowercase phrase (`fetch failed`, `cycle done`); everything variable goes in fields, never interpolated into the message. Reuse field names: `provider`, `endpoint`, `status`, `error`, `retryInSeconds`, counts like `saved` and `rejected`
+- `debug` is per request, `info` is per cycle or lifecycle, `warn` is something to look at (failed fetch, rejected records), `error` is fatal
+
 **TypeScript style**
 - Multi-line arrow functions use braces and an explicit `return`, never a multi-line implicit return. If the body fits on one line (120 cols), collapse it to a one-line implicit return
 - Code comments state the rule or the reason, never the history of the change
@@ -32,7 +37,9 @@ This file holds what is specific to this project and the invariants that must ne
 ## Workflow
 
 - Tools are pinned in `mise.toml`; run commands through it (`mise exec -- bun ...`) if the shell doesn't activate mise
-- Run `bun run check` (Biome, `tsc`, tests) when done and read its **whole** output
+- Run `bun run check` (airnode list, Biome, `tsc`, tests with coverage) when done and read its **whole** output
+- The CLI is `src/cli.ts` (commander). Every option has a flag and an env var (`.env()`), with the flag winning. Validate options in their `argParser`, so bad input fails before anything runs
+- `bun run build` compiles a native binary to `dist/signed-archive`. JSON imported by the source (the airnode list, `package.json`) is bundled into it, so rebuild after `bun run airnodes`
 - Biome runs strict. Fix the code, don't disable the rule
 - **Never start, restart or kill a running archiver** (`bun start`). Ask the user. Stopping it leaves a gap in the history that can never be filled
 - Don't `sleep` waiting for a background command: it notifies when it exits
@@ -43,7 +50,8 @@ This file holds what is specific to this project and the invariants that must ne
 
 ## Testing
 
-- `bun test`. Tests never hit the network: use real records captured from the API as fixtures (see `test/signed-data.test.ts`)
+- `bun run test` runs with coverage, and `bunfig.toml` sets per-file floors (90% lines and functions) for every source file the tests load. Don't lower a floor to get a change through; add the test
+- Tests never hit the network: use real records captured from the API as fixtures (see `test/signed-data.test.ts`)
 - A signature test checks both directions: a real record passes, and an edited value, timestamp, template or signer fails
 - A regression test should fail on the old code. Check it does before relying on it
 
@@ -51,7 +59,7 @@ This file holds what is specific to this project and the invariants that must ne
 
 **Signed API**
 - `/public/<airnode>` serves base data delayed ~15 s; `/public-oev/<airnode>` serves fresher data already under the OEV template ID (`keccak256(templateId)`). Both verify with the same scheme
-- The API's `/airnodes` route is disabled, so the airnode list in `src/config.ts` is maintained by hand. Probe a new address once before adding it
+- The API's `/airnodes` route is disabled. The airnode list is `src/airnodes.json`, generated from `@api3/api-integrations` by `bun run airnodes`. Never edit it by hand; `bun run check` fails if it's stale (e.g. after a Dependabot bump of that package)
 - Responses carry `Cache-Control: max-age=1`; a fresh fetch per cycle is expected
 
 **Bun and SQLite**
@@ -59,5 +67,7 @@ This file holds what is specific to this project and the invariants that must ne
 - WAL mode is on. Copy the database with SQLite's backup (`VACUUM INTO`), never by copying the file while the archiver runs
 
 **Dependencies**
-- `viem` is the only runtime dependency (signature recovery, hashing, hex helpers). Reach for Bun's built-ins and the standard library before adding another
+- Runtime dependencies are `viem` (signature recovery, hashing, hex helpers) and `commander` (CLI). Reach for Bun's built-ins and the standard library before adding another
+- `bunfig.toml` refuses package versions published less than 3 days ago (`minimumReleaseAge`). Don't bypass it to grab a fresh release
+- `@api3/api-integrations` is a dev dependency only: it is large (the whole Airnode stack) and `UNLICENSED`. Only `scripts/airnodes.ts` imports it; runtime code reads the generated JSON. Its blocked postinstall stays blocked
 - `tsconfig.json` sets `skipLibCheck`, because a viem dependency ships types that need browser globals

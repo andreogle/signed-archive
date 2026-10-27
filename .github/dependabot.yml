@@ -1,0 +1,26 @@
+version: 2
+updates:
+  # A bump of @api3/api-integrations can change the provider list. CI fails until
+  # `bun run airnodes` is run and src/airnodes.json is committed on the PR.
+  - package-ecosystem: bun
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      bun-minor-and-patch:
+        update-types:
+          - minor
+          - patch
+
+  # Actions are pinned to commit SHAs; this keeps the SHA and its tag comment current together.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      github-actions:
+        update-types:
+          - minor
+          - patch
