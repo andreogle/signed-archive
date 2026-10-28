@@ -72,6 +72,7 @@ This file holds what is specific to this project and the invariants that must ne
 **Explorer (`web/`)**
 - `serve` (or `archive --serve`) opens the database read-only and serves `web/index.html` through Bun's HTML bundler; there is no separate frontend build. `src/reader.ts` is the only read path
 - Records shown in the explorer are checked in the browser: `isFeedRecord` (signer and template belong to the feed, from the bundled provider list) and `hasValidSignature`. A valid signature alone only proves who signed. Never replace either with a server-side "valid" flag: the page must not have to trust the server
+- The same goes for numbers: wherever the explorer presents a value as checked (the moment panel and the proof), it decodes prices from `encodedValue` and computes the median over verified records with `src/price.ts`, never the server's `price` or `median` strings. `src/price.ts` stays free of Bun and Node imports so it bundles for the browser. The chart and feed list are unverified overviews
 - The reader never hides a record: two values signed for the same feed and moment both come back from `at()`. Medians and provider counts take one value per provider
 - URL search params come from shared links: parse them through `parseFeedSearch` in `web/search.ts`
 - Route components that call `getRouteApi` declare their return type (`JSX.Element`), or the router's registered types collapse to `any` through the import cycle

@@ -1,14 +1,7 @@
 import { ENDPOINTS, type Endpoint, isEndpoint } from './config.ts';
 import { FEEDS, PROVIDER_SLOTS } from './feeds.ts';
-import {
-  decodeValue,
-  formatPrice,
-  type Gap,
-  median,
-  type PricePoint,
-  type Reader,
-  type SignedPrice,
-} from './reader.ts';
+import { medianPrice } from './price.ts';
+import type { Gap, PricePoint, Reader, SignedPrice } from './reader.ts';
 
 // Response shapes, shared with the web app through type-only imports.
 export interface FeedSummary {
@@ -47,13 +40,6 @@ const fail = (status: number, error: string) => json({ error }, status);
 function parseSeconds(value: string | null, fallback: number) {
   if (value === null) return fallback;
   return /^\d{1,12}$/.test(value) ? Number(value) : null;
-}
-
-// One vote per provider, like a beacon set: a provider that signed two values for one moment doesn't count twice.
-function medianPrice(records: readonly SignedPrice[]) {
-  const byProvider = new Map(records.map((record) => [record.provider, record.encodedValue]));
-  const middle = median([...byProvider.values()].map(decodeValue));
-  return middle === null ? null : formatPrice(middle);
 }
 
 const providerCount = (records: readonly SignedPrice[]) => new Set(records.map(({ provider }) => provider)).size;

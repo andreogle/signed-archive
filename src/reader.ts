@@ -1,11 +1,10 @@
 import { Database } from 'bun:sqlite';
-import { formatUnits, type Hex, hexToBigInt, hexToBytes } from 'viem';
+import { type Hex, hexToBytes } from 'viem';
 import type { FeedSource } from './feeds.ts';
+import { decodePrice } from './price.ts';
 import type { SignedDatum } from './signed-data.ts';
 import { hasTable } from './store.ts';
 
-// Values are int256 with 18 decimals, the encoding every API3 price feed uses.
-const DECIMALS = 18;
 // Charts get at most this many points per provider; longer ranges keep the last record per bucket.
 export const MAX_POINTS = 500;
 // No poll of any target for this long means the archiver was down. Polls normally arrive every
@@ -18,12 +17,14 @@ export interface SignedPrice extends SignedDatum {
   price: string;
 }
 
-// Polls are stored in unix milliseconds; everything the reader returns is in unix seconds.
+// Polls are stored in unix milliseconds; everything the reader returns is in unix seconds. The window includes the
+// last poll before the range and the first after it, so a gap that crosses either edge is found, then clipped.
 const GAPS = `
-  SELECT previous / 1000 AS "from", fetched_at / 1000 AS "to" FROM (
+  SELECT max(previous, $from) / 1000 AS "from", min(fetched_at, $to) / 1000 AS "to" FROM (
     SELECT fetched_at, lag(fetched_at) OVER (ORDER BY fetched_at) AS previous FROM polls
-    WHERE fetched_at BETWEEN $from AND $to
-  ) WHERE fetched_at - previous > $gap`;
+    WHERE fetched_at BETWEEN coalesce((SELECT max(fetched_at) FROM polls WHERE fetched_at < $from), $from)
+                         AND coalesce((SELECT min(fetched_at) FROM polls WHERE fetched_at > $to), $to)
+  ) WHERE fetched_at - previous > $gap AND previous < $to AND fetched_at > $from`;
 const POLL_RANGE = 'SELECT min(fetched_at) / 1000 AS first, max(fetched_at) / 1000 AS last FROM polls';
 
 export interface Gap {
@@ -43,9 +44,6 @@ interface Row {
 }
 
 const toHex = (hex: string) => `0x${hex.toLowerCase()}` as Hex;
-export const decodeValue = (encodedValue: Hex) => hexToBigInt(encodedValue, { signed: true });
-export const formatPrice = (value: bigint) => formatUnits(value, DECIMALS);
-const decodePrice = (encodedValue: Hex) => formatPrice(decodeValue(encodedValue));
 
 // Read-only, so it can run beside the archiver: WAL mode lets readers and the writer work at once.
 export function openReader(path: string) {
@@ -132,13 +130,3 @@ export function openReader(path: string) {
 }
 
 export type Reader = ReturnType<typeof openReader>;
-
-// Middle value, or the mean of the two middle values for an even count, as Api3ServerV1 aggregates beacon sets.
-export function median(values: readonly bigint[]): bigint | null {
-  const sorted = [...values].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
-  const middle = Math.floor(sorted.length / 2);
-  const upper = sorted[middle];
-  if (upper === undefined) return null;
-  const lower = sorted[middle - 1];
-  return sorted.length % 2 === 1 || lower === undefined ? upper : (lower + upper) / 2n;
-}

@@ -4,7 +4,8 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { FEEDS, isFeedRecord, PROVIDER_SLOTS } from '../src/feeds.ts';
-import { decodeValue, median, openReader } from '../src/reader.ts';
+import { decodeValue, median } from '../src/price.ts';
+import { openReader } from '../src/reader.ts';
 import { hasValidSignature } from '../src/signed-data.ts';
 import { openStore } from '../src/store.ts';
 import { blocksize, coingecko, coingeckoOev, fixtureDb } from './fixtures.ts';
@@ -141,6 +142,12 @@ describe('gaps', () => {
 
   test('reports stretches with no polls, but not time before the first poll', () => {
     expect(gapReader.gaps(0, 1600)).toEqual([{ from: 1001, to: 1500 }]);
+  });
+
+  test('reports the part of a gap inside the range when the gap starts before it or ends after it', () => {
+    expect(gapReader.gaps(1200, 1600)).toEqual([{ from: 1200, to: 1500 }]);
+    expect(gapReader.gaps(1100, 1300)).toEqual([{ from: 1100, to: 1300 }]);
+    expect(gapReader.gaps(1002, 1003)).toEqual([{ from: 1002, to: 1003 }]);
   });
 
   test('reports a trailing gap when polling stopped before the end of the range', () => {

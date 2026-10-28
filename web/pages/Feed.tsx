@@ -1,6 +1,7 @@
 import { getRouteApi } from '@tanstack/react-router';
 import { type JSX, useId } from 'react';
 import type { MomentResponse } from '../../src/api.ts';
+import { decodePrice, medianPrice } from '../../src/price.ts';
 import { useFeeds, useHistory, useMoment, useSignatureChecks } from '../api.ts';
 import { Chart } from '../components/Chart.tsx';
 import { formatAge, formatPrice, formatTime, fromLocalInput, toLocalInput } from '../format.ts';
@@ -120,7 +121,10 @@ function MomentPanel({ search, onTime }: { search: FeedSearch; onTime: (time: nu
   const data = moment.data;
   const records = data?.records ?? [];
   const checks = useSignatureChecks(data?.feed ?? search.feed, data?.endpoint ?? search.endpoint, records);
-  const verified = checks.filter(({ data: check }) => check === 'valid').length;
+  // Prices and the median are decoded here from the signed values, never taken from the server's strings, and the
+  // median only counts records that passed the checks above.
+  const verified = records.filter((_, index) => checks[index]?.data === 'valid');
+  const median = medianPrice(verified);
   // A provider with more than one record signed different values for the same moment: equivocation.
   const conflicted = new Set(
     records.map(({ provider }) => provider).filter((provider, index, all) => all.indexOf(provider) !== index)
@@ -159,16 +163,16 @@ function MomentPanel({ search, onTime }: { search: FeedSearch; onTime: (time: nu
       {data && records.length > 0 ? (
         <div className="summary">
           <div>
-            <span className="muted small">Median of providers</span>
-            <p className="big">{data.median ? formatPrice(data.median) : '—'}</p>
+            <span className="muted small">Median of verified providers</span>
+            <p className="big">{median ? formatPrice(median) : '—'}</p>
           </div>
           <div>
             <span className="muted small">Signatures checked in your browser</span>
             <p className="big">
-              {verified} / {records.length}
+              {verified.length} / {records.length}
             </p>
           </div>
-          <button type="button" onClick={() => downloadProof(data)}>
+          <button type="button" onClick={() => downloadProof(data, median)}>
             Download proof
           </button>
         </div>
@@ -187,6 +191,7 @@ function MomentPanel({ search, onTime }: { search: FeedSearch; onTime: (time: nu
           <tbody>
             {records.map((record, index) => {
               const check = checks[index]?.data;
+              const price = decodePrice(record.encodedValue);
               const age = (search.time ?? 0) - Number(record.timestamp);
               return (
                 <tr key={`${record.provider}-${record.encodedValue}`}>
@@ -199,8 +204,8 @@ function MomentPanel({ search, onTime }: { search: FeedSearch; onTime: (time: nu
                       </span>
                     ) : null}
                   </td>
-                  <td className="num" title={record.price}>
-                    {formatPrice(record.price)}
+                  <td className="num" title={price}>
+                    {formatPrice(price)}
                   </td>
                   <td title={`${formatAge(age)} before the chosen time`}>{formatTime(Number(record.timestamp))}</td>
                   <td className={check === undefined ? 'muted' : check === 'valid' ? 'ok' : 'bad'}>
@@ -227,12 +232,15 @@ function MomentPanel({ search, onTime }: { search: FeedSearch; onTime: (time: nu
   );
 }
 
-function downloadProof(moment: MomentResponse) {
+// `median` is the browser's own, over verified records; prices are re-decoded from the signed values.
+function downloadProof(moment: MomentResponse, median: string | null) {
   const proof = {
     about:
       'Signed API3 price records. Each signature is EIP-191 over keccak256(abi.encodePacked(templateId, timestamp, encodedValue)) and must recover to airnode. ' +
       "To tie a record to the feed, airnode must be the provider's address and templateId the feed's template ID in @api3/api-integrations (for OEV data, keccak256 of it).",
     ...moment,
+    median,
+    records: moment.records.map((record) => ({ ...record, price: decodePrice(record.encodedValue) })),
   };
   const link = document.createElement('a');
   link.href = URL.createObjectURL(new Blob([JSON.stringify(proof, null, 2)], { type: 'application/json' }));
