@@ -1,7 +1,7 @@
 {
   "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
   "assist": { "actions": { "source": { "organizeImports": "on" } } },
-  "files": { "includes": ["**", "!**/node_modules/", "!**/data/", "!**/dist/"] },
+  "files": { "includes": ["**", "!**/node_modules/", "!**/data/", "!**/dist/", "!**/.impeccable"] },
   "formatter": {
     "enabled": true,
     "formatWithErrors": false,
@@ -25,6 +25,7 @@
   "linter": {
     "enabled": true,
     "domains": {
+      "react": "all",
       "test": "recommended"
     },
     "rules": {
@@ -89,6 +90,9 @@
         "useNumberNamespace": "error",
         "useReadonlyClassProperties": "error",
         "useSingleVarDeclarator": "error"
+      },
+      "performance": {
+        "noJsxPropsBind": "off"
       },
       "nursery": {
         "noFloatingPromises": "error"

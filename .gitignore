@@ -5,3 +5,6 @@
 
 # Native binary from `bun run build`.
 /dist/
+
+# Cache from the impeccable design plugin.
+/.impeccable/

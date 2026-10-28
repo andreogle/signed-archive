@@ -12,6 +12,8 @@ This file holds what is specific to this project and the invariants that must ne
 - The primary key includes the value, so two different values signed for the same feed and timestamp both survive. That pair is the equivocation evidence the archive exists to catch: never "fix" it with an upsert or a key without the value
 - Never delete or rewrite stored rows. A schema change adds a table or column; it never migrates signed data in place
 - Hex fields are stored as bytes. Read them with SQL `hex()` and write them with `hexToBytes`
+- Every request writes a `polls` row in the same transaction as its records, failures included. Without it a gap in the history is indistinguishable from a provider that stopped signing
+- Another archive is untrusted input: `merge` re-checks shape, known airnode and signature for every record before adding it, exactly as the archiver does. Never add a fast path that copies rows unverified
 
 **Be polite to the Signed API**
 - One request at a time, spread evenly across the poll interval. Never fetch in parallel or in bursts
@@ -40,7 +42,8 @@ This file holds what is specific to this project and the invariants that must ne
 - Run `bun run check` (airnode list, Biome, `tsc`, tests with coverage) when done and read its **whole** output
 - The CLI is `src/cli.ts` (commander). Every option has a flag and an env var (`.env()`), with the flag winning. Validate options in their `argParser`, so bad input fails before anything runs
 - `bun run build` compiles a native binary to `dist/signed-archive`. JSON imported by the source (the airnode list, `package.json`) is bundled into it, so rebuild after `bun run airnodes`
-- Biome runs strict. Fix the code, don't disable the rule
+- Biome runs strict, with every React rule on. Fix the code, don't disable the rule. The one exception is `noJsxPropsBind`, off on purpose: inline handlers are idiomatic React
+- `bun dev` runs the archiver and explorer under `--watch`, so every edit to `src/` restarts the archiver and leaves a gap. Use it for development only; the long-running archive runs `bun start` or the binary
 - **Never start, restart or kill a running archiver** (`bun start`). Ask the user. Stopping it leaves a gap in the history that can never be filled
 - Don't `sleep` waiting for a background command: it notifies when it exits
 - Commit or push only when the user asks
@@ -59,15 +62,21 @@ This file holds what is specific to this project and the invariants that must ne
 
 **Signed API**
 - `/public/<airnode>` serves base data delayed ~15 s; `/public-oev/<airnode>` serves fresher data already under the OEV template ID (`keccak256(templateId)`). Both verify with the same scheme
-- The API's `/airnodes` route is disabled. The airnode list is `src/airnodes.json`, generated from `@api3/api-integrations` by `bun run airnodes`. Never edit it by hand; `bun run check` fails if it's stale (e.g. after a Dependabot bump of that package)
+- The API's `/airnodes` route is disabled. The airnode list (`src/airnodes.json`) and feed names (`src/feeds.json`) are generated from `@api3/api-integrations` by `bun run airnodes`. Never edit them by hand; `bun run check` fails if it's stale (e.g. after a Dependabot bump of that package)
 - Responses carry `Cache-Control: max-age=1`; a fresh fetch per cycle is expected
 
 **Bun and SQLite**
 - `bun:sqlite` is opened with `strict: true`: SQL uses `$name` placeholders, bound objects use plain `name` keys
 - WAL mode is on. Copy the database with SQLite's backup (`VACUUM INTO`), never by copying the file while the archiver runs
 
+**Explorer (`web/`)**
+- `serve` (or `archive --serve`) opens the database read-only and serves `web/index.html` through Bun's HTML bundler; there is no separate frontend build. `src/reader.ts` is the only read path
+- Signatures shown in the explorer are checked in the browser with `src/signed-data.ts`. Never replace that with a server-side "valid" flag: the page must not have to trust the server
+- URL search params come from shared links: parse them through `parseFeedSearch` in `web/search.ts`
+- Route components that call `getRouteApi` declare their return type (`JSX.Element`), or the router's registered types collapse to `any` through the import cycle
+
 **Dependencies**
-- Runtime dependencies are `viem` (signature recovery, hashing, hex helpers) and `commander` (CLI). Reach for Bun's built-ins and the standard library before adding another
+- Runtime dependencies are `viem` (signature recovery, hashing, hex helpers) and `commander` (CLI), plus React, TanStack Router and TanStack Query for the explorer in `web/`. Reach for Bun's built-ins and the standard library before adding another
 - `bunfig.toml` refuses package versions published less than 3 days ago (`minimumReleaseAge`). Don't bypass it to grab a fresh release
 - `@api3/api-integrations` is a dev dependency only: it is large (the whole Airnode stack) and `UNLICENSED`. Only `scripts/airnodes.ts` imports it; runtime code reads the generated JSON. Its blocked postinstall stays blocked
 - `tsconfig.json` sets `skipLibCheck`, because a viem dependency ships types that need browser globals

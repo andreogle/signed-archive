@@ -1,14 +1,14 @@
 import { Database } from 'bun:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { hexToBytes } from 'viem';
+import { type Address, hexToBytes } from 'viem';
 import type { Endpoint } from './config.ts';
 import type { SignedDatum } from './signed-data.ts';
 
 // Hex fields are stored as bytes (about half the size); read them back with SQL `hex()`.
 // The key includes the value, so two different values signed for the same feed and timestamp
 // both land as separate rows. That pair is the equivocation evidence the archive exists to catch.
-const SCHEMA = `
+const DATAPOINTS = `
   CREATE TABLE IF NOT EXISTS datapoints (
     airnode     BLOB    NOT NULL,
     template_id BLOB    NOT NULL,
@@ -21,32 +21,110 @@ const SCHEMA = `
   ) WITHOUT ROWID
 `;
 
+// One row per request, failed or not, so the archive knows when it was watching. A stretch with no
+// polls means the archiver was down; polls with a failed status mean the provider was. `fetched_at`
+// matches the datapoints that request saved. `status` is the HTTP status, or NULL when the request
+// failed without a usable response (network error, timeout, unreadable body).
+const POLLS = `
+  CREATE TABLE IF NOT EXISTS polls (
+    airnode    BLOB    NOT NULL,
+    endpoint   TEXT    NOT NULL,
+    fetched_at INTEGER NOT NULL,
+    status     INTEGER,
+    received   INTEGER NOT NULL,
+    rejected   INTEGER NOT NULL,
+    saved      INTEGER NOT NULL,
+    PRIMARY KEY (airnode, endpoint, fetched_at)
+  ) WITHOUT ROWID
+`;
+
+export interface Poll {
+  airnode: Address;
+  endpoint: Endpoint;
+  // Unix milliseconds, set by us.
+  fetchedAt: number;
+  status: number | null;
+  received: number;
+  rejected: number;
+}
+
+export interface StoredPoll extends Poll {
+  saved: number;
+}
+
+export interface StoredRecord {
+  datum: SignedDatum;
+  endpoint: Endpoint;
+  fetchedAt: number;
+}
+
 export function openStore(path: string) {
   mkdirSync(dirname(path), { recursive: true });
   const db = new Database(path, { create: true, strict: true });
   db.run('PRAGMA journal_mode = WAL');
-  db.run(SCHEMA);
+  // `merge` can write while the archiver does; wait for the other writer instead of failing.
+  db.run('PRAGMA busy_timeout = 10000');
+  db.run(DATAPOINTS);
+  db.run(POLLS);
+  db.run('CREATE INDEX IF NOT EXISTS polls_by_time ON polls (fetched_at)');
 
   const insert = db.prepare(
     `INSERT OR IGNORE INTO datapoints (airnode, template_id, timestamp, value, signature, endpoint, fetched_at)
      VALUES ($airnode, $templateId, $timestamp, $value, $signature, $endpoint, $fetchedAt)`
   );
+  const exists = db.prepare<
+    { found: 1 },
+    { airnode: Uint8Array; templateId: Uint8Array; timestamp: number; value: Uint8Array }
+  >(
+    `SELECT 1 AS found FROM datapoints
+     WHERE airnode = $airnode AND template_id = $templateId AND timestamp = $timestamp AND value = $value`
+  );
+  const insertPoll = db.prepare(
+    `INSERT OR IGNORE INTO polls (airnode, endpoint, fetched_at, status, received, rejected, saved)
+     VALUES ($airnode, $endpoint, $fetchedAt, $status, $received, $rejected, $saved)`
+  );
 
-  const save = db.transaction((data: SignedDatum[], endpoint: Endpoint, fetchedAt: number) => {
-    let inserted = 0;
-    for (const datum of data) {
-      inserted += insert.run({
-        airnode: hexToBytes(datum.airnode),
-        templateId: hexToBytes(datum.templateId),
-        timestamp: Number(datum.timestamp),
-        value: hexToBytes(datum.encodedValue),
-        signature: hexToBytes(datum.signature),
-        endpoint,
-        fetchedAt,
-      }).changes;
-    }
-    return inserted;
+  // Inserts one verified record; returns 1 if it was new, 0 if the archive already had it.
+  const insertRecord = ({ datum, endpoint, fetchedAt }: StoredRecord) => {
+    return insert.run({
+      airnode: hexToBytes(datum.airnode),
+      templateId: hexToBytes(datum.templateId),
+      timestamp: Number(datum.timestamp),
+      value: hexToBytes(datum.encodedValue),
+      signature: hexToBytes(datum.signature),
+      endpoint,
+      fetchedAt,
+    }).changes;
+  };
+  const insertPollRow = (poll: StoredPoll) => insertPoll.run({ ...poll, airnode: hexToBytes(poll.airnode) });
+
+  // Stores the verified records from one request together with its poll row, in one transaction.
+  const save = db.transaction((data: readonly SignedDatum[], poll: Poll) => {
+    let saved = 0;
+    for (const datum of data) saved += insertRecord({ datum, endpoint: poll.endpoint, fetchedAt: poll.fetchedAt });
+    insertPollRow({ ...poll, saved });
+    return saved;
   });
 
-  return { save, close: () => db.close() };
+  // Adds records and polls copied from another archive, each record keeping when that archive fetched it.
+  // Callers verify everything first; existing rows are never replaced.
+  const add = db.transaction((records: readonly StoredRecord[], polls: readonly StoredPoll[]) => {
+    let added = 0;
+    for (const record of records) added += insertRecord(record);
+    for (const poll of polls) insertPollRow(poll);
+    return added;
+  });
+
+  // Whether this exact record (same feed, time and value) is already stored.
+  const has = (datum: SignedDatum) => {
+    const key = {
+      airnode: hexToBytes(datum.airnode),
+      templateId: hexToBytes(datum.templateId),
+      timestamp: Number(datum.timestamp),
+      value: hexToBytes(datum.encodedValue),
+    };
+    return exists.get(key) !== null;
+  };
+
+  return { save, add, has, close: () => db.close() };
 }

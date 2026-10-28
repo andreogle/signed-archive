@@ -1,3 +1,4 @@
+import { setTimeout as sleep } from 'node:timers/promises';
 import { type Address, isAddressEqual } from 'viem';
 import {
   AIRNODES,
@@ -51,13 +52,20 @@ function trackFeeds(target: Target, data: readonly SignedDatum[]) {
   }
 }
 
-async function poll(target: Target, store: Store, intervalMs: number) {
+async function poll(target: Target, store: Store, intervalMs: number, stop: AbortSignal) {
   const fields = { provider: target.alias, endpoint: target.endpoint };
   const response = await fetch(`${BASE_URL}/${target.endpoint}/${target.airnode}`, {
     headers: { 'user-agent': USER_AGENT },
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    signal: AbortSignal.any([AbortSignal.timeout(REQUEST_TIMEOUT_MS), stop]),
   });
+  const request = {
+    airnode: target.airnode,
+    endpoint: target.endpoint,
+    fetchedAt: Date.now(),
+    status: response.status,
+  };
   if (!response.ok) {
+    store.save([], { ...request, received: 0, rejected: 0 });
     const retryInSeconds = backOff(target, intervalMs, response.headers.get('retry-after'));
     log.warn('fetch failed', { ...fields, status: response.status, retryInSeconds });
     return null;
@@ -79,7 +87,7 @@ async function poll(target: Target, store: Store, intervalMs: number) {
   if (target.failures > 0) log.info('fetch recovered', { ...fields, failures: target.failures });
   target.failures = 0;
   trackFeeds(target, valid);
-  const saved = store.save(valid, target.endpoint, Date.now());
+  const saved = store.save(valid, { ...request, received: valid.length + rejected, rejected });
   if (rejected > 0) log.warn('rejected records', { ...fields, rejected });
   log.debug('fetched', { ...fields, received: valid.length + rejected, saved });
   return { saved, rejected };
@@ -94,29 +102,35 @@ export async function runArchiver({ intervalSeconds, dbPath }: ArchiverOptions) 
   const gapMs = intervalMs / targets.length;
   const store = openStore(dbPath);
 
-  let stopping = false;
+  // The first signal cancels the request in flight and the wait before the next one; a second exits at once.
+  // Each save is one SQLite transaction, so even a forced exit leaves no half-written records.
+  const stop = new AbortController();
   for (const signal of ['SIGINT', 'SIGTERM'] as const) {
     process.on(signal, () => {
-      if (!stopping) log.info('stopping', { signal });
-      stopping = true;
+      if (stop.signal.aborted) {
+        log.warn('forced stop', { signal });
+        process.exit(signal === 'SIGINT' ? 130 : 143);
+      }
+      log.info('stopping', { signal });
+      stop.abort();
     });
   }
 
   log.info('archiver started', { providers: AIRNODES.length, targets: targets.length, intervalSeconds, db: dbPath });
-  while (!stopping) {
+  while (!stop.signal.aborted) {
     const cycleStartedAt = Date.now();
     let saved = 0;
     let rejected = 0;
     let failed = 0;
     let backingOff = 0;
     for (const target of targets) {
-      if (stopping) break;
+      if (stop.signal.aborted) break;
       const startedAt = Date.now();
       if (target.retryAt > startedAt) {
         backingOff += 1;
       } else {
         try {
-          const result = await poll(target, store, intervalMs);
+          const result = await poll(target, store, intervalMs, stop.signal);
           if (result) {
             saved += result.saved;
             rejected += result.rejected;
@@ -124,7 +138,16 @@ export async function runArchiver({ intervalSeconds, dbPath }: ArchiverOptions) 
             failed += 1;
           }
         } catch (error) {
+          if (stop.signal.aborted) break;
           failed += 1;
+          store.save([], {
+            airnode: target.airnode,
+            endpoint: target.endpoint,
+            fetchedAt: Date.now(),
+            status: null,
+            received: 0,
+            rejected: 0,
+          });
           const retryInSeconds = backOff(target, intervalMs, null);
           log.warn('fetch failed', {
             provider: target.alias,
@@ -134,9 +157,13 @@ export async function runArchiver({ intervalSeconds, dbPath }: ArchiverOptions) 
           });
         }
       }
-      await Bun.sleep(Math.max(0, gapMs - (Date.now() - startedAt)));
+      try {
+        await sleep(Math.max(0, gapMs - (Date.now() - startedAt)), undefined, { signal: stop.signal });
+      } catch {
+        break;
+      }
     }
-    log.info(stopping ? 'cycle interrupted' : 'cycle done', {
+    log.info(stop.signal.aborted ? 'cycle interrupted' : 'cycle done', {
       saved,
       rejected,
       failed,

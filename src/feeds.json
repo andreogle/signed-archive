@@ -1,0 +1,1411 @@
+{
+  "A7A5/USD": {
+    "blocksize": "0xe6e29ad61ff2d56ad314799bc0fbeafb53af3b25f39c6d80e73952bcc176ed72",
+    "coingecko": "0x0f1a8e125677c40fab5be1828dcc27f51907dbb6646ee8006a77751e81280983",
+    "coinpaprika": "0x458b4b6fa472f46e1c4d9e45499e3b6f4bc835351084fe5180548f0180ab2754",
+    "shiftmarkets": "0x57dd4722f03210e98db5398c1b2b6f07c1f6640d76bc19f27dff6bc3823db2f2"
+  },
+  "AAVE/USD": {
+    "blocksize": "0xd15bd5d30850c7b0966e2bd38a39c771d2d167db87666d73f013ba6940a2f446",
+    "coingecko": "0x3c9a83948fc5e01018fba1a3585ecbf6aa09ddf9547d9d13e94e87b6ba2c53d7",
+    "coinmetrics": "0x70e16856bfe3c2dfd8c138c457b771c51215f22e32d599bd74217a283893239e",
+    "coinpaprika": "0xa9416c65a5220293d26742a24bc5c7c634ab6e0a2432a838ee85179a38600d99",
+    "ncfx": "0x357898ad95b079744caa0bac42240995caaa96fbc982c317520f8269accdc6a4",
+    "nodary": "0x8f255387c5fdb03117d82372b8fa5c7813881fd9a8202b7cc373f1a5868496b2",
+    "shiftmarkets": "0x01ab363a1dcbca76a2cf142337ef5d9a0ffe55e3788a37ae06c71b4ba7e5d0a9"
+  },
+  "ADA/USD": {
+    "blocksize": "0x77e005f552b2844460e5daec7da23ff23f5d4336f1747e808085f06b27648fd9",
+    "coingecko": "0x90dd9ae387cf99ff6eee7b9b77c29f0384e04336a2e8dec6ec7977aa5c8b12f9",
+    "coinmetrics": "0xa66cfa7873c8f51a4d7ecc812de0fa8ddffefc298cb3dee051fc8b63b3df8f13",
+    "coinpaprika": "0xe254c9951dbdf6351d839441e5f3918b1f7f1a69233fd2fc91e5ce0dad1e85f8",
+    "ncfx": "0xaac43d43d3a103ea14c4511c89bdb289918181ec73166a678b1bbc58fbbb0302",
+    "nodary": "0xb4a3768590684ec5e421063302f2eda69a5125558c5d94633d054830b9105c4d",
+    "shiftmarkets": "0xa322339c30509b9654f199f62db300ac9d75d3c0359d218679aa4733f17f1c30"
+  },
+  "AERO/USD": {
+    "blocksize": "0x7caa3f68c9b4ea07cffd409490a584a022f95a86a1741c8244bf907699159abb",
+    "coingecko": "0xd28ab807cbffabc97e49543e8f906bcf788a1763888f93d30dc3a131d1c0caad",
+    "coinmetrics": "0x29ca3bdfe58a31749afe2e2a3613e939ad14c156d0e8cda82fcf0a19a447f05f",
+    "coinpaprika": "0xbf4433ffc4f475307c6311be5be36e2af59069882699b48bc43c05ed420d5eac",
+    "ncfx": "0xab7187ff3fcf4a23bf0d0c9e2edca862a571a9435c6c32fabf819fbe8c49bca8",
+    "nodary": "0xf50ad7a63a9bdbcdfbb4bfb384aba4757bf22157fb774ca84355b18dee43b99d",
+    "shiftmarkets": "0xe5e2d6d34e091507c164ee62a530f40f045792918eab35c4db4876040d984257"
+  },
+  "AI/USD": {
+    "blocksize": "0xed507755fa8712f7329b6af556d1dbec9adc9f9608a37ded5530411af3b1401e",
+    "coingecko": "0x4d47f986ef3a4a8a5a864ec44edcb69698f6e86c9af18fa0cb4cb85773a1a6e7",
+    "coinmetrics": "0x99ca17eda22fccfcf8234c442f3ed03cff0ef138bae8fb69bea3b84f11733d69",
+    "coinpaprika": "0xd620a6b6af3f99499c607c24ca1f9ebc35a0c70659728f493b350a1c9538f7b1",
+    "ncfx": "0x967e299301b6496457a57a3fce34a7e5088210ceb68cdde6d6b69fbf8343e21e",
+    "nodary": "0x70f885a9559a4c3342eea54a8f1c0d2354abd54b7d0bd03e5e9133581ffb44d6",
+    "shiftmarkets": "0x2a3249c52ca78506281706a325f363304d53b1839002fe312af20dd83c2bc768"
+  },
+  "APE/USD": {
+    "blocksize": "0xacb8619e242d414ad35a9634c2117fcdbc8aaa034b63c8a8ebb988d65ef55ca0",
+    "coingecko": "0xea66d05004fc1601a83a9e5b3801442fb40f5ba3f625ea735b2c2a11f37b89b5",
+    "coinmetrics": "0x29bddd391bd9b5e3d4aadfbf1c47dbb46376da26c81c0c507851da488f89846d",
+    "coinpaprika": "0x83024b74780d3eb6c49d2727519fd2b304aea1f2649341e07a084017f15eaa3c",
+    "ncfx": "0x0554bd54f0db8aa4808f0b4c2c3aac705e9d47d0a6f6fcd9d52bfe266c55e832",
+    "nodary": "0xd6ec93cf4981c769c3ebf2aa45a63a9d30b68d79aff21791aa04644476594982",
+    "shiftmarkets": "0xcda5e6abfe3a81b521a701544331193540b0a95bc9edcef8073b9884fc3ab896"
+  },
+  "API3/USD": {
+    "blocksize": "0x7e0eeabe6ebdd48eef516d12a83b40aa5aab3c6aa6b06ca67041c8577e283134",
+    "coingecko": "0x4413dc9801ea8daa74cbcea1653ce42118b814b73d25ebd65436adafd7dc8231",
+    "coinmetrics": "0x8f8252dada6948c476120c83281ab32e0e30fbb286aa1f5b2fb8389722bdc398",
+    "coinpaprika": "0xaa83b6df82e92da5ec6dfb8b950a3cd1769d5e6002efc1948e8f780c8d238432",
+    "ncfx": "0xcd1f0a3d7e0d27f4410d1a239191bfc34b766cb28a42e3dc1b9278a6927af862",
+    "nodary": "0x96504241fb9ae9a5941f97c9561dcfcd7cee77ee9486a58c8e78551c1268ddec",
+    "shiftmarkets": "0x09b6045a0051d5709f210ddfdf3d93118f16c5f38bda8b915d78567fe9e7d313"
+  },
+  "APXUSD/USD": {
+    "coingecko": "0x7ce18134cf1504bde4dc2f585e951bcecf4ee12a73225cfb265beef92f3bb9af",
+    "coinpaprika": "0x55f5257a898a39c4f2fe20835811af95d62610c7f23c1e3ea45e01fa4d75ef39"
+  },
+  "ARB/USD": {
+    "blocksize": "0x6d0ba78cc30f9b0d73edee1146b91cd9a42e7e3c24066e57a97e56bd32e0665d",
+    "coingecko": "0x7692b85ef06d5746801f5e9abf422040a0b8232ebce6a70c7d9a1719f8544457",
+    "coinmetrics": "0x10b836bbc5593e33b5ffbb53a5e87ce34d8ebc327cff26e399d159e0db5ddd5a",
+    "coinpaprika": "0x9c7bea47a2e70cef05355c67640e2e6a4b631bb416a18e6bc6d2a5e0e7f51068",
+    "ncfx": "0x29368921e7ff25414f93ddff5b5f16ce8640fcebb9ae0cc360644b646bf50fd2",
+    "nodary": "0x4d1afc2f1d802407a8335c5c3cb02c4ee6774be8db3254fbb75a7e122d889c22",
+    "shiftmarkets": "0x41eb0dea82da2fa7a6ba305cf68b18a2ff1c87f0e036951128d0fbc16a290282"
+  },
+  "ASTR/USD": {
+    "blocksize": "0xe8e7d2a9390fc7fb4efb2e941b83d22cbf2a2883705f53f9df5b3f6eb3fc42d6",
+    "coingecko": "0xeb71040e23611ff371dee43cbf0853186f2f94aeebe2e2a6639c2e0b1ab5b0a7",
+    "coinmetrics": "0x50171e77154f4856d913d8b53ef58bb2107948d3ace3ca94097f9d5135a1d739",
+    "coinpaprika": "0xef25dbc7908c177db0be6eb7aa96d493fb2ccd00d1fc11bd311d487ff4293cfd",
+    "ncfx": "0x4a19bbce778749c0c7055baf2f4390b3ee869e7571ff4d04697656b8eef8fea4",
+    "nodary": "0xb317cec3a02bf2f20d5e91baf530a66ffb82cfc66434529f929c37451deaec3b",
+    "shiftmarkets": "0x451870542f2df93f75167a80021eea4df503cad5c7ff7ffe19424ac0399acdd6"
+  },
+  "ATH/USD": {
+    "blocksize": "0x973332c336ca24260df995d3377a533a2f62765139c31dc7525257e851d37c40",
+    "coingecko": "0xd298eaf97eeed215af45e84bb687f099a1fdafc2b3a9d8154b6f8f72e8faa32a",
+    "coinmetrics": "0x89d7005bcfafd109f22bf1f38e68630bb3a33037e98ee8895516e385ef421c41",
+    "coinpaprika": "0xc5ea456922ad76ad758c616bd8772a076bd91ca39aa70314c94c0e708712bec5",
+    "ncfx": "0x2c88decfabddca66e90d046e8a85eee08d5b03021adb98596f44d982f8867c1b",
+    "nodary": "0x1aa107bcd4525181b1037d3138308c197643093fe1244bdd026144ca5c63bc70",
+    "shiftmarkets": "0x235c795c78c00154d29c600f02c6837ba6a742f54ff61a1973ffb628d41cf743"
+  },
+  "AUSD/USD": {
+    "blocksize": "0x415091e0b5bc1c44007facedb4080c3ecc0c4554411b9c722422f0f975f21d5d",
+    "coingecko": "0xe56e0e158513c96a95589c29470477c53f46230898763cf10c93a7ca3c4588ff",
+    "coinmetrics": "0xb1b32273bd72eb1c6834eb3e713b706240d5a7f00ca7080aa18366e60c41ade5",
+    "coinpaprika": "0x37103d18e85ed3a0054c89320991770bb498f434fc50203977efce334e153b6f",
+    "nodary": "0xa786f9fbcf49bf7d425892841bb1160ed1155f1473ee1f664ca34ccd178d1044",
+    "shiftmarkets": "0x0a85d7d10154037f16f25c611a454bc8b0f4df59b2144005b892d479d86df145"
+  },
+  "AVAX/USD": {
+    "blocksize": "0x5787b44eba0ea73e0001decac55b7b5c7da7f7e00fcdb930a973f0966c4c5fac",
+    "coingecko": "0xddce0bb1d59d27665f5c6ba5ed1a0f7a8a586b6e7ba6e696c84a4d0276de6c99",
+    "coinmetrics": "0xabdd1f535f01808aa1594406f6bb622287751bf4a987c57641ed86dbaa0e58de",
+    "coinpaprika": "0xa924f88e296585d4a7c8e217403de7aa4ce19e12dcf358f0c5ff0ba177ba6d45",
+    "ncfx": "0x921658d6d42d999c9973694035c9b8b4dbb35b4d2fc84bda325af2634033ce9e",
+    "nodary": "0xb1fe724ce6824b2ffebc004980758f2c32460ea5f1bd1107e6751d7621941223",
+    "shiftmarkets": "0x9fb5460bd4ee57cf92ab4f8d70968f0d0cf2f8015adf1f7cc7a29d1ed1878272"
+  },
+  "AXS/USD": {
+    "blocksize": "0xbd91ddf6f498d0db9b8748e16bb4559d5fdddbfc257ed98487ea47af82df2f69",
+    "coingecko": "0xdad07ac04858c0f6900b8ed1274b8b68320034d06bf53fc60863d4e80909f23f",
+    "coinmetrics": "0x49408f5f3e068c9a2930c6f3f171519072be5eec49aedcfe93db2f217a46a0da",
+    "coinpaprika": "0xd67104db1a824a1c21fddb47f5dc41c6fe0ebd704de05d07a24ff8959e3df66f",
+    "ncfx": "0xbabcad15946bcc16c095e184831e3c7493c9815e9b19d2d8f605f3a50e4c2509",
+    "nodary": "0x98daf7bf56521d0a9fdcc5c2c5024807a68b64c5cf294c1ca0119496b1581234",
+    "shiftmarkets": "0xe11df85af3c3b1cccd9c56093f089b8fdda563245588b368502a5c2659c98033"
+  },
+  "BAL/USD": {
+    "blocksize": "0x636882c1c715005fc8e2672254e02a74323e93434307c4a12977b44542995574",
+    "coingecko": "0xd2c5dbc5d69273dce6ac7a75c6ed3b9f5902571b14d96bcda4052ca153dc260c",
+    "coinmetrics": "0x051e090bd065db17f755db13fd4f5c99ef457f8273248e92589376746f5c7165",
+    "coinpaprika": "0x001ec9b7521af5c610b46ce020b7a50d22f11f809c812d2c17502e7ecbf6d188",
+    "ncfx": "0x6a65cde646f60e6d76208c8413d083d210fcbc8bb7aff3afcef6e0f1cf586083",
+    "nodary": "0x9637080acc2635580932886f46ba1437bd650fa25abef83729155f01a1e8b45e",
+    "shiftmarkets": "0x11fb8a3d98624325a2ddfddcfdfc704a24f368df4f13451da3fb1ce6367396e0"
+  },
+  "BERA/USD": {
+    "blocksize": "0x24d02eef971e47add7135afd00056ec8b07bb1de5d3ad19d34d0d752d6115129",
+    "coingecko": "0x4fadded90c9ed7c02a92dda76b5fa29749958081936f7f65c7c2c805f16dfdaf",
+    "coinmetrics": "0x5eb8048d93d1274815dbbb9a4596ad82a73d442db10dc91530fd3edcf58bbdb7",
+    "coinpaprika": "0x10b14e1e668fd1f5656c7fdce6c9fea26acfbf661391410a3a7bbbd69a9117d9",
+    "ncfx": "0x9de0f680687a7d0d7d7a8430e011c79f4b251aebeb50616cfee0438096575948",
+    "nodary": "0x71e5e4b9e6a9b85c9d139c2176ee02aef80a98de8004eae092be5463d0ddd5fe",
+    "shiftmarkets": "0x14ce394e21bd200c034c86c0cf7ff1cafa0409ad827ea3ac9a0b789522ec736e"
+  },
+  "BFUSD/USD": {
+    "blocksize": "0xee0cfa8c856530974095e362d9e853dd45672e012e64175f43d9649070b82bd9",
+    "coingecko": "0x1b33edc64ce3eb8d6ee795d67cb04d6336ea4fbee50e4c8da2465be4305d4709",
+    "coinmetrics": "0x550a10b102a7d22e5b6f84068faee52f20fbd7f44bbbea118eff4428e9abdb49",
+    "coinpaprika": "0xdc797b5260db5fed268f8199a19a72bcc8de11c2f3b8e052a87e6ec94e4e8b13",
+    "ncfx": "0xbb4909d4ec206d641b703b7fa8b4c1861bc6006af8c1b4f48bb7ede0881e1653",
+    "shiftmarkets": "0x7d441a368524cced3735fa15931dae183890607dfeb7bd2532ed6dcbf7ce5bb2"
+  },
+  "BLAST/USD": {
+    "blocksize": "0x8c3ea8939cb299822a189a70ff95d3d4bc6af04b8dafe3d7fa06952e95a02169",
+    "coingecko": "0x9dd581239593ff55caab17ffed1ce760eaf2483d7fffe7ceb2f722c78d823d66",
+    "coinmetrics": "0x68e60d8eaa7efb2b9b0bc25bcb4eb9336141b50427de7d07ee2b0d2ec937a541",
+    "coinpaprika": "0xceee056f8743318f2d3966a410607210911c289a04f4add8ac76d1847a16250f",
+    "ncfx": "0x30ec7875d8acdeaffeeb32e2ccd0a51a7f0fb7b0e27df97bddafc7a8910f066c",
+    "nodary": "0xbcb481f8baa26cdb51838825fb3de64ae783d0adf55cee4035f3e19a972f90f6",
+    "shiftmarkets": "0x49743e5c243b853dba796b6259f1f2b1ea5837d210b9327798d182833e4b08bc"
+  },
+  "BNB/USD": {
+    "blocksize": "0x970484367593dac3aa0c2947775a4f19bb81c0fff43b705779abab8c740e7898",
+    "coingecko": "0x955d1d4c952d23789adb604a3ae237d9eb0ab806f6d71ebfd65569882de1adf3",
+    "coinmetrics": "0x0dc4318068b381a49d08273bb18581bece7d8684326356f6ede52ef0105e5c12",
+    "coinpaprika": "0x37193856470a4fc9df851c861bffaddd5f1c7277b8b8a0a41afb80b0d313404c",
+    "ncfx": "0xd67fb5ecb718c9036200162f3e9cee0638aeedc534ad36438aef36ce94929bea",
+    "nodary": "0x2258a0bafb60da1b3bc332c626329c053bf7d895cf3cf8aeb882bddf41ac5387",
+    "shiftmarkets": "0x609be1a7b952564537898202c0434a8018861a220e7e05ff4249cafdb50ed055"
+  },
+  "BNBx/BNB Exchange Rate": {
+    "alchemy": "0xdf83c4747bcf3a4c1fb975cd0eab2b88617d6f4513d200d9a3b4278a8433e239",
+    "ankr": "0xe6fd60a2691923e78f0d8b3604ac6adf72d06fff1d50a822c9592d9da95631c2",
+    "drpc": "0xea140fea0c05c488945725154ab84b64c4a13df27d7304b12457293e08352f65",
+    "infura": "0x8830be62321d65270edf9cbd1d4ce69e0b44fdd4e640a0159c9450e8e0d1f85c",
+    "nodary": "0xdc6a02fc02d89e23368e1b7438734e3a2bded57a6f647dbb110641d3d5d72569"
+  },
+  "BRETT/USD": {
+    "blocksize": "0xfd6dac46df89e938df40f0eea44ef1aeff163d614be18ada3dfd5fbae241850d",
+    "coingecko": "0x52cd2b2608acba0254d433c4727db7d33a77e6905708923aa7ff370f5bc26e85",
+    "coinmetrics": "0x30a9e2971499565df538702f5af2817cc304011beb7195ce645af1dcd0db9cd6",
+    "coinpaprika": "0x2c0583038aae56076da543bce64fc1ce45dda366de47fc4ac1efd60d4d748c01",
+    "ncfx": "0x3a212f411cb63bfcf808b0313e00c6ccf5034cecae1a4384828257b62737eb34",
+    "nodary": "0xa5b8d6a0d4a80ef3b46db7c29c1a66be632f58b9ed122dc9aa9d9d2c0daf5ede",
+    "shiftmarkets": "0x04e3ac0d2617a3a177607f0e44109247f061c728e07e3aab2be484d3fd6e6115"
+  },
+  "BTC/USD": {
+    "blocksize": "0x7c3bc171cf80e9d20020c13f991dc8d98922f4900dceb3b9a2c2978251ad3422",
+    "coingecko": "0x2870565b2485f9e817aac1d51d43c82b56d17f9c3152727a8a66b824808732ab",
+    "coinmetrics": "0x6e3c3ab5fb188bfaf6a187b043efa29fd5b178577619a10a2cb1dd8006f76b74",
+    "coinpaprika": "0x48eb120d26fc959cd15357377f997202a8def40096a6106d657cdfc048f51c3c",
+    "ncfx": "0xddfd8b59fba71735cd2d45d1558da9c5302a468cbd0a79b8fd2d72109563febf",
+    "nodary": "0x55d08a477d28519c8bc889b0be4f4d08625cfec5369f047258a1a4d7e1e405f3",
+    "shiftmarkets": "0x676dfcd4584660bbaa3566aaa32a1086a552704d3c13fc6c0f0e6a432b2e128d"
+  },
+  "CAKE/USD": {
+    "blocksize": "0x17cc7d825621392d173302008e474d64d4d8391c5542febb7aa41071041218f7",
+    "coingecko": "0x516a5aebc99c9d3a7e99b7709f2288c444886249d404f224f8147132567288ac",
+    "coinmetrics": "0x52d8806d44f57d7ad1586d9b0c4de2f8dffc14dee19393e294b5e4d335eb6abc",
+    "coinpaprika": "0xf9240695d5289f4c6145a41cd032d2e88e1f69221d8629fea2d88f7a962bb4a5",
+    "ncfx": "0x452e1aeb5c9a7a99f310bf62acb007b8a05af85d0efc5a9b53681a9e1118dc0e",
+    "nodary": "0xa8f945f23f4a133b18c3cf23f41277fb6d40db721f3f448fcdb90f62b40678e0",
+    "shiftmarkets": "0xb1cf17de9fa11babc50c2af1f8ba0e422fb1d744165845d9597e406fa2d30bbb"
+  },
+  "CASHCAT/USD": {
+    "blocksize": "0x2efdfc32cfbfaacdb7db15a54038191aac411432be9e43c30dfcefbf4d45e0d0",
+    "coingecko": "0xe5ea3c06e75b0d36a6e5005b87d8083f403c1931a639b4d165a30be7ab6a0077",
+    "coinpaprika": "0x7a3123b7b77bcbd9e6321d207febe5f68725004ac0f46b0c75ff5a1b9b91e6cd",
+    "nodary": "0x7962dada05419690065dcd4106ca4c6b1498b939f1141069a813ea0d0303dbae",
+    "shiftmarkets": "0x869d344dfdda48ee553ede388ec48092831e66dedb905fbe30f33cde59996575"
+  },
+  "CELO/USD": {
+    "blocksize": "0xf4ace3e2e610ca9b5cf8639788571b61718b95fe7b33b8b8f31f0b15308c2a58",
+    "coingecko": "0x802aa5bc9f9bcf33d5eb1f5a288ed2d259586a17452076aef3958fb548264f1b",
+    "coinmetrics": "0xc5db44b200f26f08be05bbb3f219570ebb4088e327a1046d6d1f1166800f64ed",
+    "coinpaprika": "0x33f1ecbc49ba75be14ed9b235b5e00708d6c3c88e26533b71aeb46cbaaad509d",
+    "ncfx": "0x94576c1aac4a055031f4ef63488623d6f38a7c2c57402b828056863bd4f984bc",
+    "nodary": "0x2e49fc86f8325167aa9a3e97e55fe4eaa3ea67841de09acc2f47bed16d7535ff",
+    "shiftmarkets": "0x4f533ba5c10926b9e6f59d15e29939c1f0b4d401b49046ef60ae7dda122fdfc5"
+  },
+  "CLO/USD": {
+    "blocksize": "0xf9622a80b3c43c0b726823e7fd28062f9250dc8c7d7a671df8cbdbf8055363dc",
+    "coingecko": "0x4d1cb9f48a455103f461a43637e4f326ed2dbf534b1f5c3f2619b3faf41f1e0f",
+    "coinmetrics": "0x3cbd1581519c621681da701634095ac2304cda2f072437700ede9e26cabfe715",
+    "coinpaprika": "0x993f0e9cf8ff05699fe83bdab7570d510a6a6a15418371b90e4a6016e976c643",
+    "ncfx": "0x8037fd2d6d828ef1be10070b75fc14ae21ff25079eb57b74862ded266bcab520",
+    "nodary": "0x7f9113b3335c9926558cc9e6cb54d192a24bc99500764f368b6cf8e9914a7ed7",
+    "shiftmarkets": "0xe83a3f95eac10e76936372709f9d082cedacf03aeb963ed95c781414711df9a5"
+  },
+  "COMP/USD": {
+    "blocksize": "0x62ddac24a27b7c46711f864429e66d701453e076454c24c2196023d284fb7ff4",
+    "coingecko": "0xfa2381cf55c3b60c08fc4227d2b12d61482de7b215ee96bb979537a260551333",
+    "coinmetrics": "0x3e0447e5246826c37e141209971d8d56c72026e1990916cc4420b51b244b15f7",
+    "coinpaprika": "0x0323ffcbdf2d88b3b386a2b697cbe1a4b7862ccfc97cadec3cbc3f37c16cf3b7",
+    "ncfx": "0x44d5bc3493e9b57ce613ebedf9d056f93b67d975e1febb4f1c4110fb9ebb1a1e",
+    "nodary": "0x288e8e3b4985b3536c99c2d8515d788c45857a5856c8d4af1fff2f326c730811",
+    "shiftmarkets": "0x46d0112963889d9ab5445c8cb3beb0203502a2eda94ba8c7ac8fd69005579ddd"
+  },
+  "CORE/USD": {
+    "blocksize": "0xc06fd6a09b759bce3d08f55733af391483c02a196a0c6f2597c4854aab84317d",
+    "coingecko": "0xff9e3dd0f029798c8ebe489345d40f22d74f326dae4c7748610bcb07b1c17a30",
+    "coinmetrics": "0x74c18469ab02d7dec97f3fd6e0127d0e053df8cfe4aac3d10c57f3e1ad821b80",
+    "coinpaprika": "0x99dc82b031763000f94e5d573a11f398e3b796023eaeeac3b8e9b9e7d1a1bd02",
+    "ncfx": "0x858c374f9a1e171353c5125cea2968d9bdff7d685d9c923f1920e0ee236a60c2",
+    "nodary": "0x7d7241192b93afe6f719b68697058078eeea382c0e3a38e54f6e60f3168bf21d",
+    "shiftmarkets": "0x99d38898c8baf8fcf28d7baa1aad12f6fdf32f20d9c4ceb7e89cdce8b8ffba26"
+  },
+  "CRO/USD": {
+    "blocksize": "0xc381b013cbe07875736e6eb116f993ebc00f90b3dce0048300eaef3ebf72d558",
+    "coingecko": "0x3618df08e3d18b69b1db122d36bd69fbe3dfdbbbfd38c52a1dc773c92e0942dd",
+    "coinmetrics": "0xc21390c65b9473ea4ac7272a3e5e573157714005038004cdc4b4d1f2fb3706c6",
+    "coinpaprika": "0xcddc5abc75115edc49bb128dc80b90685d2b80fe186f5f3aa192922fdb9f7cca",
+    "ncfx": "0xdac566b8db3ed4b7f49e48527c0e1f6a9552a9aeeef145a724703c8b635a71c1",
+    "nodary": "0xc3b2eda2e69cc4b356dba7b3d959791365034665b5d8d1737afa44506cbb51e1",
+    "shiftmarkets": "0x9bfc842ad3bec935e611dcb042a56bf6c7e0a3f2ec749217ea57ccc0d8e816b6"
+  },
+  "CRV/USD": {
+    "blocksize": "0xceeb58421d9a184c6d8fd620aeea17d939e19d4d4f1aa74b2dc46db8431b3709",
+    "coingecko": "0xb38a82ee0e4b2834ce614cf99765e410d03708003033f3d63db9d8ba25d41444",
+    "coinmetrics": "0xe8cbb7c45c1d5af5e72a5c13a6b1d43120c1d06b63334a58e42b4a7b285621d9",
+    "coinpaprika": "0x84884bfd196d33412c36b4dcbefc0edcc8c5b52412fd682b9daf8f53801e8496",
+    "ncfx": "0x678db534a62b9622c534ff4fb52e96c3703140562b580d1f3254cbe6849afed1",
+    "nodary": "0xa747d6e944c52b10b36d3aa2f67776eed7ed33bb761e1a1d1875fd164a2e47c1",
+    "shiftmarkets": "0x866d92c1b601aa1f805fbbb4677d25ffafe863a21f275f61176f750172c63cf6"
+  },
+  "CVX/USD": {
+    "blocksize": "0xeb077591d9893d83df8abad2ef89e2c935eb4f5f367bca0e800a66dd7f825662",
+    "coingecko": "0x4b2a0b21eb6b73e23d991fcb79bb0a843a87c25c37b05e66570b1589bffef583",
+    "coinmetrics": "0x2148611c8587c87f7b596fc78861706ab4f72b33bff4320985a786e6c255f752",
+    "coinpaprika": "0x70d326a6777d7843edcf03fb6e88b52b52b519a87d6593b76cc502c78395044c",
+    "ncfx": "0x199b1e739546b2683fe64ed703ec13073ae7c4b07df0fa8ad8921372b14e75b6",
+    "nodary": "0x02d7d17a6079e603bc6069f6982e68215b6536d1421bd1c2174217ff5ae76460",
+    "shiftmarkets": "0xf45277728bd66cd5b96295cdbf2f73861fa1fc7d408213b730b7101e1c67a7aa"
+  },
+  "DAI/USD": {
+    "blocksize": "0xe161e09023dac5e484ba3cffc6fd4147c99c7ba9956e4cb84e96d575a1e54051",
+    "coingecko": "0x6d00938e266ed3f36ad889ede20ab075bf4681760d47750e12f54c1f9d4eef38",
+    "coinmetrics": "0xe6bdb7026a71cb53552d527806ca5a7ec809771106c3fb73c184f36b15c22de6",
+    "coinpaprika": "0x1102f20d2476fdccf621954f80b1bae2e8c8e6d3ebd539ee5a1ec38cfc4ca41d",
+    "ncfx": "0x89f60b35835deab6939243827212820d00d06db7485833182a254f2cf6a7dc2c",
+    "nodary": "0x667d531630ba57d876f402b2ddcc4ad4911ba6871880cf90258916a2285b6ca5",
+    "shiftmarkets": "0xa9cd0b99e38dfb6e9f6ee527cf320190f1da2137f7acfcf7b129075b4ad1cba0"
+  },
+  "DEGEN/USD": {
+    "blocksize": "0x7363fc40c0c9690aa43ac9661cd7091d4d2b74aca1a5c5b0c4eea292fbb920b2",
+    "coingecko": "0x6ff51d6042e370d95731c5a0cf7575b3fe25bdf6882deb6422976fa86ccd9b8d",
+    "coinmetrics": "0x0a6f42a7b0effa3ba5c80da18a708057a7b4fc3ae1503fe425d8aab699caefab",
+    "coinpaprika": "0x8de1ee17d9422d7a489e08205508e83683f96763dbf5aa4513da7e005d765b61",
+    "ncfx": "0x8b32c20f18d7ba7811e75f1c515d339a2d3e09c39fb4210941f69deb4f447b60",
+    "nodary": "0x52ddf69032228b03798076cf9609355169b11e0af2d45abc75c682b4ef946dbb",
+    "shiftmarkets": "0x5b826c69db35c79571dfe16dc1a5e5d4a7cb10ef169199fb6270d3b258c74cf6"
+  },
+  "DOGE/USD": {
+    "blocksize": "0xa4508606b01082a77cdb4d537b05acb5cd97b6579e57630f05fa73f5623e8c70",
+    "coingecko": "0x24a47072e880ca3e345a718ea964d227dca35a73b713100ecb6fbe105622e05f",
+    "coinmetrics": "0x25f06f6427e8972cb6898fec96039d3bf06e679bbf009014c79eaa9a844779ca",
+    "coinpaprika": "0xd615cca17e7bc5cf91985c6e5ce73ab99224eb2144a2eb977e89534bdc69b22c",
+    "ncfx": "0xb8e5cfab4fc0f9f9791253e621de6867057e63c9e2dcbd2b4fc9fd1468c5198d",
+    "nodary": "0xe67eccf34a958030d197275c50de38dff73aec2976eabd7cf9d30013c1e5290e",
+    "shiftmarkets": "0x4a23d9f36b659a956e12f098df4d081340be3cbfbd5ca3642f5a1f0aa9166e1e"
+  },
+  "DOT/USD": {
+    "blocksize": "0x71c7d43c2e979a6422cc41949fe2a5a969eb113119b432532dd90a948254ed02",
+    "coingecko": "0x08e0c5dca088842899784953a1c1fff9d626d435d830b96f5b89aebd6bf3d86b",
+    "coinmetrics": "0x0623350323a44cf331bcf64dfbb3f46b6210f8969c09747749c23182be28999a",
+    "coinpaprika": "0x478a0c636f69df482daa4251e793d35f3b35f4296ca3434b518e5650a4b3988f",
+    "ncfx": "0x4c23a315118ec7cc3cfb9fb749a45af03da4466659ab7c5639a0b6f5ccdecc2a",
+    "nodary": "0xdcd21daad1e5beb590261c3fced48166510ea25229453f2133fc36e70bc855c4",
+    "shiftmarkets": "0xb09dbc0f7976bf69827f085b719acb3a790a21069cca0bfdbe101dc5d828cdae"
+  },
+  "DYM/USD": {
+    "blocksize": "0x406094140cfbb45c876a384980143657e884d4ea219a45736d87e579ca433a1e",
+    "coingecko": "0x7321bdd08b2f8df2a827c92651153789f2bccac696b67c08735742d399001b44",
+    "coinmetrics": "0x518f53991264b2d60607cf254632a4e5b366093e1a85b6ef83e432d8984c95eb",
+    "coinpaprika": "0x109b5ce067fcf7187137f493bb6bca01745dcd7e64ead0bf9e673d0aca9c7076",
+    "ncfx": "0x38c23a99b5258721bb4906144b0aa2863c4afc40a74b2e5f6b6a201d49e15311",
+    "nodary": "0xafa7b4ed1f8b7f9a7c9ca8e1592fc4bfd7a0d2c6b68f33501f7d555e628d4052",
+    "shiftmarkets": "0xcde20e8a943bfac90aba92b952b4c43358f531d80cb10dfc73bcbe023038fc80"
+  },
+  "EIGEN/USD": {
+    "blocksize": "0xdb5efda561524a955e315b76339d53ce06ca1b5ddcf30118e1ef1b160587e556",
+    "coingecko": "0xe359c26537c6b3ba7c6578dad5a9e2b61c38481d78c965ff8821e52aa0646138",
+    "coinmetrics": "0x6c98bd208f385aaba2eefc5808cd19fbae9b53d4012c7019ea666bae20dc20b2",
+    "coinpaprika": "0xf51904086425242f86a7c4ec925bc978e847a53012aa9bcec5d16789d3e533fd",
+    "ncfx": "0x5a485888f8ed2347be271f939b6f475c745317244b503fd7d184855064d6720c",
+    "nodary": "0x56e932a8d3e3c7e22c4354a435f02fdfe4a5f65910b3dd4532d59bd67eff1118",
+    "shiftmarkets": "0x1e9263f210418391179470c3426d8093cb67b11854d51f922c18561ccff21dc7"
+  },
+  "ENA/USD": {
+    "blocksize": "0x58bab4f31d4592a377db57d1b38522fda4ab94ad17fa301cdd857e174b1ce9c8",
+    "coingecko": "0x2786c7390c7601bcc108795875995ca406f62a62b5cb8d2bad63b242dc7f3f25",
+    "coinmetrics": "0x181e4532a616c2515e92d010eeea445c192b47392fbaa4ff1884c3832fd6e17f",
+    "coinpaprika": "0xf6e254a46b45eda1eaf35c171f55ec46a89d5be05a052c5eaa638a56cb386040",
+    "ncfx": "0x63d2de5277875d3459a4602270c0c7900ad2904143598be72e038de408cfb7a6",
+    "nodary": "0x1dbe949a218961b988546a5c651cb2388c6a70d1a3c0b61aece241e59ad49ffc",
+    "shiftmarkets": "0x61ab099b80fe99697c64973aee287b38ed3d6074b6d3c5fad40debdd8db67597"
+  },
+  "ETH/USD": {
+    "blocksize": "0xc853e5b91b5326ffb4779de80a64e5bec73ab01747093036d565d7fce84bd733",
+    "coingecko": "0xdeda2f7938bf877d2f011aa550852d3459794e16944ea0b7513465479752ba93",
+    "coinmetrics": "0xd4a4bf4e3d7c0f5e41a5eb2453d7c14624b9566c369a2e60afedafa841098138",
+    "coinpaprika": "0x3bdd99217e0be6a0c7812aad3138bd941c2eaf60410740cac7d716d1c5e05558",
+    "ncfx": "0xb501fe47e4ad40fd34f5e5a685e79b991b51e2c887d2dbe35bc645ed1f390241",
+    "nodary": "0x154c34adf151cf4d91b7abe7eb6dcd193104ef2a29738ddc88020a58d6cf6183",
+    "shiftmarkets": "0x1f35ee0a5f02d6f2dd7991d612275508b24f296b1ff9aab71a51499b3f18f90d"
+  },
+  "ETHFI/USD": {
+    "blocksize": "0xcd932c7485e366852848605590465a6b1fe142f87a3a24254b9a25198bb4f624",
+    "coingecko": "0xe740887272086b7caae63ce712725f9f6b2db7d4b98958b3c26fc284f3a329bc",
+    "coinmetrics": "0xead719b6a26048326640d8e021ccc48915a8a9fc930d3c9c3030eafd189f0f2f",
+    "coinpaprika": "0x0fbac29bd08092024db6ba8b9bc9cb756a11a69b0724293a6f6d0a8f7004744b",
+    "ncfx": "0x020229e2fad5cdcac7db9c96bebe893246d05f81f0a9d53cb32257815d0f0ef6",
+    "nodary": "0x3777b1db5bd694cc7946b5e2a844682ccb3147ab1e876a5ee5bc022ee606ab05",
+    "shiftmarkets": "0xfe2732c05b99bd427ffe383e75dee36ccb73e6ea567fd59b0727487971f93ca0"
+  },
+  "EUR/USD": {
+    "blocksize": "0x16a86d16963876ef6d7f79475dfbfda8f2787f08e3681f773a2c7ae353010851",
+    "nodary": "0x253085db7304511171df7cc334e65e2d20b2e182444ba1777d8a05b0cedb9dae",
+    "shiftmarkets": "0x2a748fed7f76b2788926d6add874b2034735b756d320c599a5efecca2b3e8294"
+  },
+  "EURC/USD": {
+    "blocksize": "0x653020e6a0cea5a3385591d265a746a3f0c97b1838c376e6db31e258f7f88237",
+    "coingecko": "0xe6cdff0184d2f1cc39276244461330ec415e29f5adf4233dd302ab2aec4bd1c6",
+    "coinmetrics": "0xa69e2320af5b7cefdd393895e6a7e74cb50c29499409efaa0fb146919a66bd12",
+    "coinpaprika": "0xc300127a9e22d661c99e07bc9ac8581a364abaea973f403cec4ea910ca04fa02",
+    "ncfx": "0x11c53676817fb81f552046a9a6f7d3c6901ae854525716e0cc4bc6292f4dc90b",
+    "nodary": "0xf6e8be46e3bf8db53a1d1e2d997eba39eb12ff8ac1699bc2c6be0d99c1255d1f",
+    "shiftmarkets": "0xa35a3ae32818d74aac1fada9c61f9b6bdfdc7d2000b604f549bb521651d68980"
+  },
+  "EURCV/USD": {
+    "blocksize": "0x878ebe92523ba7825df9b44ade926b3eba452aa03e32e0d49426d5fbcc06b610",
+    "coingecko": "0x8a8a55da0f8ab450b2fc10379ea8d6f91b7fb382b04861a32cbb67efdcd6c1c5",
+    "coinmetrics": "0x7b3da52abde52b9469331250592a5d5fd4a6e4a1fff49039d166de30e785cfd3",
+    "coinpaprika": "0x8245a7ea9bb9dc0c22886c92bcf530a70c67e22bacd6ec1c01796d76db4ddb54",
+    "ncfx": "0x3b7918dabdce333b1e0c06c95a0c9ce456d269320ae1b5f6972e14f71e440d1e"
+  },
+  "FBTC/USD": {
+    "blocksize": "0xb0327988f822ca9b36c96648ac55264348245337d74c3cbbfdb10f9b052aebbe",
+    "coingecko": "0xddc0956ee9a8bdb7ef149a5e75b4b0edf4d854b8379cf4e42d68182127496e8a",
+    "coinmetrics": "0xe439962bb63474259cfdea1656e29282ae7a945b18f3c3d674297c7a2324da2f",
+    "coinpaprika": "0x118e1e15d7462a4b091270a71790c2c1e43a6996179d2cfacc7eb6a9c3398e06",
+    "nodary": "0xd51f6c1c0c402ccdfa707f922fd626dbfb616d6baebc7c29c2da5d16f9db6abd",
+    "shiftmarkets": "0xb3396885c628d6c44a359f1fec2e88fc4ef3a2e4d910af79f12cf735ea30e84b"
+  },
+  "FDUSD/USD": {
+    "coingecko": "0x9d8dd251619e6680f82b040ff5ccb98ce484eb4d128950b90fc4a1297e78068d",
+    "coinmetrics": "0x24e639fcaaff513db6a687c413f35ee2b9d39d8f171339a9d79c6b2eecd533d2",
+    "coinpaprika": "0x13e81390c1aaa5d1665584d0c5e5e57557ca8f267e30ab98755d9f1b47253b29",
+    "ncfx": "0x6de111660b94bb01340c6a1c5419fbfd3ce14f95c0531f9ea554db07b3e9db09",
+    "nodary": "0xfaed2ba06a23d190ced4e9ebfcdb0d3bda36f49ca9de1ad936d7a3b1b9ff22c9",
+    "shiftmarkets": "0xf568a376fe3eb418f332dcadd8aa38b22efe0ae35611cb10265ccbca1a4e69af"
+  },
+  "FLOKI/USD": {
+    "blocksize": "0x116eb69bfb85fbff750ef0103b2ce399bddb04dec2481a384010d8198daccb55",
+    "coingecko": "0xad7311edcd453a56ee9829fc647fea4979fb54dfaaa431938a52c9acf3961a0b",
+    "coinmetrics": "0x33662e8ba04c98a86123ddbe9f110109d50d1ca016fefd584f4c8143b0a2a174",
+    "coinpaprika": "0xee30d9e275d00f2bc535b64cf2d56abfd52174ed5fd859d14c2681d281b5da5c",
+    "ncfx": "0xadd8a787deba37c512741c51477da0e6b554f016acf515fab6c6efc0d35bba8b",
+    "nodary": "0x69be8b9ec6ccab014e94c8b51f15e5c1bf03705b9c7457af84925c51381e0e47",
+    "shiftmarkets": "0xb9cab830cdb9d8a2f49e458442c99bb4609dedf5af07ebbd1ccde263b5ba34a1"
+  },
+  "FLUID/USD": {
+    "blocksize": "0x1fd6d47140efba3b3f9ab1a7c2cb4f6302c19b1279fefb07249f9dac82978145",
+    "coingecko": "0x9c0c23c9cf7cf776fcd356e7bcbe783b643f6aa5cf8ebef1fbebbb9db2afa5ed",
+    "coinmetrics": "0x6f2d96380f75d03f1f8314ba659974a6931d224b4e5f0fab4ca8291df7a31e4e",
+    "coinpaprika": "0x07987cd6f803627f9b2684905e742cca41c1e75b0c3f7ef5d08919988e29607c",
+    "ncfx": "0x13732016db19fb195e1917b0e255570e72d42389f990eb9ffc65f7926f943747",
+    "nodary": "0x7d845ea58323df77cc6c895af012d51837374e0f4fecf51f89a95a60f0042fab",
+    "shiftmarkets": "0xe2e47b798fed318f9d155917c4b7503bebd1720dfc8ebfd8e83c2c17ecdf8eb6"
+  },
+  "FRAX/USD": {
+    "blocksize": "0x1dfacc89737e80fa5c76c1a82f8047b4003ee5254328a5f7bd87a1c38600cdcf",
+    "coingecko": "0xae1cf621e493761a55fb68940570f84947c74286a4b1bdce55e4f9402b6b0105",
+    "coinmetrics": "0x95196d456499069d1db67102a2a4163f9e4b71432ab4d08a7f8dbb23f8d58bdf",
+    "coinpaprika": "0x1374b8b4b449a81fb63939b2d18a6e49b0b8bfe7b259ed49032e4199f924b7b6",
+    "nodary": "0x99a4b7a8c479875f40b4855c1596db0c251a22ee61b6667114b646fd52bd939d",
+    "shiftmarkets": "0x7b6476e31c72786f531c07646501c078939f4a4c30097513e959722a1f08a200"
+  },
+  "FXS/USD": {
+    "blocksize": "0x275847fa21e620146a2b6689c935747e1ea41f5b9866183c6b17caa92547c696",
+    "coingecko": "0x2632cef5b4ba14a76780e12a9b910c94e0108e9d021f7773e26e720b203b6b1e",
+    "coinmetrics": "0x9ef350da5b87f2c5eb4aa7f26ca994c804fd5c1ba10879d5d24583140d13298a",
+    "coinpaprika": "0xf632f84e2cfcd56478360c20670209a74645d98259fd0c2cb9880742a3b6dd8e",
+    "ncfx": "0xe6348f62381b4c31515df84fa1d7036a2398ce522ffedda29fe7ee6b74bbdd2d",
+    "nodary": "0x4de6c569783bca970edc9b9775425016b0814154390a7e8fc67ce054074660aa",
+    "shiftmarkets": "0x078212fa79f0a112967dcf559efacb23fd5fd3e1ebc552b5706de6e6209843a5"
+  },
+  "GHO/USD": {
+    "blocksize": "0xe0b27b7f46a8ba526f4583f66f1c06414a12d86305b7fb4d644483d9967c8c8a",
+    "coingecko": "0x971f17568310e95225949ec84581c5fc2ebc51119a2600b6975e54470d12c79f",
+    "coinmetrics": "0x32c95c30bdd800f13b7775d94c9d2a60366b27d8b4f627c565b5c6a3c9b4c929",
+    "coinpaprika": "0xfdcbfc092fcbf5988dd2f29ba9169a26fb39ab569cdbb6e937d8790dea4efeb8",
+    "nodary": "0x674781f4f7632e1d5ac5c4ed169f7beddd159a5332bdacf46026ae3d5d9774b7",
+    "shiftmarkets": "0x26ea9602effd5187da64b29457392181ef29dcae567bea83210966ddbf6a08e7"
+  },
+  "GLMR/USD": {
+    "blocksize": "0x9398ea6c326901b04099408fc7f1d87259cd1fc512694338b586243d297d0895",
+    "coingecko": "0x0dd64f15fd2a7c8fffaebdd904616d6dbb854ece48c9fb2f3de1c85483dca97e",
+    "coinmetrics": "0xd396a172fc1cdb59f719c26ff8a670e5e0b00bb77ce810fdb1dc68df0504d764",
+    "coinpaprika": "0x8cc53e0d45628c3fd54273ba54500cabfda124980376774f12c1a327d6e4414f",
+    "ncfx": "0x4d343240d206b98029f470d6a3f7092db9ea0ce6729d8b8e3bd3cdec6e68f74e",
+    "nodary": "0xead28adb72c7c298943db5cbecb088bc617ce013d70813acba9339fe20345488",
+    "shiftmarkets": "0x3dd24ed5763225a17210fc03964e171346883038bc7efb2c6906f8268bf66463"
+  },
+  "GMX/USD": {
+    "blocksize": "0x420bd9aa1f80ce19e3f66abef6b43f11ffe3e09b511bcff0e91f506a8dafe291",
+    "coingecko": "0xbd66e35bf9bab82a63ae4461dd28ce6e709bf7edc947f7008d1d44a11b0e15db",
+    "coinmetrics": "0xf2531158c3a618ec0411d229dea6645da52056ab2d7d14f0c5620e8456d63044",
+    "coinpaprika": "0x10551620ed92e196af355ba5e9f4d88d34a162e9f9682829bcc0e87078fc2424",
+    "ncfx": "0xeb32e9653024ccb5bf8b1dc7effa99928aeacdd5aa3d7392299348c7d64c5b45",
+    "nodary": "0x0cfa9e8dd3134af51ba665c62be5fa7370866b69906d860b2630a59d8dfc701b",
+    "shiftmarkets": "0x62b99f5560050d3729babf8cc1aab6999cedc32309e3140f498bd15b7f2dcc20"
+  },
+  "GNO/USD": {
+    "blocksize": "0x31e4b883cd71fd7507fd49983bbd72b95ff0a2391f93cb5cd100983a2934c1e6",
+    "coingecko": "0x37b14cd9cc76a1373e3fe81ceeba7d40c4b7467d52e4491a9864cbfa44539962",
+    "coinmetrics": "0xee014dc7955db229c76b7cfc314083a52405f9b405235b4b0b32deca98d47271",
+    "coinpaprika": "0xc25a203c3f585e6fb35187f849053e33b8054f84d97bf972530f8ea1bfd2e44b",
+    "ncfx": "0xf422d17b9fce718f8f42fec2f9ac33ae614bed5642a0d3eb82093cb2f8edf667",
+    "nodary": "0xc7a65e5349014e93e29b08ec9b196786403d800e011b582a6b46c09bb71e27d9",
+    "shiftmarkets": "0xd72fd3c2b95ee97ca27dad9cbad00d1fe2516ed4cf95e961a14bc2437e1cccbd"
+  },
+  "HYPE/USD": {
+    "blocksize": "0x4a5bdaf014e098e41d8236c9de606cbea63210d6d86923fac58ebd276d02b7d1",
+    "coingecko": "0xce84a9ba6d1fe8f2dafd04e7f1a86cb6a5bcd53c5246c75c9f24b026eb594968",
+    "coinmetrics": "0x67fc7bf6cda01dcec8776bf9f0bb4b42d9ff59c549c21a74cc6d5c9e481294fc",
+    "coinpaprika": "0x7ae47b53ff585a0c1898b385e63c3b1b6a57f2d4674f7c60c48eee41805e49a0",
+    "ncfx": "0xfe13aaa05014af170b6f333b63d400452c4c7a52c057d3de9be9dc671c34b001",
+    "nodary": "0xb2d124dbfb376b6880aa80ab192d18e8ddfab689574d7d1bd891bda4964dda52",
+    "shiftmarkets": "0x255f407a380e00e7b0b58a66e36e5d7be66e71f5291d3ca933eaee2b6cd60a90"
+  },
+  "INJ/USD": {
+    "blocksize": "0x7d010a6c1de7f3c7bd8465e67f27b1cfe8e4cb70d7dc39432a8a51fa57afbdd9",
+    "coingecko": "0x9e43a71af7718899689fe02fd0e355e3cb03529c1db0b4d84c3f0e8b961a4f03",
+    "coinmetrics": "0xd3bf03791494485c3c71c61e1be904d58498f141a11505b953a2f4ad3b91ea01",
+    "coinpaprika": "0xc6c6765c295899fb69450db383b268b5725059871717ad1290821f78adce9d31",
+    "ncfx": "0xd61c6483e763aea8a749d4344a525890ad5097fa365f780bdf990b2002b8a672",
+    "nodary": "0x480447077da89523dcb3206ec30eb0f387286784d82b928d2394a1021083f4c7",
+    "shiftmarkets": "0x160435293ec89f0774f43cab5df6049ade647e0c0dfb50f7515a6ed6577b2fd2"
+  },
+  "KAG/USD": {
+    "coingecko": "0x508e04d2955da558750fdebb2403cf4cdbcfb061585793519464a273fcaad012",
+    "coinpaprika": "0x6daa94adcb091ddd2f6bab850da2e3c3a138c37064348cae5f04e68da4d06ad9"
+  },
+  "KAU/USD": {
+    "coingecko": "0x1f99c31d48b65b52219784f0084271d5700aad7b8f6b67770bf6acf519c1c761"
+  },
+  "KAVA/USD": {
+    "blocksize": "0x48f50a7cf8a97fbc10b03cf6a184a04d72f6bf8521489793350d3a99a5d8269e",
+    "coingecko": "0xf72e6f3b07747bec8ecdfe31843d83f1e793c3c34dbd549158eb87474d82c585",
+    "coinmetrics": "0x409af12f56163facd89dfe9b25288075a5b1c2d756af652fcff73133ecaa299e",
+    "coinpaprika": "0x547704c8486aea9a7436a5ac885ec041da89e837d2ee80463b9e6a597f24c705",
+    "ncfx": "0xe157f3a9e8917196fab5d463aa106491426bccfbdcd73e282dffe6c8b20a38aa",
+    "nodary": "0xe5aeb04468b66d18a4805c013d2df3c36764e8a020651620cee0c2b1a124654d",
+    "shiftmarkets": "0x18791017851ab9b5da0a39f5abc20534312fe22da2731364999bb7c8862a095a"
+  },
+  "KSM/USD": {
+    "blocksize": "0x47479bb15c717495eff861b97bd2477289a4859cd7e74a0094bd54e85475e2c5",
+    "coingecko": "0xf3c184a91afb129904a407c1016807d9b6dee7ceb82441015e5aa3220c9344d9",
+    "coinmetrics": "0x3ea4c4fa43071c7d585ea64444b57fd9e05f4c984a4d741560377d4fa26740f3",
+    "coinpaprika": "0x0902c1b2ce69a8299093f71553877063c773c90fad4753c52c784e63214a0988",
+    "ncfx": "0x7bee5f0dee56cabeb429233161b79cd36adfc7c271ec6b34e7873ee8c665d9f4",
+    "nodary": "0x8b5c70abb0f33b7e71a07be67beee3109edac30ba9cf12888ca091cc1d335cde",
+    "shiftmarkets": "0xad755f6313c6221f0f9f25f275077658bbd65d034da9f39310009cb81c0df634"
+  },
+  "LDO/USD": {
+    "blocksize": "0xaf0d77beb4811d7ae017eb52374d06baeb4d159b6e293352127691a660996ff2",
+    "coingecko": "0xf69e3307065302126c398f40bf76933548032481477fd7402cad6352337fe077",
+    "coinmetrics": "0x87f9d389ec0ebde75f78490bbcc55434867846ee96440b89872e4e02fdab2796",
+    "coinpaprika": "0xad60085bb0676794e9cb036925058527d3ffc5b681bfd9b315b6ec8a166d437e",
+    "ncfx": "0xa581c0786f3fc8bdfd2d67bc8e2f60011a47dffb606bb51ca897490a3d366b93",
+    "nodary": "0x210b852e0fddbd5f157de016ff0d01bcc260ef9e5daab8cc89606d5b97df68d7",
+    "shiftmarkets": "0x061d237e975763beeb8b34b1c1df304ffa7c585a8a21a7e2dad524ad0134691d"
+  },
+  "LINEA/USD": {
+    "blocksize": "0xd294141cc940efeeec4ad3bf71f78cac9e14c8bc0ecb463733e6b8c89ef429f4",
+    "coingecko": "0xa9f9300236d7eb9f7da148e2e887e7a58ca03916b8db493199a1365b4e1920df",
+    "coinmetrics": "0xc0c1cf10a109a9fb36723532fff45cb11a05ecf12b4b765bedb3d66e79c8d520",
+    "coinpaprika": "0x01879bc4f1c1879c02dac2b76fa0038dc8c5f34f27d32fdb280ae57b54ff95d3",
+    "ncfx": "0x073e787640b3d2c39a8a51355cafdf8e02b5c3d04b0b49636753a8b1d6cfd25f",
+    "nodary": "0x6fbe11b703a4ec3bd3114c42c61c905281a19e5be227cc56fa174cd4ac0e5cb6",
+    "shiftmarkets": "0xcbde6fd853e77a95af2fb9a213c9ee31cb88538e11f87c22d6c53d884a1091c2"
+  },
+  "LQTY/USD": {
+    "blocksize": "0x9b87d74470387418af25960288bbeec5e0e91d5258aa0dff80069dfba6a56447",
+    "coingecko": "0xf91677112ddbd9220098f8293239cfa22ec31932ad0151152bd59ae7ca4b7ab0",
+    "coinmetrics": "0xb23508d5701d285269328e3769af3ddb2952283e00b6d5aed90b83a12fa01221",
+    "coinpaprika": "0x48bd2d4146ace7a62c7c80cb7d1dc3f03cc3fbd3569a2b93a12fa8811cb5ee40",
+    "ncfx": "0xad0b6634ddd3df3fe0d3372c374d12bb388f1f7139fc98925a4139c6abe49f23",
+    "nodary": "0xeaaf19d1f4b62c6d5a8bc1266cf5a3948aea08a9eed06325564759c5108525a1",
+    "shiftmarkets": "0xd5e85b10b7be74bf95ad5d856d2bed0dee2a964c08e82c3852c75ed54f5acc5e"
+  },
+  "LTC/USD": {
+    "blocksize": "0xe2aef48130548bb12082873631bb603c82306b4f5959a0ef3d146ae0f3de37fb",
+    "coingecko": "0x66854492b06c69fc68bbce9c925c9c60b1d98cc0af4f3f1ad471a11a8918d2aa",
+    "coinmetrics": "0x3d21e586d4af9af67d36ed28b7892eaa08b8596adb078a5ab31b0270faeaa3d5",
+    "coinpaprika": "0x4b7365c33bd21bd64c84f6a4142838de6baa0878f3add73867c0b81d82b5606a",
+    "ncfx": "0x031487ca600cd3a26a39206b5b4373f9231f75e4bd23edeb3d5bdc513c147e2a",
+    "nodary": "0x9f54ca238132ef09c73bdabc578cd9ae52cde16dae376e39840130afbbebdd8e",
+    "shiftmarkets": "0xc97bb3beb0d70769067dbfab8fc3d8f01efd8b162d3d37e1f5b82f6b4375140f"
+  },
+  "LUMIA/USD": {
+    "blocksize": "0x8592c1bf5d9a1bf6e1e21b68898d97a671c893b47e2a641fa8d07c6cc456937c",
+    "coingecko": "0x42900068ffa67c2d8d61c3af9a6bd2794a97c52a5ac16760878805a4a93af4a2",
+    "coinmetrics": "0x0d4c6ebac69a01b2121041ddf92efe6c5da9747c020b676a66734fb89d3ec92a",
+    "coinpaprika": "0x292fea7f65c5164ec246bb7f561c58c1a87be4c3022e946bb46ea1ba1fb1efea",
+    "ncfx": "0x03250c1a58a502459c89b119a4e16890472ffc962e55700bc53a9830e88de70d",
+    "nodary": "0x31458a51d3ca30a9629cf3abac762b4e0fde8b037c82eb33f6b2523fc049b595",
+    "shiftmarkets": "0xc0423721667e9a641b94bf5e32392389140b7503c4625141e867eec8b1feb1b1"
+  },
+  "LsETH/ETH Exchange Rate": {
+    "alchemy": "0x156d6131dd214f492461e714566dbc0a3e30b21c20608f52fe90c749b7fc7e3b",
+    "ankr": "0x1bc26f76b881eb0194932a0b9a1cd986821346e93ffc9149cd02d6616d9c316d",
+    "drpc": "0x31b25a528f38fbb8976e3e6d78f175803f596cd08da1ab76c5aa32f6e27626a4",
+    "infura": "0xb49ed1987c3e97684663ffa36215bc5a714dead44722e6dea31877e59c534d50",
+    "nodary": "0x16d2d5030ae76e13ff0604d43c62fb0ead034e5cc9f0d552ac3f8825df4b766f"
+  },
+  "MANTA/USD": {
+    "blocksize": "0x2c58672d10f273ce7e101f3f4af4a458b2441520c6c598fa46b21dc21f8da733",
+    "coingecko": "0x48342fb9bb1c8a57c19bfc21eff8d38d6303321ca6dfe4c05830983fbeadf7d1",
+    "coinmetrics": "0xc2f1eb4b9523e9099d95f8f3f6325d611dc8424167cf43b66d2142c3859e9f7f",
+    "coinpaprika": "0x8f0e51ed7e3b57831823de9cbc73761dd1d4c8bdd0b6f77ca40d9d0b77e25af7",
+    "ncfx": "0xdc21a1a8ecedb41acfea2c903d55a2fbdb47f2cebf531b7f4cf40531389b6b48",
+    "nodary": "0x6eed28160dd4733845f73bdffc702e842f575535774b190c89df578f7161a590",
+    "shiftmarkets": "0x4da65326b87011046ff84a035a8e6d04b3ce5dd9e83bf3769137eb375ac6fbce"
+  },
+  "MATICx/MATIC Exchange Rate": {
+    "alchemy": "0x64f6dec0f22b0cc29b47dfc372d2799cc052f92e2d00679262fdef3bd0ee2616",
+    "ankr": "0x0594baf6d8b6ce0cd54a0a87dd43929db4022c1f33d6901e1034d2afb049f856",
+    "drpc": "0xf686166c0f0c3108138ce3ec763873823d219aec7b3fa897750eae3e8179a9a5",
+    "infura": "0xc2d06234721ba44b1246a1f1b5048c0b3f20e5b9e091e8215de15b438b7b62ab",
+    "nodary": "0xf770918e08f5e55897405870830334f48c6c41079d919bcb4d8e7fef3eb285eb"
+  },
+  "MERL/USD": {
+    "blocksize": "0x071d9d1c6df56280ecacc90a813fd8863d5f3a7785a7fd6cea26cc56aadd9982",
+    "coingecko": "0x0f407bde1afe7cbd1bdfddf11cd022be4992e8b262e574ca9e982f2f8cf1e627",
+    "coinmetrics": "0xffdc05d1c2b0db635c7bfe67732768e307181ca8f1df5bcf7cced2ea547619e3",
+    "coinpaprika": "0xf8fd3ac6333475f541e3995da5a495d330594b6556e8060ea7e7474614647ab8",
+    "ncfx": "0x1ca5c4a23ac969e1ea69175597352775036754050d27a0af003bb0cea2fa8a4a",
+    "nodary": "0x2e329bf2224889e5cc3ac00e54072913ff1c00be46f80964c91cead4c5dc8bf5",
+    "shiftmarkets": "0x1bb61e1bd59e0f3da4d3066701919aede737a45b4e85e5b097433a09f358bb8d"
+  },
+  "MNT/USD": {
+    "blocksize": "0xd43be67902d73c91239a18e62468d4283bec7ae17306f06fb82fa314939a407e",
+    "coingecko": "0x840fed0dfa8090e04ed7cadf46f87fd821ed6e1fc6e08883426cd223e83f397d",
+    "coinmetrics": "0xd58163886da19906f712264ff8158268762cbcb01926f3c929c7c24d736cb6ef",
+    "coinpaprika": "0x60dbdaccdd218f8b1915f084a5eca86b0436db882d1354124a16d4e200d85224",
+    "ncfx": "0xbde96dfec0d69012960feafa082452311d837a1964f6a0b7dc3585c536f2a9af",
+    "nodary": "0xa09525bbbbaf0b2862546dc5633e32cbb5a987b967f7a9bba4f2f2fd8b949203",
+    "shiftmarkets": "0x570cce21db3db47d2af9c14682ded26d25dc6d66874b6da7ebaf61f7278e3651"
+  },
+  "MORPHO/USD": {
+    "blocksize": "0xa07454e39aca10b08880dcdea3ec6b9ece03e317bb8a5f28319d506ce6017ecc",
+    "coingecko": "0xcb69a0c55fed3a1f40c5743a836e47bc23d38559cb4501aac89ad4043ad349c6",
+    "coinmetrics": "0x7bda4edf7ddc9107e5f158493a319eac82fc703d0535fb76b61c9a01c31693eb",
+    "coinpaprika": "0x31f8bc90f428a69641ada44bc407864ba7088fae64de05d8694c31242e2bd67f",
+    "ncfx": "0x016e05606837a2328f10e754baf94ba0f799256a735e4d8a12b5258cc34def02",
+    "nodary": "0xda782b77ac57b08948012161bd6a002c8e04c11624a0e5883e22f35ea6d41749",
+    "shiftmarkets": "0x24024cf41de69a9491560d8feece6965050f811d0371504a5da744ec973e1d76"
+  },
+  "MOVR/USD": {
+    "blocksize": "0xde6a1a73b248d99fefb6f7516f656a8e08ae1f610e70ace5fa0f739bfde96932",
+    "coingecko": "0xd7826ec3882ab4c4a79d2918f01731ba94473d3a1cf1b081b0a8f749e7ca7dde",
+    "coinmetrics": "0xd46480fb9841e0b23083f5a57abf457c73782bb46bcb877f54c28f94ad0cf466",
+    "coinpaprika": "0xc286c7ce49877c35655408394ba81ff94cf4c9209b873d57110f23c7379c9a3e",
+    "ncfx": "0x88a86226d494eacc340ae3dd8ce32780bd2f9bb35f4d1e1e02a2183b0bf554f5",
+    "nodary": "0x69d5b4251562afbf785321516021fcc9da268111ee46f35ae22bb97d8caf0a4b",
+    "shiftmarkets": "0xd0890c39f60912ca877e3e668b302e7af7ff670bec75ef0315c6b1a15cd28eb6"
+  },
+  "Mog/USD": {
+    "blocksize": "0xf30a787067fc5eff78e225c9aabdb6f38412380fc940ca784e555076b9bb9bc0",
+    "coingecko": "0x95bbcea46e48dbf8551fb3c659a76ddc02d247e5fe1ab7c344616e974708ea9f",
+    "coinmetrics": "0xd027008e2f1400348c39c7a85fc526a59ba4369dce45b2f3e2a312c8a9bc9302",
+    "coinpaprika": "0xc66b3d1b4371fc717df3c8f0d99eb76ba669e84a33623a6a8231e6b53afd6a64",
+    "ncfx": "0x58fbfa26013c1df84e7127db0d2b535278e546dfc86cd6219293cc23a8839ffd",
+    "nodary": "0xce906febeea6c394203a2c9ac5636de26a0b2c0cb4ae930f29ca103011fc2dee",
+    "shiftmarkets": "0xede4af3b97e2f1af800c972de31cf1c6e8668857b3f1c86f90805782438d151e"
+  },
+  "NPC/USD": {
+    "blocksize": "0xf7d43d8b0119cab3ec98c7dacf94f38743605a6406d477dd738bab5bd4922e3a",
+    "coingecko": "0x2562d1d3c196b2b933447b776267144dc2654af5f885c6fb667add48e38b18da",
+    "coinmetrics": "0xb7e2ae99c8fcc79b0fe4684ae91dde79a4e2383c327622e8e1e105788fbf0e0f",
+    "coinpaprika": "0x9b313ad84619ffa421e5d30eb75ca32527ccb211db022facfea848fd93f79547",
+    "ncfx": "0xb3e29cb9493170f95ab3e35db6c39c30c50f2026c5c3c85e627b07fcd79ac2be",
+    "nodary": "0x50a5c7c21fdea46cccba36dea340f592253ae82a837c773c9f404a2c03e06e8b",
+    "shiftmarkets": "0x33379cec233ca74e373b72ce41550c0fdf62aa9ec8fa20bdc92053f35bf8aa77"
+  },
+  "OKB/USD": {
+    "blocksize": "0xcd6352d365fe0b26bc6515b227041a0d1c974ed47728b9a634e463a69b1ad9a3",
+    "coingecko": "0xefba6f0c252ea1170edd3c227793c4ca8fdadc883108b15efa52d6d913c9f253",
+    "coinmetrics": "0x22a4cbc8a68ed4aead34357e0a93be6e7582a4cbd234acccf033320ab3677d11",
+    "coinpaprika": "0x698c156750b7e72bbf3aa1168ef04ffc8cda521d4146eb8a6fd42d2e7eea3d6a",
+    "ncfx": "0x43c266e2876662baea1877c3dab148b350d72629dcbb04065ef5a55ec2f3bf18",
+    "nodary": "0xcd7c03521670f2d1b2ff348b08b7f05fdede0cfe5e0c5c2d7c4b29546cd42b52",
+    "shiftmarkets": "0x8d106709b1c0fc401dde377f4e7f734d4b18a2cd9c4293222f545d1b444716bf"
+  },
+  "ONDO/USD": {
+    "blocksize": "0xfd926756b941383b3d84c0eee1c15bdae42c7f896f925de0f6d974d68a2e225a",
+    "coingecko": "0xcffa266c5a534f37e7b11d04d35d78ecdeedae32ce92b3a9fde5c7b6ab234dc0",
+    "coinmetrics": "0x471239c5f809d6535b932308087616bc25ed60d935442081aa37f0df70a4fa58",
+    "coinpaprika": "0x819d47a6343283f7968e7809803002ad7aac923ddde1ef3f208c404a9f1e06c7",
+    "ncfx": "0xf45603aa02602cdeace0adc809b5a6fe09a238075224d576f921c5bbfb44c455",
+    "nodary": "0x0de555f102f96427b0db71ad1bb3a7d8a5f1c24f9006f5b367e7e61649bfd06a",
+    "shiftmarkets": "0x571ae7a0b94be090a365a365ecd3353b7205923562f98db86b44861932d2c3cd"
+  },
+  "OP/USD": {
+    "blocksize": "0x1bb22764667f9b124fa0c6d0a94fbb68d7f9f2ed3b49e88200827a15ccd1fbd7",
+    "coingecko": "0xa27974db729a7cf4129edef7af8985875064d85ed77ba4d0098b9f7baebfdcef",
+    "coinmetrics": "0x8310fb2e9893374535c5d14fb374913bf835b9fac43c838f0e4cf5b9fa4adf47",
+    "coinpaprika": "0x173b624d88a2298740329f56b9c8074cf8dd84ea099bd975d34aabaf29b32d01",
+    "ncfx": "0x3f5c469995c72670cec07bfe40fe713ff534b8c321ef1d98a26f4bd2a51e9303",
+    "nodary": "0x9184c9e16ff32a87d324c8ea56b261472c75a46f527b5c1d39aadbf9428b8218",
+    "shiftmarkets": "0x181c5323ee8cedb65c2588eb47832835516c5091bfe82e16f12467bac70bc0a7"
+  },
+  "PAXG/USD": {
+    "blocksize": "0x7245ff2890335969d4d96970e483d319b2778df7bb0022afbd505ecc35da9893",
+    "coingecko": "0x041e1b51e9f0d582f113ddb95222ff3daf1d066fb42245e7cdb42c771bb1be45",
+    "coinmetrics": "0x8778f3079cfad5bd3089f466928a74fe138023e0f99079a6ad530ff7d1324312",
+    "coinpaprika": "0xa4a8784f7ba54112573d030347b58403484247a89c274914097914bbd955382f",
+    "ncfx": "0x124a9b5ad4336c54f9873d1a19502a6af12d44f3879fe3575b142a42420bd3ff",
+    "nodary": "0xed41d23a3dc582afdf682fb2aceeb90374f89739b4204199f844ba4b5d1f1f68",
+    "shiftmarkets": "0xac0eeb2bdacba6b83f8225a82efdae30cdc91aad49c747d73504428a607518ed"
+  },
+  "PENDLE/USD": {
+    "blocksize": "0xc7ef2d84fb68231ad130724da2f23d75b4afdc3cc3caad08c2940e9351dfe439",
+    "coingecko": "0x64d49c21f2f00075f0ddd3741a7c35cbe1f45aa6b7b1990ea2d07e4384531881",
+    "coinmetrics": "0xc2d4067cdf00d930928ed6739600fb1402f2d691bc48f5b6e29b9c568c385ddc",
+    "coinpaprika": "0xd5e5abe527d41aa9a86b972a94a958214f9f4747d694dfd52b2eea8e107ef1c8",
+    "ncfx": "0x41d996ef3b5044a817f5cacacd3eec552095f000ab2f3c7d4bb076acbf0ad965",
+    "nodary": "0xc34187a5f3b6417ecba62e6ac6396892976e00f09715353d83370749f7782fe9",
+    "shiftmarkets": "0x08456315947a1d27c6fb63bb2d7894a1a1ed01ef835a659f849cbf5ec220b83c"
+  },
+  "PEPE/USD": {
+    "blocksize": "0x62f4737e09f2531c6135496380d5979cf5d4cc8147643fc9078a308e7bf6a3dc",
+    "coingecko": "0xa49ee57b926db52d14660d81375d92ff6d46fb5d1e75cebee475b55861f4ef2e",
+    "coinmetrics": "0x373ba4f689daaa870688218a9976438e5261d474be1315667008d911b6794e25",
+    "coinpaprika": "0x330c2a62874837bddbebce2758b3578dbaba6337221979c1a9a0751987352f61",
+    "ncfx": "0xda4c0f9d262b88fe8edfdc9dcec7c583c907f2c9758e1ef3e3e88a18323155f5",
+    "nodary": "0x91ae70658dc4c2c42033001f773f3894f0ed15ce7d0692e24817249daf5fe626",
+    "shiftmarkets": "0x9c5ace46988eca23ddc8bb2ce433e99b6712d8c0a1b400247da6dca02a1d3152"
+  },
+  "POL/USD": {
+    "blocksize": "0x45bac524ee9ec6561f182321549c52994bdfb4f7a81ff7be50c8951be3316bfa",
+    "coingecko": "0xae60e20df2d421ac5e84d08cfe3ee5779f193e1b5cad0db86503810da2be477b",
+    "coinmetrics": "0xbda0aa9c7db962a49b8c9e645ab659e019eff97190a15c478a4c0e9082059b9a",
+    "coinpaprika": "0x3afab2e355caa47b6fcf8a5cdb9346f1d196fe5968d2d7eb97aa411650c3133d",
+    "ncfx": "0x4bbd00746e78b5b4805d7b26644f00673895910f3ee2b87c1ab5b892ee224c68",
+    "nodary": "0xd6e71f76ef667f8428790fb709bf736f9fe3505eabcddd8bdb928c4186a075f9",
+    "shiftmarkets": "0x84ada76f9e034acb92f62cd44319fd84db63cd95bbf160ac96a3098deff51670"
+  },
+  "PONS/USD": {
+    "blocksize": "0xb200e2478dea938d68519eac448d4db53a1f54bed8d3a3ca517bf1d165ab423a",
+    "coingecko": "0x0477a3c4088669748277d831a37ae40669c912dc955328688bbdd2a00eeaca99",
+    "coinmetrics": "0x5e3a79909919e29b9aa5015e1fd6a9557740d04722eb79616c17bb3eda6589d3",
+    "coinpaprika": "0x8c989b22674ce25c554d27148228c395071f52a4702deec0d2541ecc9a5a3004",
+    "ncfx": "0x512fc767fffd25c5b8ede632cb76196d66d69db9e6f17da3642b257043995f3c",
+    "nodary": "0xc3ab5159663c0229a5febd4320181a3c2c703071205f461d2bbf380943448690",
+    "shiftmarkets": "0xc47af6fb948c8382d75788cf6d2df019a5a46b05d4f38e6091255f1b006c3113"
+  },
+  "PYUSD/USD": {
+    "coingecko": "0xfce91ecbe1a4ab44be3be211a10303be7df79124eaebe460d1385ed2581d53af",
+    "coinmetrics": "0xf4d9edad51be77e44a4cd922df6d3c379691be6e969841810cc08e80127c8e5c",
+    "coinpaprika": "0x6c4032abbbd24102dfa686852e2f349708f08e8d6fee9239e3e508650b75a455",
+    "ncfx": "0x41cd68c7528373a99b274e398d0c3cb6ad8f77a15f8a86f463bc5912f0f3de89",
+    "nodary": "0xeaea95044c8fee3bbc32bf6e51f47f7bd1c66b25ff3aec28abcf179e882b7595",
+    "shiftmarkets": "0x691c9cca8b869e882a18e36269ec8b4413d475dd69478855eeaaddec112c167e"
+  },
+  "REUSD/USD": {
+    "blocksize": "0xa337b4da098d854e4b3058ce5fa7d3e7a82c5998868bf9691eebbe0573f0e701",
+    "coingecko": "0x86dcc18095a5603a10f75ed1b6be70f786dd3b4cba9e5aa6f5ab9c29a3c841ac",
+    "coinpaprika": "0x7a657394284f4cc0180e62786ae174bd8f9449f3e6c4731b6f3e4daf24caac8c"
+  },
+  "RLUSD/USD": {
+    "blocksize": "0xb5b975fa56254a3f468123c29b924969d70a67e01ada16f73048fcdab9d0269e",
+    "coingecko": "0x456e0af6207a1c3a375356c3acc33074b127912b46ebce2df1c2fc6e7072329e",
+    "coinmetrics": "0xef0e2b0cb02a72d58736159fec36290c232872ed01f8c8c68322043b4f5d3338",
+    "coinpaprika": "0x707c33ebb37b3b8fe177d728c2ab3ade671c8a150210823897edd0650e6954f1",
+    "ncfx": "0xa661d401b30cd30992939f95104669781f260ee87f8a5510d8b736bd10a9927d",
+    "shiftmarkets": "0x066fbdc6c45794c4d4b4eaa95ba11b81599a82474e8e5f3be79fdf85d4289090"
+  },
+  "RON/USD": {
+    "blocksize": "0xd89d628caf447c74a4a557d54a5c64ba64625012884b43a1488b9cc398eabafe",
+    "coingecko": "0xde75b887733bd678a33293bc03ef89005f5847862139ac3b141114b8d45a3130",
+    "coinmetrics": "0xd000bc2ebe493f9e5710fbc0231805e9d557d5c67b66ccf710176ad346c310fa",
+    "coinpaprika": "0x323b18038552c2a0b32e72728b78eb85c97e88311374e0791a08059a4f1bfa49",
+    "ncfx": "0x73a3945a9b25db67feb6e723d0e0c4318114a823cadd931599cae6a3c84f86ab",
+    "nodary": "0x2258b83edc96e3ca5f18b7bf15ff7c7b8d54e9fa957664d3e8fd8d8761a877fd",
+    "shiftmarkets": "0x22806bf78f89e8a579a35971a325e9ac80c20b178956871ecdc8f900c1443cde"
+  },
+  "S/USD": {
+    "blocksize": "0xff1d73dc50e1fac5151030310879b00cedbb2cbeb15bd58e9f90f80d2117ebf2",
+    "coingecko": "0xa028d04dc0ef95b31fa2023abe3da1c4fa069fbb8e75af831076ca7a3a3230d1",
+    "coinmetrics": "0x9650845b1e393fcc83f5a91b824ccff2cb4ae302cc3f553e161d01f26a492765",
+    "coinpaprika": "0x052c12b22399272337704e48a09a3948b01324ee02cdb63c96d65452ce9994a9",
+    "ncfx": "0x3428ef2efb6d9e8e435169b5b36565b8d0737178498b265652a59d2ca9f407b3",
+    "nodary": "0xcf413c06d21f2b8d5167b052c6e9b666ec41a56a8365e4ae6b332456553b847e",
+    "shiftmarkets": "0x9f78b5b2996214a7b0d0192531833934b267f287c5237f1909be7efce8079d1d"
+  },
+  "SAFE/USD": {
+    "blocksize": "0x3cbf7d12627e80521bfc1dce7e63ea99994818b28876c6f091e3f6fd02f116f9",
+    "coingecko": "0xae75937ed08c0a0e27a3eacdeb64a8d7fadc6590cb034b1fdaee98313d547185",
+    "coinmetrics": "0x8b3d05eaae91f72eb19d668d51e3ba4fef262fc4642290546a55230baf7eea2b",
+    "coinpaprika": "0x7e4a3c7dafcc5a37bb86837fdd56a417713f50cc39dbf2024f41fff7f6763546",
+    "ncfx": "0x5b0c7d69724c1fd9235aeb180db88b723ebd5cc42e9e5b0b7f4d8ec41e85dcf1",
+    "nodary": "0xe77f6b3e93f3e72b09b97d70b7c225d4f2fac9f7fe51b81d44d493a98ce9d0ab",
+    "shiftmarkets": "0x2952dfe07d38350a979b9e80d6d36d9264f7234597275773213a255ac4ba3958"
+  },
+  "SEI/USD": {
+    "blocksize": "0x4a1baae048c8441a65fdf6c0d29748c120783e07753e13d66ec4a73dde2ea70f",
+    "coingecko": "0xf46157192893c01a0cbcf0214233624a91b6de64a473394e155ff59ed69ee1c2",
+    "coinmetrics": "0xa834bb4ca639bdb4c1d7172a876a90c65c7f046a75341f0cc58d9c021e37a8c5",
+    "coinpaprika": "0x9e4d7775924da6daa5f5f354c7d51031ca94a96e8bdce50365351cdd90e80dde",
+    "ncfx": "0xebc075b0cea22ded7d08810b4ebc40585a4bc04b09ca43b1989d874ed461a1c1",
+    "nodary": "0x159c7cc1703beefc4160d29c927a0e61f88e999982f9357d51dafa4b077515cb",
+    "shiftmarkets": "0x1415db5d708f4c328f27de57f271091ebe836ed14359f5595260d9d4cdf5e74e"
+  },
+  "SHIB/USD": {
+    "blocksize": "0x99a6884a7d1d493b985dd9963d05de7dbfa274cb4a09389ff563ef1dac010368",
+    "coingecko": "0x1c1f47bdd9127dab4f838927224e1289fe1f27d80c7d934b0fcb3fc00c14a85b",
+    "coinmetrics": "0xbd87926d916e972efea859bb822a25d2c51fce2bb154109e72b1bd9940fa4376",
+    "coinpaprika": "0x07d303f93debab7f42cfc81c3669cf86a035d9b614f397fa0cfaec2e7640cfbd",
+    "ncfx": "0xa42d17af6782fa50c9aeb1a1616d1597feb0d408cf040d885670db0c95544d78",
+    "nodary": "0x27cf8a880f7d23be150f980edf638c275f8dd6dcb687394837f07563272ae2e8",
+    "shiftmarkets": "0xe559746c943e22c100a3951d5bb514a9860d852600cbc58314b6d29f5ab2ccbd"
+  },
+  "SKY/USD": {
+    "blocksize": "0xf73298f50441f7e7f23f8ce27938f3fcbeecc6c295c10d855a7a9f5c4b1e4e61",
+    "coingecko": "0x7cf695fdfad1add6a5c30e359274f8b424e46af50b51a6f6b5a02293a0881841",
+    "coinpaprika": "0xe30f91231b61dad92ced962df0d879e638a615bc80d3245bec30b636d00b3cfb",
+    "ncfx": "0x20062361735ad1ecd94bed8da8cc68e386da3f6c0a391147c417f03472be4658",
+    "nodary": "0x493f100554dc5bf49f26d13a1ff7c6d3d9795a4e2b10205d12ed0fcba5c50a9c",
+    "shiftmarkets": "0xaf697863aa6630910781a2a4c0173530504aef1da319f016face88cc64a38135"
+  },
+  "SOFID/USD": {
+    "coingecko": "0x4a80e9b4d1c3ce4c5c5a6bf5918da858a72cd8824c330b43a684a33dc15282a4"
+  },
+  "SOL/USD": {
+    "blocksize": "0xa12104b8bd007bd888d183d676963a9a50d118ec0f2d150b6f2f546d46ce6311",
+    "coingecko": "0x9c89d04b8b866f24ff265359771315f5b06d288ffa4e7b59a87d35f750585c56",
+    "coinmetrics": "0x3e1b6d3857726adf89bdb7488ba22d6a9623c79f0897e6b0d7aed4ae0e2ddfb2",
+    "coinpaprika": "0x390146e805be8a0c168e8195cd4213564670c0d48cc8af00172c0187a6559770",
+    "ncfx": "0x8e3580c006511ec21c53765a6c70cf79b9a6577c4fceaefa86de6a43ebfbad98",
+    "nodary": "0x11902910feef28a8089cbe00b3f7fc0c0bb8e27fc658dee76deaa681022e364c",
+    "shiftmarkets": "0x4d30c8bd7756cbb69b576d6b51bbbee8420926b6374a48f24aab16a4361c0cf8"
+  },
+  "SOMI/USD": {
+    "blocksize": "0x8be922097a3dc694ca15f86e9ba43594068068ebc81b55585e26e50df91bc913",
+    "coingecko": "0xe00711f3f356867ad76d4b3f02fa7ee80d9f2ede0c22214c193a50fa21ebefe6",
+    "coinmetrics": "0x052495e7d75bd75038859be6e070cb87a8245922fcb919ba0b80a359317bb01f",
+    "coinpaprika": "0x2deeba9f9896cb04cf046556c2efe64246e1f013add4bbdc634e0a663e5cf3f9",
+    "ncfx": "0x25e0a18998335e91a8eebeef70633eb6861f9dfdb560140c1fa0b85a731eb124",
+    "nodary": "0x504fc1702cf33cf01ac799099b0c8b55f6e902a940b70c2cd299e8479b6ca1cf",
+    "shiftmarkets": "0x97323cc210750d37e4805c3706b1bf0faed0e9acd4957b71f7adbc56e04f4fe2"
+  },
+  "SPK/USD": {
+    "blocksize": "0x678718c1b349c3e446e600a6ceb3d9810b955dd5536a1c497cada98423e67c09",
+    "coingecko": "0xea2cd999852d9d4a643dcb82566dbf38f21e36399cc8cbf842699242ffdfa235",
+    "coinmetrics": "0xb6786f5ffd4d9ea58b78f32be2723ae46ec2aac1c875c3299d195721a509bd52",
+    "coinpaprika": "0x84eb21f23ff9d8602e105bf6304694ccdd71b4bd13cb52dc8be00d94e3587ff0",
+    "ncfx": "0x3fb2b49c6154a32cb937ff58c212764469c346de2dd06d234409224fef9cca18",
+    "nodary": "0x8cc0e6b2d62b7c739a6c5d2966b0aea9c8068d13f5cb91f0f9477ae1abf44987",
+    "shiftmarkets": "0x63d9ff1d85fac34f885b2e7e1194626f6972e5b0c25f7237c17862ecb26d2c40"
+  },
+  "SPX/USD": {
+    "blocksize": "0x2510ac2a6d33306bf915597b2f763d680cf4828e84490334a268d3834c43dae6",
+    "coingecko": "0xcf509dac71a954ed55b93a6a72e82cf9c5c6df31b28d8ba369dc066e13f42b2d",
+    "coinmetrics": "0xb60302fff219f5584ad18b5e60cbd43a175dbdb92b6628c4824535e6d88dfb55",
+    "coinpaprika": "0xdfcaa42372372ccfaa27b86d8453e71bc62417ccb4b9b791132a58e7ee45f754",
+    "ncfx": "0xce5b02c27d29ebf87827d7e2d5c1c72ce0069e95e8aa1fc024123beadbb888cd",
+    "nodary": "0x2a6cdc59eb4a572d019bb37720ab3d761f2bef874341828f3cf37b6447e8bfc8",
+    "shiftmarkets": "0x967f4eedfeb3685b444bb22d74549a9e515d06432684b074133f04a3ba2265df"
+  },
+  "STONE/ETH Exchange Rate": {
+    "alchemy": "0xb0ed6e66841f45656644eaf31128dd87f2aedfb8968068d939e039d1c24a7c22",
+    "ankr": "0x651eeb90647dfae57281467bbfaf354f63582744b81ee7882f7b677d8d89dd4a",
+    "drpc": "0x828db3bf201f1a19572c628bc4cbc8555619e1a404598f3550ea301ae4d95287",
+    "infura": "0x5787b62d6b1df6f12e17736c14a45685d2db6d2804eb1e5a5b25b934a67ae28a",
+    "nodary": "0xfe0b554a4fe12d3418da7f625e6280b857ee96f43bc3a688569c8ae02d31ab55"
+  },
+  "SYRUP/USD": {
+    "blocksize": "0xc66e651d390ed07026d1c78eac7d73f646765e3c91c894099d611598d8d767c5",
+    "coingecko": "0x65f42bc01807c43bc00270e6034c51ef842765b450884c7e9a88c13dbeac73f9",
+    "coinmetrics": "0x7bc78f821a6be224d30137b87a931d59bd9fd85d8d2e5e6ed482e1981afc040b",
+    "coinpaprika": "0x44dca41bd2bdf71e791193d0b1b4e568f299ce63a86e172cbef8355ecedc7625",
+    "ncfx": "0x43931dbdc3ec9aee6368218c5d1328691fdb8bc8afd8a38a18c89cfaa4129757",
+    "nodary": "0x9212ce11c426a17d7fde391b3ffd89c2cfc4373fd49886cd0068f2b6fe551bef",
+    "shiftmarkets": "0x43f3971b0ab5a3c4fc049a30b357d9cf8a15551c799cb45553529d6dab4675e1"
+  },
+  "SolvBTC/USD": {
+    "blocksize": "0xd1bddcbbc52df9577b66fac09e701bf16ed194060488e4c55a7332eed5a1c7cc",
+    "coingecko": "0xda11d98237a406e47a289db264973d0b15b904ed8e60bcac8e6918a296e7eb1c",
+    "coinmetrics": "0x2206411020957bf73299b055057d6bb7d16297690f30b9af3f112b24a9d94eac",
+    "coinpaprika": "0xfd2fd3e8d025a7ba7654598479df73012af7cc89796fe929ee88e6f7fdee7f73",
+    "nodary": "0x15ab22dfe037acac4aaeef5571b276a4c057ff42d66cf4fb7f6c6081d956a902",
+    "shiftmarkets": "0x76423ee33408f06d6b6f925599c1f496db16a9741fc7523ef6303e008c348792"
+  },
+  "TAIKO/USD": {
+    "blocksize": "0xf9a999ce9d00f73ef21d406cc6edb2e94a8cf3a3d7bb08ab91173470d37a3d40",
+    "coingecko": "0xe2cf4ea07eb8833a8b6204e06cb9df7e17a87683838cf25e8d46557258f93f2d",
+    "coinmetrics": "0x6f66d758a2ca6d22ef9b23bf9de121d8482c815213ee571d38fc5b66fe1aa64b",
+    "coinpaprika": "0xd47ff64caea9cdf5be39dfe4749ed767e201a7188747e8e12e619f448aeb8afb",
+    "ncfx": "0x3eecba078b0136c798f8d14ba9bf6272ee0fbb40060d40508869e1f0a7292767",
+    "nodary": "0x80243592afaa7f19e9b35a3bcd1694e91c3284d72913919526bb11246a04c4ed",
+    "shiftmarkets": "0x50a0a5952cff296b8662a5a3a5c9ddcaa26776a9014c6f5579c2f6c3aa60c7f3"
+  },
+  "TRX/USD": {
+    "blocksize": "0x91e343020a6ca43266df48b03964c00860c1c7c3c92e828dab490ad1fe9476e6",
+    "coingecko": "0x54138cf9f77b54baa0150b1d5d30bb93342bca2589d7b75de61980f2bc5bb1b4",
+    "coinmetrics": "0x09ca46ee9763d0806647d5279e9a534706d2cd89c64ae10e55b34dc30add8c67",
+    "coinpaprika": "0x41ab924c0323350e2d64d0d7ebb5e5d45ef37ddaa13a55285de467d901184242",
+    "ncfx": "0x2d84b0d1df2fba6ebcfc8e0b4e424ea9148a561563fd874d4300d4ebafaaf196",
+    "nodary": "0x59bcf7ba04f4a26efcba196d20c2ce7b61a50b6aa54d99f6c7583050578ab224",
+    "shiftmarkets": "0x87f8be99cce25d1f0bfd53ac58d8aff12391bc75762b48710c1ff8b6cccb818c"
+  },
+  "TUSD/USD": {
+    "blocksize": "0x8a3f5a1382cb85e4b1d08ca440266b8a99714b28e7ac4f86e03c3a3a7299cf02",
+    "coingecko": "0x647d9e313c9e1c31839d70bf70dd9a511aa5b3a69ec186dc35e4c6d7bfaa9844",
+    "coinmetrics": "0x8d04a1e74ea59781ef65d3c7a49b84d27da1f633046bfad3daf052beab1e35e8",
+    "coinpaprika": "0x77332a9e888b91c704cc3cc3d76e5dc8eec6b033380a497fa97b706b0210980d",
+    "ncfx": "0xe5dc95eb9a951ae1025daca805cb5951b05b8fdb0c0974bab140447add3cbc94",
+    "nodary": "0xf1a015a67421196209c0b014db0862ea872bfc80d58356d0df33ce5d99916752",
+    "shiftmarkets": "0x77df142934d6a69453b8e0e73bb23aa1bbebbd8b59c7f6de22003d18bfba8842"
+  },
+  "U/USD": {
+    "blocksize": "0xf0f12679c55e0c02bd8b245c65d8795f3d287c85603858eee91adbb256aba8bd",
+    "coingecko": "0xabb9cd3bc64e2f1c4902f5c72a28aef45f0fea8ea3237beb55ca76b32d9c03ff",
+    "coinpaprika": "0x62e3d6791acbb55720181e36143094ab14914657dbab5859e1a127218c35a87a",
+    "ncfx": "0x68b8c70c2ab68cd6d824a9d24f9b92698a34855c9a6097a7450c60b98568c9e4"
+  },
+  "UNI/USD": {
+    "blocksize": "0xf7fca37dee4b8be09f5820d5a532bdcadf9020e0f7f2b3dc4818c73d7ce4807a",
+    "coingecko": "0x12d04f8db13b056a08896ad764c08a446d692a86f80884c2732d6ad932bd3f41",
+    "coinmetrics": "0xaf6a9f243ba4a7a3344caec01b045b8642c007201864322be757b52e50649175",
+    "coinpaprika": "0x055f8960ab7d86b72bb73d5300adc214b3c0ed830080b0488264ef12f0abe438",
+    "ncfx": "0x9de09967577fd03ff84275d747f5fd251a70d3e294c282e52eb5e59137aefd11",
+    "nodary": "0x77a7875472032b50c5ac4edcd3c1041aaa8b7b229920fbe9e0238018ebea7bf7",
+    "shiftmarkets": "0x3ec5ccfb3c66199fb6f62d6e7c7a8b752c5ede577a0b2ad83932caeddc2bd8d9"
+  },
+  "USAT/USD": {
+    "blocksize": "0xf3c3148408b89cf936f9ec27878fb9221c9f9ccfce863b1c3190c41d5a87ff81",
+    "coingecko": "0x9bf7697e07febfed5a39536f9736333ca4c729d7cfc34ca0a1fa6a3300af25d3",
+    "coinmetrics": "0x4933d3982cd45d08e09f4648f2979f965a2b2ba7f552a4117801dfa36bba6821",
+    "coinpaprika": "0x631f3d6040fe8bada4e7554da1e2e5185b93b5fb9279803389094fadfce764ce",
+    "ncfx": "0xd97dad36fae3bee3945c03b759f140e70d8437554bd59fe3d30b909c7a509be1"
+  },
+  "USD0/USD": {
+    "blocksize": "0x2bff12f30ca4e7dbb733d6497e9d35c1f4fc6011516b92aa3d5d9295b897bd57",
+    "coingecko": "0x494c4185bba593cb417c81678c62dcab1094c95890301d9b69b74cc3b28e0863",
+    "coinmetrics": "0x302ca230d53c7374b96055041e9a9988974cf9d8ce05ae2450290a8c7a2f8c41",
+    "coinpaprika": "0x15266b113082cc9371e5a374698825ad02537f3c3c75bef802c2b1fa82700f64",
+    "shiftmarkets": "0xdc3fe729407bc511a1e33bf171de007fe5c6a9b375244d8229b0eb014b87135b"
+  },
+  "USD1/USD": {
+    "blocksize": "0xd85847e843805894f4d0fb079f5dcb942263c0554d1708d0af83d4e75a776006",
+    "coingecko": "0x9cd0b9e6a564df4cecfd00ec21e307aacd2b9741daecaa9441bd9dd4e23940fb",
+    "coinmetrics": "0xebb766af4cd5844256c9b7de153e338a6de9718039d3f926e509f805339e97df",
+    "coinpaprika": "0x069e97dd81f64d2f0ec8738a9104ad01646fdc9fd76bf34701130d3a331f9c75",
+    "ncfx": "0x1053c1783e8922e2438f1eb49ba696ff33f4d80be8651e94b7fde64bbe33f3eb",
+    "nodary": "0xa49d29f2552c749f845300970687aae54cd605c2d90c2b63459e57f9d2f47965",
+    "shiftmarkets": "0x741016773e2926c65a25a10e648c02355dae282896b08b61abf2875e27964ca8"
+  },
+  "USDC/USD": {
+    "blocksize": "0x9c03f3e5097685cf77bb6aa98f603a4fd2b770a11c0f872d595c81d5371d5765",
+    "coingecko": "0xed95118bfe1c1f2ec011b974cc8864b6f692c38b7622f5bada807ed2491dc54a",
+    "coinmetrics": "0xc06aeb2cee6b762f75062cf569087a0c7884d11ddd0f359a471eb9a898e50da4",
+    "coinpaprika": "0x5b3ead52611924a91a97a921e303242b404e765ac1e8eb3455f0685377e147a5",
+    "ncfx": "0x4328f91c7e753a72c1075da89cf3871d35d4856cc15ecf15c6fa8a1acd4fd0e0",
+    "nodary": "0x8d0e5de88504b750c4200fc17b416e92f989aa13753addb6db88d60f1cb3224d",
+    "shiftmarkets": "0x24e8a40c14f41c8faceb8421a0a00a4c1833d3f44a3c7c8fe0e822fa516b7b9f"
+  },
+  "USDD/USD": {
+    "blocksize": "0xaa520f7c9fb92b41e853cce9372ec7cb22fe9b270db6bbe4d1da6fec7cd3ce08",
+    "coingecko": "0x3cd3df079f4456bb79f540c548e2ece8f295ac48693e480070d2678a6141aac1",
+    "coinmetrics": "0xed62e45b4192e3dc502d84924fe5288771457dec1767e363de92d364563056d0",
+    "coinpaprika": "0x3be818024086d4df4992e477d765dfc90bd3e8683fc59601d78b0bf518838345",
+    "ncfx": "0x99a013d4dbf40b9746465e707906ccd61782b8859ba4f5ccbc58b7f605630ff3",
+    "shiftmarkets": "0x60a99a69e2fc55fc1ada13b33b5add77b44021a1472ae0c35d87f0f4a32874cb"
+  },
+  "USDG/USD": {
+    "blocksize": "0x1c37c3dd526c999a2238125fd5561cd45faaeafc713ab98f5046e96e1667b9fb",
+    "coingecko": "0x9c17f116965a022bf0f94091c3cd169ff3f682186ea0fa6a735d6d1050286edc",
+    "coinmetrics": "0x8f6af61bdb39febec1607fb085cdcdd894e51d424b59e45bdb4d419319ce12b1",
+    "coinpaprika": "0x08036f9890ac0b67dfd1e6bb03d6058ed474ebe79a4597c0178a42fdf0f15e92",
+    "ncfx": "0x2c8c41cd326d810e049ad14d650b65f255c12b1a7905da59b0e5c16373865024",
+    "nodary": "0xcd9b10bc78fef5da482bd8b68e7f220689046f419e2e56286c61074778ccd248",
+    "shiftmarkets": "0x7adb946a4c074fd31c7a939a5d4427bd73819e4b94482830d0b295335e408a69"
+  },
+  "USDGO/USD": {
+    "coingecko": "0x09b1cdd0bc51fa257a64f4e79a8cec6ffe9f772fbc2e90e2a6c1f58e57af0de4",
+    "coinpaprika": "0x2c1ceb5c263d632fc03e4f1d43dcdbfac04bd8014c9fafbabac0cf4993ef40e1"
+  },
+  "USDP/USD": {
+    "blocksize": "0x3312291d01be1f57aba47f992ba3662a9e3862e226d06fb32251b879af0febb7",
+    "coingecko": "0x6548461397b72c816031772daba6b3da375683008cd5f1f6b6619134b81a7d0c",
+    "coinmetrics": "0xd954ee26b837c398d3f20b07a5ab2a097fa5d5e40b8cdfd197b9f97c86302505",
+    "coinpaprika": "0x6c592f9e26845b97927dce29bb41e7c6169bd29f1d11818c79bb9a4f53e2d8f5",
+    "ncfx": "0xf9a6a8f580e2708e1760e0549d0f0800d16278b9d00f2ddaa5b66c46edf69d78",
+    "nodary": "0x2c30e7632d1265b7851d18d8b30c73b96c9209222af0b3e749bed2f661d75e70",
+    "shiftmarkets": "0x78a4de2d0043eb40cafbd30db3e484a80fa09502e351a91f4ce5073696e6b6da"
+  },
+  "USDS/USD": {
+    "blocksize": "0xb1136e645a3b0813c79b5f7f49cf4175525bf8014d490a20f376e0dcdab39a58",
+    "coingecko": "0xb0820755fcc7fd780d42b35cb2d97d06e05362ac283980c13822703d5a4d1ef7",
+    "coinmetrics": "0x34d1ec7a0cee00b3002d958f4383cbc40de382a86b15cf0508513f62569c035b",
+    "coinpaprika": "0x43168384d54434775b1e42ecd4115f76b741a0a1f071648fb59503f915148cab",
+    "ncfx": "0x159261d42d27d86186ac43ac8310ff3d01fc681a54171168e9aec6c92768a13e",
+    "nodary": "0xdd386f60b50197dabe89789fdcb3307f595de926634357932b8060ef55f89ff1",
+    "shiftmarkets": "0x65317f41bd4ed304e9b05e644352c7ef8633bafec07e01fc5da79f62e7a0f369"
+  },
+  "USDT/USD": {
+    "blocksize": "0xb2d93943d5292e1d4b98fcca8b2b04fb7f78ed7f19d21fc285b3f1ab544d5501",
+    "coingecko": "0x7b7ce3fa226f1a53718feb14c4dce6492e955c931e791794c8d4f6ce339a179b",
+    "coinmetrics": "0x1a10b260c5c16c9e14ccacfae3e3de6c2bef167f10c51504f802195aa5dccd3f",
+    "coinpaprika": "0x822acaaba2fcdf3749b41ed7caefb067c8bee0e6ab2e56b20c1db8ece3b293d9",
+    "ncfx": "0x9810d65138d25490320b828b6eb6652d3081b6cc161a6884122dedc032523a36",
+    "nodary": "0xd75b9cd153a62cd52f84faa0ae43059ed4a4f76eafd441dc48833c45889a1592",
+    "shiftmarkets": "0x4b51e7e8d9316f1a739806e7d56414a648f96a66dbf8fba4d21fd312a9a436ca"
+  },
+  "USDY/USD": {
+    "blocksize": "0xd71b4ea08db216ed109f9cdbf95df289bb2d58486e8adec15658a7c39face6c5",
+    "coingecko": "0x59eab8d64a19ea44344c60cf70d6940de55366a19ce6e3aa1e2c5aba82d852c7",
+    "coinmetrics": "0x8c249ea008acb109be77183e48acc6329ec595502abc319df477b14717d489eb",
+    "coinpaprika": "0x7a75d4b45edb95355ada55266a8593c649d43e1f3a4c53d078a30cdb6b297529",
+    "shiftmarkets": "0x17c4b4de3b84edd63a12f141cd90601b0e8bc68112e126610a5e31ad12849a0d"
+  },
+  "USDe/USD": {
+    "blocksize": "0x3ab046da9ca7505abef17004a02d77216f5b488743a66fd53689c172889b84b4",
+    "coingecko": "0x890ce2e2ac6c8dcf206901358f90b058a51737c2dea312214c1b85a272dd64bc",
+    "coinmetrics": "0x0fa64b784ce12af696416d1c558c28610ea80c475dd432c2d24c4ec2456d91f6",
+    "coinpaprika": "0x429a84d0420c4e267e30d4512aa6c1662ff7e086535cfad5fc1cd082d33dc582",
+    "ncfx": "0x36746ee780d370be2517af6c4a75aea51352f76e347eaf51442692dca7fb05b6",
+    "nodary": "0xa2703e231228f7620e2824258be5b4551d8afed98eadffedf4ae13d479d935f8",
+    "shiftmarkets": "0x25de4722b292acb5be4920059e2f3421a1c970233971ed6a349f312bce1e6767"
+  },
+  "USDf/USD": {
+    "blocksize": "0xae92e048b6ee39220ffe604c2b39b234f4f91a9d2e89ced9bbbcbffac26d32cd",
+    "coingecko": "0x2d00f37c2d84c82804a7ae5bb3001695e8ac61f88db9d1fc73b7a497851568c8",
+    "coinmetrics": "0x5f9e8924298506b9b1fd206ad7820103ef3beb67615b6782ab94df539b0020f2",
+    "coinpaprika": "0xd2ecba67989283779aee3496689f989a66c3eec083170c834ec4ceb11f313b5d",
+    "shiftmarkets": "0x1ac149f8588b935f0610555a855195bf614f213824e6a161145874c33c96af2b"
+  },
+  "USDtb/USD": {
+    "blocksize": "0x47ab7db87f7fceb323781ffc6a83bf12f8dbc2b522daf066024398f4dd9a4dfd",
+    "coingecko": "0x3dc9ed2f3408fb93495fea210a1e8324418088bbfaf27f0a11a5ee597d9d11aa",
+    "coinpaprika": "0xfd55133c4725097542548d5e62d0ff587285bcb1d728c8712a6f62c6dfe98994",
+    "shiftmarkets": "0xf0d1660ac643d2fd1522f914040f3fb983819fb4168ff40c2ff016dad76f935f"
+  },
+  "USX/USD": {
+    "blocksize": "0xeaffd0ecaee88276b22819d8e363a75fde49be3fbed312deceb5da9d470873df",
+    "coingecko": "0xfd6106986398a7eeb457d5a9a763407bc517f2336ecd0009c479b453f730a777",
+    "coinpaprika": "0x7ec3c65fc6671481442fd2f48a9f8886b1e5d7cf31a67fa33a8101f6aee66718",
+    "shiftmarkets": "0x53efd49d8264126817fec84d8f9259f01b08b9e26e3a5eba8192fd8ad9fdc2ac"
+  },
+  "VELO/USD": {
+    "blocksize": "0x83927eafb96b126d0d215af8a35507a4cb3cbf385e5b7acb263450a3c563c3d9",
+    "coingecko": "0xeb02dd7aa420feb7d2c9cad309727a4c611d04c2caa42bf04a2e34ffa3749779",
+    "coinmetrics": "0x4bd9f61e8500b5df970304fe422c8d0d157a4228cbdf806ab7922814a5e4f5f7",
+    "coinpaprika": "0x10343a5db88c434e8611c62240e5ebfabce4a2d379b4de95c8f3c2186aae4734",
+    "ncfx": "0x2086b83b0e9376ec9ecb53cb82997d22c1304b5aee08a4e0669238c0cb08092c",
+    "nodary": "0xde36dde9bf04c7910335dc9d08584024bb22fb39b5376e65ef09703a95a539cb",
+    "shiftmarkets": "0xac0a01c4613c8e442d952d576a8f6d75b53df73cc511d37663a07b99a228b9c6"
+  },
+  "VIRTUAL/USD": {
+    "blocksize": "0x1d98278eb8a8d9389edb8cee3e46cbd353765980a8cb61b1b3a2d2d35bb4d99a",
+    "coingecko": "0xd22244f5aaed40322215a3b335b0d5f6e487130c4891647cb6d3ebb927ecae3c",
+    "coinmetrics": "0x866e085d94d12d65c016f0af3a0e81fb845844d29efc8e0cdd4e7c7b3be734ec",
+    "coinpaprika": "0x1aff241a555677af18bbe3313b44735956b7bbd628b85e9f07b17d8d6cfd712a",
+    "ncfx": "0xbad231088a6cd369d01d92ed847d743e55650f1979343c25737938b340a783a9",
+    "nodary": "0x4a1f6acd0f1b2413f17b7e3bad33908542b4f01ea5891e00c01fa865a9eb31cb",
+    "shiftmarkets": "0x811fb437ffb5a5316fc9389dfc11ad58ad4c96fca1ceb459b35bcc9b1b46a6ae"
+  },
+  "VVV/USD": {
+    "blocksize": "0x4a889fdf258d39a35001d8567bb5ef0f1ee811b7dcf721d52c36533748b8ffb5",
+    "coingecko": "0xd9b74c6c6c2910d5460bd03768cac86db0f48ba8fa4387432c2309b3a34b3a21",
+    "coinmetrics": "0x84d13a83fe6451d457b55d176ccf5b7430d19a37bed3915740adf0fee2a242c5",
+    "coinpaprika": "0xa145677628d986b96636d5e57659a7c12374d2a14a509a29df21a185dbd57b3e",
+    "ncfx": "0xfcd01e28d233ac2e6a0869f29738eaca6f65b4bf38443b4e55e85bc257fee30b",
+    "nodary": "0xeeb0a10e159d6c4336914a40d0286a6dc1579ed2d8c20c4a8beda09e48c0a6b7",
+    "shiftmarkets": "0x240aa5e0eb540e4dd1dacd711f789ed43332e9329855d8d313bb7c684a3ae3db"
+  },
+  "WBTC/USD": {
+    "blocksize": "0x0c8ed0e04eee4871b93b879621715a262ab73113fd7fa00f4842bd206e89f57a",
+    "coingecko": "0x0b5fa054a22f07dd1d8db96280eb195b8a691903648f97c583638ac95ff94eb4",
+    "coinmetrics": "0xe50a1c2cceb2fec730a4b6fdbd602e7421e2bb2cad3ed2b763e77286cba267d5",
+    "coinpaprika": "0x27a05ab9e3a4d83d1f050ae4759afdf31092b6eb172af81a3863fb357cde0122",
+    "ncfx": "0x93ce9a4fa62d71149c762af4d36ef43ac724d4fed8ea5761f640077cfe34833f",
+    "nodary": "0xf99370a1d814b498451f410fd283367a5d5d86291cf5e3fd26f1f75c8f7e3842",
+    "shiftmarkets": "0x380a64fd1d5f3ef5e92e4a461e81044163d657ca157bd996a3bb2f5d79268956"
+  },
+  "WELL/USD": {
+    "blocksize": "0x74955536d9bd746c164137525cda7a171a7b118d16b77ed3a4d524bcc49284a6",
+    "coingecko": "0xa31eca410101ebfaa48b97fe5284b9ba5c9abc852ff3a4ca38fb439f45f866d2",
+    "coinmetrics": "0xbeac8c446fe6e768a8dba66f1cf416a533e12572d8e60a747f131efab0bf62ae",
+    "coinpaprika": "0xe389ef72065e06980a9201b36a64e7229c4625bfab0b446198905d855adec354",
+    "ncfx": "0xe114050ba51034a0173f0c98fa414d05dfc4d9c3b5b984ecd21d0ff88dfb3cb3",
+    "nodary": "0xbcad89564d5669881b097614ece193dddf27746e1c2e2d2d5390e99e2bc457ea",
+    "shiftmarkets": "0x644402d9988657006738f38008bab578c86de9d3a50a455354cfab578035e1d2"
+  },
+  "WLD/USD": {
+    "blocksize": "0xbc309c5184b82306b4533394d65e43de031ebb99b2a93643f35ce0bda48768a1",
+    "coingecko": "0xcb0bc834effcce5afb576814692fcc9b5b9dea81938b984e89eca59497f4cf4c",
+    "coinmetrics": "0xabe55101b2904acb76f79cf01ddd2a35ff8ed12ea32c8dc6cbc7f66e8dc7d505",
+    "coinpaprika": "0xa2a51a3a2e4f608bf1fbfb82e22fed7792c259bd50945a9d81521bb429d05aaa",
+    "ncfx": "0xa5edafd05bd031474a416e3ece81a5d6b00cc1b4ad70a328f0bc88a58f8b7123",
+    "nodary": "0x439d06e950aa10bca3058b973977be7ed821c62dc2a00d16d6f171a045c5148a",
+    "shiftmarkets": "0x38d6a7aad7e24ec20002033e57b087e528f0a8d191f001d6e2e51d61e8d3ee02"
+  },
+  "XAUt/USD": {
+    "blocksize": "0xd0720b78cd611342c3ad238015ea45be9de653c3dd46416a1e121949ff91f35e",
+    "coingecko": "0xec550ac009232e069c1fdd1b4fa9ce010d5120c9892115ea4780a4d6f21a982c",
+    "coinmetrics": "0x643b01d843d596693500ebdd392c0358d029f7b041f8e3e9d00a2f7cb989d8b5",
+    "coinpaprika": "0x460be2068d2b81b73cde2691da86b783809b3021540f82c09550548c625fbfc4",
+    "ncfx": "0x02dd602b7c52827be26a67e7b77fd8285b2c177d8d0547cda2cf9c57fccbc060",
+    "nodary": "0x092d2e04fc72b61693a86c6305f661a8b7d62d7b2e1dc23a2759039154275a42",
+    "shiftmarkets": "0x556dec7dd733e05d020e09e63c0cb8d7b0b5ddc6d3630615cf5288b7ea874530"
+  },
+  "XRP/USD": {
+    "blocksize": "0x681ca3fd35834a70eddcd5e9edfdc6e715ff91fae7c2530907fa52f150c06845",
+    "coingecko": "0x684f465e2b8dd33adbb2180cc189b4a4048554706e407b0cc015cb3a230a938b",
+    "coinmetrics": "0x774bd3b61e176ecef9402915c45c179629f611bd5203288406854a919d53e237",
+    "coinpaprika": "0xc44d4a3679112b3078aefbb64f581bcebaa3e9c11460749e3421c68103d09fec",
+    "ncfx": "0x101f552faae34174a7f2390ce513ca30b52f4488e1bc3104c6bebbd754075e3f",
+    "nodary": "0xc7876cb33b61d06ab86a72f1e32b2b605b7a23ac8471159cab21bffdcccb86ac",
+    "shiftmarkets": "0xcba8f64908a8b13abd12633bbe6417ddb80610a7e44071c8d2eb526e0a95f3be"
+  },
+  "YFI/USD": {
+    "blocksize": "0x23bfb1ad077823b8ba273f7fc2561315d85cbde0994a0bdc9752bbaa7b258199",
+    "coingecko": "0xf5d3fdb28ebee51a10abcc02ec982a804c02a569048bd4eb3d40d73ab24f4bfc",
+    "coinmetrics": "0x326ec534f75dc32a01ed9cf048fed73ada9a18d9cd07d86d45f4bbaacc3c62a9",
+    "coinpaprika": "0x2b6edc0ee43b7cfa46ac6be44783bf84d81fba2e070f6e1f48f0458cf5354dad",
+    "ncfx": "0x7c6b8605ea8cb4ed6f2c0aa94b41fa7aef30ddcc8ae1218eedb7f5697429cc38",
+    "nodary": "0xf6ebcf18e20f5d59399e2ff5b1812e01e7f812567162c615f57ce2c231cf9c4b",
+    "shiftmarkets": "0xdc7e8f83c6c9b482f0d7c2509b862b99e8ab4916a4910ec4c48ca983ecbbb522"
+  },
+  "YLDS/USD": {
+    "coingecko": "0x406a7bfa78901cfcc9e042b060b1653540a4315a0f2171f7792f3d6ae62d4f82"
+  },
+  "ZEC/USD": {
+    "blocksize": "0x0b467ca80281a7e17ae7ad1f987ec1b2adfce9badf8dd42b22999b13b9c521fc",
+    "coingecko": "0x0fe493dbbf2b274b5c2395db38f5078f1ab51f60c94ec5d29383cd6c7eda3032",
+    "coinmetrics": "0xd2105d7fe2672f1aeb792a93e3eecfea2b562b318e003e4395533676a8d38f40",
+    "coinpaprika": "0x985a32934657f6c9417cbf19e613d885cb05fd9f25c53733b5aa74887f031c21",
+    "ncfx": "0xf1d95e5f5a307ec112c615bb589d32b26d3b2cb17b9fddd03b62d41e2135e70b",
+    "nodary": "0x354b83903b12f6a0e70e2f2a167c63159850a4a1258c6a78513532be4eaa5ec8",
+    "shiftmarkets": "0xda5046d151e41990c4d2fafe9df0da26d02421735b791c9c50b5c7944da657f0"
+  },
+  "ZK/USD": {
+    "blocksize": "0x85d6e22508e3720bce7b5eaa2a076ea063022219eac1955e5d4aaf7d22329a15",
+    "coingecko": "0x9b34ea88100a612a1f2edd1896ebfe1b9f0fb52f6cafd638c8b6e3c8eb7f7830",
+    "coinmetrics": "0x3fd984220684145ea57ee4257339971be2235021e5913586a3d11ef1c640c710",
+    "coinpaprika": "0x14c3a627a1f3eef0516d6943408bf6f0b12dab3256912d47ea3c04e425aa361f",
+    "ncfx": "0xa5f15c81cbc5f97a6e4d106205afeb6552fcf06cee5497ceebaea91c3164606a",
+    "nodary": "0xe5924a37a3ba65132892f0ddcbc97cf293b7a5f8d702ae618d16c0a08a8f871e",
+    "shiftmarkets": "0x0367384ca06f42fb1924649c4fe29e7de961b80b64ac14a9152a0dc69f2364c1"
+  },
+  "ZKC/USD": {
+    "blocksize": "0x5a43613e4bafe6270679366a7f6673159789dbad7cea3275d2a4ced725c8c96b",
+    "coingecko": "0x3b42813c1e7afd0059e2c15be59df4fbb8a61fc90174efcae2835d479830a1a9",
+    "coinmetrics": "0x8864778d287466d62c52f2bb4efc2868e4159d2f7891685e0a2a8000c3ff4644",
+    "coinpaprika": "0xa17f751cf6e81fa4570aee1685db8992dab30435add04fd773a95ec0cd9c91f4",
+    "ncfx": "0x4e7b6330b42e698c3aa19ff9b7c45242632318272c77f0810c5726ff95dbabdb",
+    "nodary": "0x7905975176ea5a2ef4f38689a3e48bf18d45f89944c7051660ecf89f7b9cb636",
+    "shiftmarkets": "0xfba1953d6ed2a503941526f3d0d8c724b2af5b7d73db66d2dbc08bb648546258"
+  },
+  "ZRC/USD": {
+    "blocksize": "0xb63c035c71d0d7cd831de1e6ef50cf1217841de8f92c6e0898073295868b890c",
+    "coingecko": "0xd552ce6c91ebc942e424560e76080f3c0682da0389f125409e8973e8fd074120",
+    "coinmetrics": "0x0f13727eab35453dee2ee3840682e0320c262c4c8d509bb455f0452e90a0620e",
+    "coinpaprika": "0xd8bf42946918f00306dac3d95a4bc1b605cd85ac857d6432bd1551e9014334ed",
+    "ncfx": "0xa9a66aeb042cd65e1f069106baee8902d2b2412571813d4f7cca87dba34845b1",
+    "nodary": "0x08fb7315a74864c360b899d8e0e160e798bee1f7885a85b50f9568ce77b77fe3",
+    "shiftmarkets": "0x21c25ca01f0701fc6bbebcc432edb2158403478d497fb88fc29d424e4d2d0225"
+  },
+  "ZRO/USD": {
+    "blocksize": "0xcf7e3d1d5cb9c59e20e6865555391835d6b3471afbbf892f6a3562a3314a5a28",
+    "coingecko": "0x192f7ca5903c0c8eaa6a96fe2992bd59807cd6a8ca4cb1a7fe7f5ba4703fdaf7",
+    "coinmetrics": "0xe1ce641cd377f50906245bfd110c6f639b0b4c9bca5bbf29f584745170a50371",
+    "coinpaprika": "0x4708b43fdb76636d218ef0d26af955a826e01cf385badfa12fd219642e4b29f7",
+    "ncfx": "0xdf5179c2225cb9b2180d94c719540fe827dcab13c3577af33fffe19c2fc3898b",
+    "nodary": "0xc92ecde0cfd1155ff0db009f229bee6f2c79adf40ff0b03bb3eb9472ab7e227a",
+    "shiftmarkets": "0x1784c669187711853b01fd68cdf12795346e14742ed1494b394c37eed3d98749"
+  },
+  "agETH/rsETH Exchange Rate": {
+    "alchemy": "0x6cf297c1db0af5ec844e83a74c416a806cce3c016211855ea2cf8ccfb78d9cd6",
+    "ankr": "0x975798dfc7b9e9272689a607e2560dc92e4cae6f86f14671e070b34a5a0d158a",
+    "drpc": "0x192fb1831fdfdaecafc153b71be27457d32ac1ec59fb3d6c1e79340cc3aff5a8",
+    "infura": "0xa5ecd3edd347680898d1e3075540882ecef8d1a18ff6e503b77fe2eaaa32bbe3",
+    "nodary": "0x1e2b21daa43f29a4bae04f6d960ae1b10dfc95121e99ffa6ff37d283956683dc"
+  },
+  "ankrETH/ETH Exchange Rate": {
+    "alchemy": "0x509911896421b7816c4a32869fb9bfa64bbd035e89ec3430abb8fdd66db157f0",
+    "ankr": "0x698c6f00c5d62a47f806a0e60577dfdbbb02a9f79e237f2f7bb759c5d83850c6",
+    "drpc": "0x7ca6410ea4a8314980fc7070c93715b97fb6ed710f6de589678170b2ba7e4b51",
+    "infura": "0x20e733f6467264128690d3814a14cac60ccdd3d786408de8d4efb14469ab2422",
+    "nodary": "0x3bc3022ae76a9ece0df2250819001a59914e962e232262eae5f8040a6a485bd2"
+  },
+  "apxETH/pxETH Exchange Rate": {
+    "alchemy": "0x12091e9e78e8e4b0b9b5c7936880356781d7eed8296fc764c8f72ac876196376",
+    "ankr": "0xe77fdddae24c785755f790eb045d0d1ee78eb4474f8df1cb0b75abccd94c86c6",
+    "drpc": "0x86e9a8448639c0bc5a57afc36c7be4cb5512c7ab0936c31e022a5c62c569476d",
+    "infura": "0x56fab2985c565e7f2293515141725eab17d5d3042cbc4ac1bf2d0517d621a6ff",
+    "nodary": "0xf6cc2a6372ec93f77c785123eb0659696146c8e329f2852760b9734c1a4d4725"
+  },
+  "cbBTC/USD": {
+    "blocksize": "0x94cf734c118be726842f5cb1522929fde22a6314f44c9931992f9c0d8b7bb73f",
+    "coingecko": "0xf90d64cdfd3395e704c4467df982342f3f52a31aba59a3cdc76aadc8dad4976a",
+    "coinmetrics": "0xd1eb4fa97462ec98f235b7613f32d2cb54992cf4284f98d481b534960c9fb970",
+    "coinpaprika": "0x7851ecbc76189cf1f93be6e765e0911025299574d7f4b663e0ecee1dc38c6112",
+    "nodary": "0x2df7ffc4cb72f370b7ed494c340b45f9756855e547047558788c6537ef3d3095",
+    "shiftmarkets": "0x79d6549de163bb2232e32b10152839de6bdb166c2d212b96342c104102f42e8b"
+  },
+  "cbETH/ETH Exchange Rate": {
+    "alchemy": "0x24c3eb9e222d7d8a05134ec4110660cdb9eba1b0728a69d6033c995f71851b35",
+    "ankr": "0x7ede5a716526d0695b455cff8d60125f97569c206c16ff76480e2b26e4aedda9",
+    "drpc": "0x11cb82bd99ee5bd1861c6b771fb72048b1cf34de1e80975a087f9961ceeb6570",
+    "infura": "0x7f4bbd2f730c88c3d7ba8b3cb1ec5be14c6773522391728c809a73448f8a19b9",
+    "nodary": "0x1005ab8474c226d7255f8d1dd8a3a4ee6234d55d35f2635f40facc3d739a866a"
+  },
+  "cmETH/mETH Exchange Rate": {
+    "alchemy": "0xa0772dc8807f0385cd938ae1eb7c48aff3bbc34fda95fb05fe73d41dd6ec7326",
+    "ankr": "0x55084c60c500d5a0444b3d2b8182c6648fc130ed32ce0b49bf883c68b7362272",
+    "drpc": "0x5ecf738cd2da8c942f5691a22c7c7b2841258b423d60b6a0e6e0d9b92ee83f77",
+    "infura": "0xb55581fa6563f719513fd61839735c71fde16ad87845bf8d1083737a6dcffe33",
+    "nodary": "0x3a3df1168b82c6d6fd32d31176d1ca8cc596d26e3415b97ad5ed3753bc13707e"
+  },
+  "crvUSD/USD": {
+    "blocksize": "0x03f8b6f0d7ca930ee8de23805f27bf53e91495a9a9d4f5aba42be434a6507a67",
+    "coingecko": "0xa7600072a49c5522023aa472f91445acccab8c51381c7e3344cf34a7e17df0d5",
+    "coinmetrics": "0xf4b66c4315b64885285d7b7c1008a74802e0687db20d285c239a7646e8f18759",
+    "coinpaprika": "0x57a083b25f88c3c166010bdb3b086db64ee66878e07f1112bb4610d3530e05d8",
+    "nodary": "0x569cf0271cceaf14695fe356b9b12b29cd3b8985902afb9e1b9a6f0ba5f8d7d9",
+    "shiftmarkets": "0x3109228ea7092ecb916044654fc57f26e494126d022bdacc45ff7c0b45460d58"
+  },
+  "eBTC/WBTC Exchange Rate": {
+    "alchemy": "0x8cb98202a1379212e1e4fdf44894799eee330cc77456e667a61f7913575b0efa",
+    "ankr": "0xa031dd4d2dd88d6562b45f14d42c8fc5b8483a436c46eae7df6a35fd5f32faba",
+    "drpc": "0x3742ac12b9928324830e0e0350454c129cdf195e724a8cc40dc0416bc26259d4",
+    "infura": "0x01ac9a9bf23bdcde9efb14bee80800c0acd4c99e2c8628084201fd8de2bcbb30",
+    "nodary": "0x4545d05603891df5c07ecd7e222b0be05339acf77a0c008574375da5a206c819"
+  },
+  "ezETH/ETH Exchange Rate": {
+    "alchemy": "0x07027f3640ab08924aac59b1e654f6ee0698e22a3d1a87eaf66c11a8605491df",
+    "ankr": "0x6cb2dc23ced4be949183dce3012eb39baa30e7a39a9b948220bfc03acadef1a1",
+    "drpc": "0x0b5ca7c4bfe64023e9fd1f0a27ccfcc731237ab6f8fa7f4b626163cfcc5c32c4",
+    "infura": "0x51674a342dafe4785818c0f87254ed75bc089c73a2916e4af9f1de35bf78927d",
+    "nodary": "0x3231acfd0ddc810ddd7caa2d14ecce6c59cb84e1b4ab72ed0e4ebfe05f27c24f"
+  },
+  "frxUSD/USD": {
+    "blocksize": "0xff9ed61ba3a65bddb8b32f577ba7ddbef7f4ef2823d04d43f8d4f2b1966204a9",
+    "coingecko": "0x1df850928f767604dd68056af65f5ef15eefbd48dc88594bb312702257d94cff",
+    "coinmetrics": "0x28b26edbc1cf1e7dfa49d7f50d11d8b50306a14f1efaf166dc72de45da7b2f71",
+    "coinpaprika": "0xe3e412d85f46aced7c605260311b3f058c59a0a6b49bc3c80a9a79650e8a09ab",
+    "nodary": "0x1c907210b050b5032db5df4d7353e41461092ab79b2e673e989ad1d1e686d57e",
+    "shiftmarkets": "0xb3600af6d13f060f23d852d97a86c6e9189c52f1d86c4398b202d4a9f27de4ad"
+  },
+  "mETH/ETH Exchange Rate": {
+    "alchemy": "0x0e91c3bf1b94897602e00293c356ded85d609084606447f55ead1fcc61b711ff",
+    "ankr": "0xd978c244e924ea08cababa238a45ae241e1668f299ad51bccd33ae57efc6e09e",
+    "drpc": "0xf121408b676bf884964164de317e53cd52d46c78263e689a29262e6bc0f84de0",
+    "infura": "0xce6e3c858fde1eec089b69227c613dd7cd29a26935aafe85d4162f5d97b00cc2",
+    "nodary": "0x441a7b5582b4f60237efd7b773c963e93a42f55b528c6e23d3e8000099670684"
+  },
+  "osETH/ETH Exchange Rate": {
+    "alchemy": "0xcca0787acf4592354ec7479157c3291d5f3678bb3275de65e172151b5f421809",
+    "ankr": "0x632f49bb86e7d373568e7e69c0cc29e59662a7617b65d6c2eb23404780dc96f1",
+    "drpc": "0x5067a2d5b97bc98b1e1c7668b1ce724f89a1bf375d9ca0e8f9d2bc60450f4bc6",
+    "infura": "0x2144ff7617c258ff627ac076818cdc116ab2de62262c3c6676ffaf91eeb196a7",
+    "nodary": "0x96d8c20e8eb714203d5a0d28f63825727d6facc891cd200bcaaede67901d7331"
+  },
+  "pufETH/stETH Exchange Rate": {
+    "alchemy": "0x77cac4438a67d0e326aa5ad9596dce1b64eb2f8cda2a41eb4985ebd57bb1b8a0",
+    "ankr": "0x2f6afdf22231fc1a7ec755e99b8b657a2cd446228ef14cc5249e1f1428336d25",
+    "drpc": "0x7e4552e1754dce70e66d3d0553077d15cb7d37eba9d3949e0c13802cc185df74",
+    "infura": "0x12e97e432af15f80deef83fef106a5a1bfe398f40e3c29b97ec61a204e93f4f3",
+    "nodary": "0xf157d530780765d6b79d02a6ede38cc0df7404a82c2e376d049a4f172589ff36"
+  },
+  "rETH/ETH Exchange Rate": {
+    "alchemy": "0x45377cf2a22d9aae2bf8356d7e67c58453c2ea01399475b36ed3d5c850623aea",
+    "ankr": "0x4fbb430d1e383ce26471685013516488ea6381505654ec1dfd6040c6faf8ac9c",
+    "drpc": "0x890b0b53ad823fce0be19d359398914dc9d98bd2448ed2545e02d27106c30297",
+    "infura": "0xca7b79c74948638ee65f7bf367d1488250493a838057c1e0ae39d374d615426c",
+    "nodary": "0xb86a44619de69b729d4f029d2f8d7623fa3ac88f73e724ec7864bb61c7ffc54d"
+  },
+  "rsETH/ETH Exchange Rate": {
+    "alchemy": "0x0f1223c03aac3a09c9aea07ba0aea257309ac9ec91ba50de5d75a1bf416541a2",
+    "ankr": "0xb468a8384effb1f9b4567db0e532e7bb8aa3e3976fdce608b25b8ed6498ced06",
+    "drpc": "0x26e61c46a9701c6283996eff7f3ef2b05ac8de22935fad84ca204eec2d703b58",
+    "infura": "0xbf254e38f32793667d64e68a676d8e2bf0ca3458dfb9b40e9f8c8f64a9305726",
+    "nodary": "0x951e0015d1e113b32bce4c1e2dde4bedab1c83e3ab7619eff51ba8d35652acf3"
+  },
+  "rswETH/ETH Exchange Rate": {
+    "alchemy": "0x21bb8325cfdd1c4e0348fa799b3fb04eda32dfbb8c26ef715db1590b160725d5",
+    "ankr": "0xdbc9c7bdc2724134ae1b4157e6da2409f4dc07e360380e7f03c020ad9c2ded24",
+    "drpc": "0x792eb445c1141d241aebbcc761260013f9bd63b0a808b5618c81fa687d598c57",
+    "infura": "0x8b5739cbeb08eb50cf98d270c11b487d9cd970c2108d63854a095eb9b52b1a30",
+    "nodary": "0xa25136286a990d1f1cdb43d45f3c5186e0effaa7cb57b0448e69da793297a190"
+  },
+  "sAVAX/AVAX Exchange Rate": {
+    "alchemy": "0x999efe41bcac770d54bbaea367a93aeea981f0eb578bed8b281ed907ee8326cd",
+    "ankr": "0x8fa8e7cdf350757acb95e0eba2e4c97a3642b20bc769cae7c43cbc919aaae35c",
+    "drpc": "0x77e94320ee16c05900adc3ec74b3071977dc5b84e50ba6587005c9a9d365aef2",
+    "infura": "0x554fefc543ff90021f521bf7ec40b234afeb4da5089fbf82d49c08a71add83b0",
+    "nodary": "0x63f897d6dc8cf650217d0ecc3c49b9d4250675469d0311f5cc784d87e8c34ec1"
+  },
+  "sDAI/DAI Exchange Rate": {
+    "alchemy": "0x59f979af48dbc9112e0c81bbd21f70306b42234edc95016fabc5758893177a61",
+    "ankr": "0xb31d4070d38e1146f82823180f290c237956b9c121aeb44fe7b68d3c2850708b",
+    "drpc": "0x95ac5c54b95f9fd3b25050a33eeac5bd795b4e6d32167da8673051523b60a3b3",
+    "infura": "0xe5a9e2aa61ffb11817f3881e1990ced0a0e4203fa2ff4d7287fd2da4956bd1ff",
+    "nodary": "0xc2372ed534176d1f7ea4cbcd69f1c281c8b7610b33fff27c22ae5381555f6065"
+  },
+  "sFRAX/FRAX Exchange Rate": {
+    "alchemy": "0xedcfd531d95ac9702a3cc0d7e6ed5b56e9b2480e68173ac26966299a79dfba18",
+    "ankr": "0xfc4e0b6bbdb5f2d5a7f2883f53a60b987fa0dbf5ce8c5ef4b0c2b4ba2f5eff2c",
+    "drpc": "0xaa0684f6ed951872ca334b8213538d9723ba8541c7f673cd087889bf07b4873d",
+    "infura": "0x95765cdc3d7233f7d6e6f13bfdc26d760f721423e773c839d32154c36e08a614",
+    "nodary": "0xa2032fef0a1f1c3aaf0679f8b2eb1e038f4e6b3b1ea8229d16a85c4782b98101"
+  },
+  "sUSDS/USD": {
+    "blocksize": "0xd4355b1b75bb1318e94240af57684351da6e3a042823d498c650eb4fa7c9be65",
+    "coingecko": "0x9206b1b551687e0a2abde717b406209509df167958b8d8b81fd9131200fa1ce3",
+    "shiftmarkets": "0xc45112c513ec3df6a9128b71ca306608c5b3353dbde8dff61f7c019c6b8c54e4"
+  },
+  "sUSDS/USDS Exchange Rate": {
+    "alchemy": "0x741de752f15aea1487bb4c255d58503886410043151fd97e499819c0dfc50f01",
+    "ankr": "0x0f8b40174e2b5b8731922d1cbf8f4fbdc84cc7b93939ad73471774d02d6b6f0a",
+    "drpc": "0xb567b4682f4cde9c8af45afafcdc7cbaeed3936cdce2fc8c955cb97b0cdf9e84",
+    "infura": "0xe24f6c2dcfda6f07049e5013d8766f67b294d2048351294cfecfb02282e2c10a",
+    "nodary": "0x00a8cf8b550ea8cf8f3cddd8e063b9e2c86581bdc41fc9dd59d73fb40ce5f6a5"
+  },
+  "sUSDe/USDe Exchange Rate": {
+    "alchemy": "0xa2367f5db8d09160e7893c25791aa43e99922287f7d3ba15425171a5679d6468",
+    "ankr": "0x37e709f32c2c962d5f11c0089ca9a370feec2508dd8ad44f57d860ab8ba81f4e",
+    "drpc": "0x020f5796329f6530095c0ca2d5e6fadfc0a8679932f329c6601fcafdabcd3e9b",
+    "infura": "0x7f3fafeb8a27d903fee39bc2ac5a9183400588feaf394258d063d4e300d94e23",
+    "nodary": "0x8675f9893b84e20e2b2bfc78b727395e2b456e1eda2c391ad23ca0e3664c0b20"
+  },
+  "scrvUSD/crvUSD Exchange Rate": {
+    "alchemy": "0x5ddad2a17fe7fbae3469b7bfb7eeb686ce1c2e0f9559fbfbbea635d101cf862c",
+    "ankr": "0xf148137d92b003d2328b045053936daa0e0148b7d63ab38eca8d817ffc9ba7e1",
+    "drpc": "0x1e54128aac02fceb6a22add4a17cfda962060f87aee72eb5495c3ec95255ce41",
+    "infura": "0x4f29d68332b85c11390d3cd82f09f5effc312aa447387383c7f3cd41019bc499",
+    "nodary": "0xbd4d0270b8c2f7b9807c67956b2b0e08dae182ac30d32d43fd9e20539b70369e"
+  },
+  "sfrxETH/frxETH Exchange Rate": {
+    "alchemy": "0xca1580f2f43d5404ad2477a8f28895a2c08b7db40cbdb24718f4c9a65469b382",
+    "ankr": "0xbd56ce14964c2dd963a0203391b2fe6ea3eb5cab4f70215b8f378bb5a2ab67ec",
+    "drpc": "0xede621f7de7029cf04d4bf59902bc19acae0420d190e0a20f721d287a6a2d63b",
+    "infura": "0xdd65b2e214c3f680c20625859f205f97630f15e5cd43fc08233b25515a7f7de2",
+    "nodary": "0x44fdecba7fc5fa83051e50bf07b919f3842c223ad0b43afe83b39f2b53518e97"
+  },
+  "sfrxUSD/frxUSD Exchange Rate": {
+    "alchemy": "0xa937fd5c3087973cf1a24e229faac76ccd800c1bbdee892655eaadf0e4a63642",
+    "ankr": "0x3004319c9f0c6fd67dae27d4606a6f2324914fc131a806366ed9758f8345f008",
+    "drpc": "0x1928122ba52e885c6e1c112d649ffb0a782af9496ac77df25eb7758e5ac9d7c1",
+    "infura": "0x246b1bc6624d3a3d6d6cbdf321b3ad29dca518d3349dceea5b678db43c8a78d4",
+    "nodary": "0x34e4eaa92a137b5b980d72bc3d31f87e1b334485b0af9c0451db6fb1ad7c645e"
+  },
+  "siUSD/iUSD Exchange Rate": {
+    "alchemy": "0x7c5fbec613bd4f27bfa6d7792b9772d077f4b5b8c11a894f789a04092363e7e0",
+    "ankr": "0x90336b81bc023965c4007885657e214d8bf43356085df5fc12af4f256bdb0e7d",
+    "drpc": "0xa5d526f73bd43536c8f95dd048b09ea40b45b21f6e0a4d55a9d6c1684a4403b9",
+    "infura": "0x40390723932bfe1754754acf2c929d335827bc17a07d35ab25f5b39464cb7379",
+    "nodary": "0xe9df162eb53c6786894751c53b2aff046771b06fb4976288ba8ed624c0a8507b"
+  },
+  "slisBNB/BNB Exchange Rate": {
+    "alchemy": "0xa93f3d5e590d596936fbb4709e41bc38061124954f008f081a4b9cc1d89c26d0",
+    "ankr": "0xbfa03a07d6f7dcb07afc39670fed3aeb3b47451573694754dc6d4dba99b01ebc",
+    "drpc": "0xc8bd11196c39d60be2139bcc66ca90a6c8dda23bd9b946977874d2c401c15942",
+    "infura": "0xba7063440b11702448a0f9842bef3face8ab2dbc6a7283db1455cec7b95b606a",
+    "nodary": "0xe99206f00d671f5f9d2c76efe5f43805c80bf3402837b0059b9c60017d14f88b"
+  },
+  "stETH/USD": {
+    "blocksize": "0xf9f6d2f5d0c541a1bc3793b97745c4219878802bae25718712e3fb64c4f71aa0",
+    "coingecko": "0x79c16119df6ae81005c68d96f68f59c292f231653ef87f77d7d69048fc734bc6",
+    "coinmetrics": "0x95f2afb21ef2027adcdaa533a0f09b235bfea6a916be767443525ca671ceda08",
+    "coinpaprika": "0x8643671dcde1c3a17b59828777f38b6de89f2af5f3655c88ef85d0a7ac6a1281",
+    "ncfx": "0x956293dd4d053f129857d95efd157e3c158db824bbc08c72bb0b3a7755ca1d36",
+    "nodary": "0xa7ddf08967c2bacbb9755bfd9ffd26b4d0f6dcfd29933100b6a128be11d6a0ac",
+    "shiftmarkets": "0xf3274b971f3d904f218fa0b04defc35526bdb083cae624d11dad49e5cfdd4ea6"
+  },
+  "stTAO/TAO Exchange Rate": {
+    "alchemy": "0x13bf066b7f9d19b8da7bc46ba97942635baf42dc81264467f1f7d63ea8a8dc95",
+    "ankr": "0xe354f0d4a5c85dfc2d384d79a6e2932e79c7a29dcd6fa84f356bc70883a8addf",
+    "drpc": "0xedf93ae57ef1d579c23fccb2bf7b00b49f7245892f1bbb05fdcb1bc2908416de",
+    "infura": "0xb4ff479b65cf7d4c5ef404c12fb71a4bd9fa5915f976c471d0cd6480a99ecd40",
+    "nodary": "0x00bd55f41f67de2441b9701984a9ee1e330d024eeea2e0b8b3f7915932a64e72"
+  },
+  "swETH/ETH Exchange Rate": {
+    "alchemy": "0x5ef0468edcd9bac4e641a4d96a1a914d283b95d7ced7ca994cc182ca8ef3e9a7",
+    "ankr": "0x08ba7431d307186e50650f9a683ce10864a06a360473d003c10fd87bb647b094",
+    "drpc": "0x645c5ade43d6289667f89f6465ece194356316af44e1f5f934c2e2277347569b",
+    "infura": "0x5bf927978c7291a03ad76e50a73f19134977fb841890648bdac0ff169b2bc4dc",
+    "nodary": "0x6bf5483e2b53e32fa0f2ea6b34798c384f7f28254d70492f513824bea6f74197"
+  },
+  "syrupUSDC/USD": {
+    "blocksize": "0xad5193d539cf3a5916e46f4c7b8b7f6ca0a7279c20847009d814f920f544e759",
+    "coingecko": "0x028d1e902f8950eddc96aba93608f78bf21a897e68ca0ab6853e7d099bf62709",
+    "coinpaprika": "0xd2a271971dce072551a298bacd8abde37dc8f2a0a2abc41ab6ae255aede706a0",
+    "shiftmarkets": "0x4f89e7a1f7b51adab455fbd97cee62513ba708c6ae40239e029c7e09e892f7a8"
+  },
+  "syrupUSDC/USDC Exchange Rate": {
+    "alchemy": "0x816ec243568783f50b08fe065d84750806c1fb142cc18d4ae1e60e332b04381b",
+    "ankr": "0xea23d2d0edb5a6ec36d82cadbdcf3a41bdee2a8b8dbfb8eb57ce0839a3182732",
+    "drpc": "0x8dacfa8ff42a97fe5c7d12bec4e1602099ec48636613ed6a041ecebd897ac9d7",
+    "infura": "0x6f04705639a239f36a76af4609a8fd1b97072837d2e47a63dce067ddad80b7c8",
+    "nodary": "0x2cf7c9b1a10f604038412335eee844709ce0dd34c4a532344982842f576057e4"
+  },
+  "tBTC/USD": {
+    "blocksize": "0xb9e8460b43c97857c575d389e227e3281114b13254b91d40c8a9b6ad07f08a99",
+    "coingecko": "0xa377dfc6813b750920a511fa17d5e436b5bcf31b1fc6b5a1eba49ed1b00ea206",
+    "coinmetrics": "0x4d457ff82b8ed58a736ff6d5967d3b2bd902e0e9faa1625126e0c32fd5c39d35",
+    "coinpaprika": "0x6cd7824a272be34f063c949243798706ac56120ae6b5cd4253372a72ddaf85e1",
+    "nodary": "0xf675f27e8ac4c36341c7ca95ddc94c45ea69d547e6e38ea89239e98b4f73bb34",
+    "shiftmarkets": "0x011bd8c9d13c74a21c1e0b1f16ce43191078a4d24e4beeb8b12d3d1c67bff91b"
+  },
+  "tETH/wstETH Exchange Rate": {
+    "alchemy": "0xefdac0a762c0f9a48332c27b5a22dbaa349e2d128f8f986218bbb0e7e12d57f2",
+    "ankr": "0xc87e5856e81c5a46c974e1951616de1736a6634a00c1ca4e013d58f107d7fcb2",
+    "drpc": "0xb5917cb9ba5befd521d140628fbb6ff716034dd585a29c1bb21ba5efd079aa17",
+    "infura": "0x9a17391b9f547cb0655136db584e725c81c663c094d1882ce2ab39a156c6262f",
+    "nodary": "0x8b3cc3b44a19d429ff7721706be3c0288a1d38f4caad94eb57d3901d6263e8dd"
+  },
+  "uniETH/ETH Exchange Rate": {
+    "alchemy": "0xd622abf79b141ed49d8cdb93ad15d6ca8cb1f2c3c7796b2086884b53c29404f8",
+    "ankr": "0x90dc0a77916a7ff554f21f63a28a10dd82e04b9cba37937109f2ba6a62684372",
+    "drpc": "0x31164a733117cc756f35ecec99399bd2fa33bebe900bf32837795e0954c4efef",
+    "infura": "0x77436cd7d34d96bb7e39e3d9d78e81587fe5d21a11fe652e6b02cdda9f8ed93b",
+    "nodary": "0xe7d1b0c2ac56c2d587beb9bfd4a40170278dcf4d750141026c105c78880a37ef"
+  },
+  "wBETH/ETH Exchange Rate": {
+    "alchemy": "0x43c20c0f368d1fe28ccd4c7eb7139ff20ff41dd6ddd564c9529eb3acbf3b0b8c",
+    "ankr": "0xe850bd42c9093207f22e7864d4a3c3ca105b0e7469f1a1601c56a6e6d105c0a9",
+    "drpc": "0xe48f5ae425052175c673b672f2d91e6355b52b9e3f1e4507562d448d669898d2",
+    "infura": "0x827c6800537ed31a8a989fc2b3822c8eb3a420e2c25612d8cce7fade95cf70dd",
+    "nodary": "0x61180ab9ded6f2d289314b5e5550880ce16df2e1c2dafd1d06f06038c5fee6d9"
+  },
+  "wOS/OS Exchange Rate": {
+    "alchemy": "0xdd671e035b83e2b6fc0ff3f500b8b50ba8430cbbc22b8ab5f1a21fcf21a53cee",
+    "ankr": "0x5772923d58d41674d07076014bc0f5fe9df8f1f3b5b6aa4f2a3c9bf7aa6ba0d8",
+    "drpc": "0xd188989260b411f5f39eb29315d57459616f88da2f8de03aef5614a5c7b318ee",
+    "nodary": "0xc84433f94023aca3e42626ac43611b2024f57fc937d229f78e4699def832146a"
+  },
+  "weETH/ETH Exchange Rate": {
+    "alchemy": "0x6f3095d06c2279ae3db6c8efa7fa2ab2434a7f134ea523d21d362b804f657e13",
+    "ankr": "0x896b86848a23096a82c95297f6a029cbdaf201ace0e4dd1593e98446de5b8d79",
+    "drpc": "0xc43b6d477df2ff38b4edc34d2ac4d7e60b8b5378cc364e74690be45de5019d5c",
+    "infura": "0xe95608dd8e5ca7945ee9a1ad0c712e19b11cc2fcb2b69d788ee74ff9f99ffe4c",
+    "nodary": "0x94da3865c7e530fb1be1b020f11178de6dd2104e7e955011419d77a62221bcd0"
+  },
+  "wsrUSD/rUSD Exchange Rate": {
+    "alchemy": "0x5b7098bf4f2ba77e5b001d7cd2b337d58b1eb0f32ebab6848543d0b3ba9026a7",
+    "ankr": "0xde6591aebdbeb5eb02075c2b79243171eb729cb8c5826b9ed755ba0b122f7a12",
+    "drpc": "0xe413426e46f6558fd5dc236fd290a47d63c1485bb059dbfcecca7ca1b6f292ae",
+    "infura": "0x269a7a1fd864eb38cf768ce6d5411d391f89a07ec6310bc5f77dea155d00a3a3",
+    "nodary": "0x3ec96cf6caf8982572f9a6144dd0c6b6a36b19383a7fba51a2b331ebf82dd187"
+  },
+  "wstETH/stETH Exchange Rate": {
+    "alchemy": "0x7638ba6a339ffba5ba102bba8a07d5d3d6ea75b6868eb6395a94adca69dd4957",
+    "ankr": "0x9b7b0db711263158bff810ce7a1e8ab42053917a737f2ea45254ef9242cb4d85",
+    "drpc": "0x9f0686390ae1da2a8dfc08fba47a97ee2b3105c460dfa5210b945d3969d7aae2",
+    "infura": "0x7aff0d9be0d94e287bb8a243802eeeea1ee15c5a37e48057d14ea4d798f4c510",
+    "nodary": "0x27808f7b37580462dfba7706309d98453341f759c28e79e51c4c491a30b79aea"
+  },
+  "yUSD/USD Exchange Rate": {
+    "alchemy": "0x79ec79f464ac417a263880e8f73a7fd5f41a22e33d11a67bc6471f5f7a6d7ea1",
+    "ankr": "0xd84eac656c68ceb867b16948310a3e245790d2bd2963d89088fc83e350acf824",
+    "drpc": "0x5b400c93fea225352e5a7a0bdd4d85a9df90e00fc2cff84d9e7b74d425daef7e",
+    "infura": "0x039afe0f4f2532bc6b41ee49a51117003c2d399db972e066dc4fb7f24ebc1256",
+    "nodary": "0x9659aeeb606209aefcd3e24519b98c21261a89e9f24c4c256422c1436db476f4"
+  },
+  "ysUSDC/USDC Exchange Rate": {
+    "alchemy": "0x129216831771b6e5012f48b097b559ab7d66bd58d913c112e298db7ee4eed0ce",
+    "ankr": "0xf1ed98e2500c1b09739718b6bdaa23239d6ef31d2cc99bd9041eeee63a740690",
+    "drpc": "0x9f4d71773082cb99e9dbbcb16a89f9b502ede3da883371a387b133910a51567b",
+    "infura": "0x0995212d8797d369486cfaa2087d0f7a6877e438934fe627aeb0b98e763e2fde",
+    "nodary": "0xd04bc4665b7751f013e28783ba85ec3d33a89917f3debbd4a2c89c203690c082"
+  }
+}
