@@ -49,10 +49,14 @@ function parseSeconds(value: string | null, fallback: number) {
   return /^\d{1,12}$/.test(value) ? Number(value) : null;
 }
 
+// One vote per provider, like a beacon set: a provider that signed two values for one moment doesn't count twice.
 function medianPrice(records: readonly SignedPrice[]) {
-  const middle = median(records.map(({ encodedValue }) => decodeValue(encodedValue)));
+  const byProvider = new Map(records.map((record) => [record.provider, record.encodedValue]));
+  const middle = median([...byProvider.values()].map(decodeValue));
   return middle === null ? null : formatPrice(middle);
 }
+
+const providerCount = (records: readonly SignedPrice[]) => new Set(records.map(({ provider }) => provider)).size;
 
 // GET /api/feeds, /api/history and /api/at. Times are unix seconds, like the signed timestamps.
 export function handleApi(reader: Reader, url: URL, now = Math.floor(Date.now() / 1000)): Response {
@@ -65,7 +69,7 @@ export function handleApi(reader: Reader, url: URL, now = Math.floor(Date.now() 
       const records = reader.at(sources[endpoint], now);
       if (records.length === 0) return [];
       const latest = Math.max(...records.map(({ timestamp }) => Number(timestamp)));
-      return [{ feed, providers: records.length, latest, median: medianPrice(records) }];
+      return [{ feed, providers: providerCount(records), latest, median: medianPrice(records) }];
     });
     return json({ endpoint, feeds } satisfies FeedsResponse);
   }
@@ -76,12 +80,16 @@ export function handleApi(reader: Reader, url: URL, now = Math.floor(Date.now() 
 
   if (url.pathname === '/api/history') {
     const to = parseSeconds(params.get('to'), now);
-    const from = parseSeconds(params.get('from'), (to ?? now) - 24 * 60 * 60);
-    if (from === null || to === null || from > to) return fail(400, 'from and to must be unix seconds, from <= to');
+    const requested = parseSeconds(params.get('from'), (to ?? now) - 24 * 60 * 60);
+    if (requested === null || to === null || requested > to) {
+      return fail(400, 'from and to must be unix seconds, from <= to');
+    }
+    // Start at the first record, so a range like "all" (from=0) spends its points on data, not empty decades.
+    const earliest = reader.earliest(sources);
+    const from = Math.min(to, Math.max(requested, earliest ?? requested));
     const providers = reader
       .history(sources, from, to)
       .map((series) => ({ ...series, slot: PROVIDER_SLOTS.get(series.provider) ?? 0 }));
-    const earliest = reader.earliest(sources);
     return json({
       feed,
       endpoint,

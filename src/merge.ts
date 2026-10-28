@@ -3,7 +3,7 @@ import { existsSync, realpathSync } from 'node:fs';
 import { AIRNODES, isEndpoint } from './config.ts';
 import { log } from './logger.ts';
 import { hasValidSignature, toSignedDatum } from './signed-data.ts';
-import { openStore, type StoredPoll, type StoredRecord } from './store.ts';
+import { hasTable, openStore, type StoredPoll, type StoredRecord } from './store.ts';
 
 const BATCH_SIZE = 1000;
 const PROGRESS_EVERY = 100_000;
@@ -102,19 +102,32 @@ export async function mergeArchive({ sourcePath, dbPath }: { sourcePath: string;
     }
     added += store.add(pending, []);
 
-    const hasPolls = source.query("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'polls'").get();
-    const polls = hasPolls
-      ? source
-          .query<SourcePoll, []>(
-            `SELECT hex(airnode) AS airnode, endpoint, fetched_at AS fetchedAt, status, received, rejected, saved
-             FROM polls`
-          )
-          .all()
-          .map(toPoll)
-      : [];
-    const validPolls = polls.filter((poll) => poll !== null);
-    store.add([], validPolls);
-    return { read, added, rejected, polls: validPolls.length, rejectedPolls: polls.length - validPolls.length };
+    // Polls are written in batches too: one transaction for a large archive would hold the write lock longer
+    // than a running archiver waits for it.
+    let polls = 0;
+    let rejectedPolls = 0;
+    let pendingPolls: StoredPoll[] = [];
+    if (hasTable(source, 'polls')) {
+      const pollRows = source.query<SourcePoll, []>(
+        `SELECT hex(airnode) AS airnode, endpoint, fetched_at AS fetchedAt, status, received, rejected, saved
+         FROM polls`
+      );
+      for (const row of pollRows.iterate()) {
+        const poll = toPoll(row);
+        if (poll === null) {
+          rejectedPolls += 1;
+          continue;
+        }
+        polls += 1;
+        pendingPolls.push(poll);
+        if (pendingPolls.length >= BATCH_SIZE) {
+          store.add([], pendingPolls);
+          pendingPolls = [];
+        }
+      }
+      store.add([], pendingPolls);
+    }
+    return { read, added, rejected, polls, rejectedPolls };
   } finally {
     source.close();
     store.close();

@@ -2,6 +2,7 @@ import { Database } from 'bun:sqlite';
 import { formatUnits, type Hex, hexToBigInt, hexToBytes } from 'viem';
 import type { FeedSource } from './feeds.ts';
 import type { SignedDatum } from './signed-data.ts';
+import { hasTable } from './store.ts';
 
 // Values are int256 with 18 decimals, the encoding every API3 price feed uses.
 const DECIMALS = 18;
@@ -50,10 +51,15 @@ const decodePrice = (encodedValue: Hex) => formatPrice(decodeValue(encodedValue)
 export function openReader(path: string) {
   const db = new Database(path, { readonly: true, strict: true });
 
+  // Every record at the source's latest timestamp, not just one: two values signed for the same moment are the
+  // equivocation evidence the archive exists to keep, so the reader must never hide either.
   const latestQuery = db.prepare<Row, { airnode: Uint8Array; templateId: Uint8Array; at: number }>(
     `SELECT timestamp, hex(value) AS value, hex(signature) AS signature FROM datapoints
-     WHERE airnode = $airnode AND template_id = $templateId AND timestamp <= $at
-     ORDER BY timestamp DESC LIMIT 1`
+     WHERE airnode = $airnode AND template_id = $templateId AND timestamp = (
+       SELECT max(timestamp) FROM datapoints
+       WHERE airnode = $airnode AND template_id = $templateId AND timestamp <= $at
+     )
+     ORDER BY value`
   );
   // SQLite returns the row holding max(timestamp) for the bare `value` column, so each bucket keeps its last record.
   const historyQuery = db.prepare<
@@ -73,14 +79,13 @@ export function openReader(path: string) {
     return { airnode: hexToBytes(airnode), templateId: hexToBytes(templateId) };
   };
 
-  // Each provider's latest signed record at or before `at` (unix seconds), with everything needed to re-check it.
+  // Each provider's latest signed records at or before `at` (unix seconds), with everything needed to re-check them.
+  // A provider has more than one record only if it signed different values for the same moment.
   function at(sources: readonly FeedSource[], at: number): SignedPrice[] {
     return sources.flatMap((source) => {
-      const row = latestQuery.get({ ...keyOf(source), at });
-      if (!row) return [];
-      const encodedValue = toHex(row.value);
-      return [
-        {
+      return latestQuery.all({ ...keyOf(source), at }).map((row) => {
+        const encodedValue = toHex(row.value);
+        return {
           provider: source.provider,
           airnode: source.airnode,
           templateId: source.templateId,
@@ -88,8 +93,8 @@ export function openReader(path: string) {
           encodedValue,
           signature: toHex(row.signature),
           price: decodePrice(encodedValue),
-        },
-      ];
+        };
+      });
     });
   }
 
@@ -112,8 +117,7 @@ export function openReader(path: string) {
   // Stretches inside [from, to] when the archiver was not polling, in unix seconds. Coverage is only
   // known since the first recorded poll, so earlier time is never reported as a gap.
   function gaps(from: number, to: number): Gap[] {
-    // Archives written before polls were recorded have no table, and a read-only reader can't add it.
-    if (!db.query("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'polls'").get()) return [];
+    if (!hasTable(db, 'polls')) return [];
     const range = db.query<{ first: number | null; last: number | null }, []>(POLL_RANGE).get();
     if (!range || range.first === null || range.last === null) return [];
     const { first, last } = range;

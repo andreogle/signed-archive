@@ -1,4 +1,4 @@
-import { type Address, type Hex, keccak256 } from 'viem';
+import { type Address, type Hex, isAddressEqual, keccak256 } from 'viem';
 import { AIRNODES, type Endpoint } from './config.ts';
 import feeds from './feeds.json' with { type: 'json' };
 
@@ -22,6 +22,24 @@ export const FEEDS: ReadonlyMap<string, Record<Endpoint, FeedSource[]>> = new Ma
     return [name, { public: base, 'public-oev': oev }];
   })
 );
+
+// Whether a record belongs to this feed: signed by the provider's listed airnode, under the feed's template ID for
+// this endpoint. A valid signature alone only proves who signed; this ties the signer and template to the feed name,
+// so the web app can check a record without trusting the server's labels.
+export function isFeedRecord(
+  feed: string,
+  endpoint: Endpoint,
+  record: { provider: string; airnode: string; templateId: string }
+) {
+  const sources = FEEDS.get(feed)?.[endpoint] ?? [];
+  return sources.some((source) => {
+    return (
+      source.provider === record.provider &&
+      isAddressEqual(source.airnode, record.airnode as Address) &&
+      source.templateId.toLowerCase() === record.templateId.toLowerCase()
+    );
+  });
+}
 
 // Chart colour slot per provider. A slot belongs to the provider, never to its rank in a list, so a provider keeps its
 // colour across feeds and ranges; providers that share a feed always get different slots. Assigned greedily in

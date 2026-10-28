@@ -8,6 +8,12 @@ import { type FeedSearch, RANGES, type Range } from '../search.ts';
 
 const route = getRouteApi('/feed');
 const ENDPOINT_LABELS = { public: 'Base', 'public-oev': 'OEV' } as const;
+const CHECK_LABELS = {
+  pending: 'checking…',
+  valid: '✓ Valid',
+  'wrong-source': "✗ Not this feed's provider",
+  'bad-signature': '✗ Invalid signature',
+} as const;
 
 export function FeedPage(): JSX.Element {
   const titleId = useId();
@@ -113,8 +119,12 @@ function MomentPanel({ search, onTime }: { search: FeedSearch; onTime: (time: nu
   const moment = useMoment(search.feed, search.endpoint, search.time);
   const data = moment.data;
   const records = data?.records ?? [];
-  const checks = useSignatureChecks(records);
-  const verified = checks.filter(({ data }) => data === true).length;
+  const checks = useSignatureChecks(data?.feed ?? search.feed, data?.endpoint ?? search.endpoint, records);
+  const verified = checks.filter(({ data: check }) => check === 'valid').length;
+  // A provider with more than one record signed different values for the same moment: equivocation.
+  const conflicted = new Set(
+    records.map(({ provider }) => provider).filter((provider, index, all) => all.indexOf(provider) !== index)
+  );
 
   return (
     <section className="card" aria-labelledby={titleId}>
@@ -176,19 +186,25 @@ function MomentPanel({ search, onTime }: { search: FeedSearch; onTime: (time: nu
           </thead>
           <tbody>
             {records.map((record, index) => {
-              const check = checks[index];
+              const check = checks[index]?.data;
               const age = (search.time ?? 0) - Number(record.timestamp);
               return (
-                <tr key={record.provider}>
-                  <td>{record.provider}</td>
+                <tr key={`${record.provider}-${record.encodedValue}`}>
+                  <td>
+                    {record.provider}
+                    {conflicted.has(record.provider) ? (
+                      <span className="bad small" title="This provider signed different values for the same moment">
+                        {' '}
+                        ⚠ conflicting values
+                      </span>
+                    ) : null}
+                  </td>
                   <td className="num" title={record.price}>
                     {formatPrice(record.price)}
                   </td>
                   <td title={`${formatAge(age)} before the chosen time`}>{formatTime(Number(record.timestamp))}</td>
-                  <td className={check?.data === true ? 'ok' : check?.data === false ? 'bad' : 'muted'}>
-                    <span title={`Signer ${record.airnode}`}>
-                      {check?.data === undefined ? 'checking…' : check.data ? '✓ Valid' : '✗ Invalid'}
-                    </span>
+                  <td className={check === undefined ? 'muted' : check === 'valid' ? 'ok' : 'bad'}>
+                    <span title={`Signer ${record.airnode}`}>{CHECK_LABELS[check ?? 'pending']}</span>
                   </td>
                 </tr>
               );
@@ -214,12 +230,14 @@ function MomentPanel({ search, onTime }: { search: FeedSearch; onTime: (time: nu
 function downloadProof(moment: MomentResponse) {
   const proof = {
     about:
-      'Signed API3 price records. Each signature is EIP-191 over keccak256(abi.encodePacked(templateId, timestamp, encodedValue)) and must recover to airnode.',
+      'Signed API3 price records. Each signature is EIP-191 over keccak256(abi.encodePacked(templateId, timestamp, encodedValue)) and must recover to airnode. ' +
+      "To tie a record to the feed, airnode must be the provider's address and templateId the feed's template ID in @api3/api-integrations (for OEV data, keccak256 of it).",
     ...moment,
   };
   const link = document.createElement('a');
   link.href = URL.createObjectURL(new Blob([JSON.stringify(proof, null, 2)], { type: 'application/json' }));
   link.download = `${moment.feed.replace('/', '-')}-${moment.time}.json`;
   link.click();
-  URL.revokeObjectURL(link.href);
+  // Revoking at once can cancel the download in some browsers; the URL only needs to outlive the click.
+  setTimeout(() => URL.revokeObjectURL(link.href), 60_000);
 }

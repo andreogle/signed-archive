@@ -1,6 +1,7 @@
 import { keepPreviousData, useQueries, useQuery } from '@tanstack/react-query';
 import type { FeedsResponse, HistoryResponse, MomentResponse } from '../src/api.ts';
 import type { Endpoint } from '../src/config.ts';
+import { isFeedRecord } from '../src/feeds.ts';
 import type { SignedPrice } from '../src/reader.ts';
 import { hasValidSignature } from '../src/signed-data.ts';
 import { RANGES, type Range } from './search.ts';
@@ -50,19 +51,28 @@ export function useMoment(feed: string, endpoint: Endpoint, time: number | undef
   });
 }
 
-// The server's word is not trusted: each signer is recovered in the browser and compared with the provider's address.
-export function useSignatureChecks(records: readonly SignedPrice[]) {
+export type SignatureCheck = 'valid' | 'wrong-source' | 'bad-signature';
+
+// The server's word is not trusted. Each record is checked in the browser: its signer and template must be the
+// feed's own (from API3's provider list, bundled into the page), and the signature must recover to that signer.
+export function useSignatureChecks(feed: string, endpoint: Endpoint, records: readonly SignedPrice[]) {
   return useQueries({
     queries: records.map((record) => ({
       queryKey: [
         'signature',
+        feed,
+        endpoint,
+        record.provider,
         record.airnode,
         record.templateId,
         record.timestamp,
         record.encodedValue,
         record.signature,
       ],
-      queryFn: () => hasValidSignature(record),
+      queryFn: async (): Promise<SignatureCheck> => {
+        if (!isFeedRecord(feed, endpoint, record)) return 'wrong-source';
+        return (await hasValidSignature(record)) ? 'valid' : 'bad-signature';
+      },
       staleTime: Number.POSITIVE_INFINITY,
     })),
   });

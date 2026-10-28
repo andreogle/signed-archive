@@ -38,6 +38,17 @@ const POLLS = `
   ) WITHOUT ROWID
 `;
 
+// Archives written before a table was added don't have it, and a read-only connection can't create it.
+export const hasTable = (db: Database, name: string) => {
+  return (
+    db
+      .query<{ found: 1 }, { name: string }>(
+        "SELECT 1 AS found FROM sqlite_master WHERE type = 'table' AND name = $name"
+      )
+      .get({ name }) !== null
+  );
+};
+
 export interface Poll {
   airnode: Address;
   endpoint: Endpoint;

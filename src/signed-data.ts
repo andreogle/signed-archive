@@ -11,7 +11,8 @@ export interface SignedDatum {
 const isHex = (value: unknown, bytes: number): value is Hex =>
   typeof value === 'string' && value.length === 2 + bytes * 2 && /^0x[0-9a-fA-F]*$/.test(value);
 
-// The response is untrusted input: anything that doesn't have the exact shape is dropped.
+// The response is untrusted input: anything that doesn't have the exact shape is dropped. Timestamps must
+// be safe integers: the store keeps them as numbers, and a rounded timestamp would no longer match its signature.
 export function toSignedDatum(value: unknown): SignedDatum | null {
   if (typeof value !== 'object' || value === null) return null;
   const { airnode, templateId, timestamp, encodedValue, signature } = value as Record<string, unknown>;
@@ -19,7 +20,8 @@ export function toSignedDatum(value: unknown): SignedDatum | null {
     !isHex(airnode, 20) ||
     !isHex(templateId, 32) ||
     typeof timestamp !== 'string' ||
-    !/^\d{1,20}$/.test(timestamp) ||
+    !/^\d{1,16}$/.test(timestamp) ||
+    !Number.isSafeInteger(Number(timestamp)) ||
     !isHex(encodedValue, 32) ||
     !isHex(signature, 65)
   ) {

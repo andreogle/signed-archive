@@ -3,7 +3,7 @@ import { afterAll, describe, expect, test } from 'bun:test';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { FEEDS, PROVIDER_SLOTS } from '../src/feeds.ts';
+import { FEEDS, isFeedRecord, PROVIDER_SLOTS } from '../src/feeds.ts';
 import { decodeValue, median, openReader } from '../src/reader.ts';
 import { hasValidSignature } from '../src/signed-data.ts';
 import { openStore } from '../src/store.ts';
@@ -25,6 +25,22 @@ describe('FEEDS', () => {
     const oev = eth['public-oev'].find(({ provider }) => provider === 'coingecko');
     expect(base).toEqual({ provider: 'coingecko', airnode: coingecko.airnode, templateId: coingecko.templateId });
     expect(oev?.templateId).toBe(coingeckoOev.templateId);
+  });
+});
+
+describe('isFeedRecord', () => {
+  test("accepts a provider's record for its own feed and endpoint", () => {
+    expect(isFeedRecord('ETH/USD', 'public', { provider: 'coingecko', ...coingecko })).toBe(true);
+    expect(isFeedRecord('ETH/USD', 'public-oev', { provider: 'coingecko', ...coingeckoOev })).toBe(true);
+  });
+
+  test('rejects a relabelled provider, a foreign signer, another feed or the other endpoint', () => {
+    expect(isFeedRecord('ETH/USD', 'public', { provider: 'blocksize', ...coingecko })).toBe(false);
+    const forged = { provider: 'coingecko', ...coingecko, airnode: '0x0000000000000000000000000000000000000001' };
+    expect(isFeedRecord('ETH/USD', 'public', forged)).toBe(false);
+    expect(isFeedRecord('BTC/USD', 'public', { provider: 'coingecko', ...coingecko })).toBe(false);
+    expect(isFeedRecord('ETH/USD', 'public-oev', { provider: 'coingecko', ...coingecko })).toBe(false);
+    expect(isFeedRecord('NOPE/USD', 'public', { provider: 'coingecko', ...coingecko })).toBe(false);
   });
 });
 

@@ -44,4 +44,13 @@ describe('toSignedDatum', () => {
     expect(toSignedDatum({ ...base, signature: '0x1234' })).toBeNull();
     expect(toSignedDatum(null)).toBeNull();
   });
+
+  test('drops timestamps a number cannot hold exactly, so a stored record always matches its signature', () => {
+    expect(toSignedDatum({ ...base, timestamp: '9007199254740991' })).toEqual({
+      ...base,
+      timestamp: '9007199254740991',
+    });
+    expect(toSignedDatum({ ...base, timestamp: '9007199254740993' })).toBeNull();
+    expect(toSignedDatum({ ...base, timestamp: '18446744073709551615' })).toBeNull();
+  });
 });

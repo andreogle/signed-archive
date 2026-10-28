@@ -52,24 +52,32 @@ function trackFeeds(target: Target, data: readonly SignedDatum[]) {
   }
 }
 
+// Records a request that saved nothing, so the coverage log shows the provider (not the archiver) was down.
+// `status` is the HTTP status, or null when no usable response came back.
+function recordFailure(store: Store, target: Target, status: number | null) {
+  store.save([], {
+    airnode: target.airnode,
+    endpoint: target.endpoint,
+    fetchedAt: Date.now(),
+    status,
+    received: 0,
+    rejected: 0,
+  });
+}
+
 async function poll(target: Target, store: Store, intervalMs: number, stop: AbortSignal) {
   const fields = { provider: target.alias, endpoint: target.endpoint };
   const response = await fetch(`${BASE_URL}/${target.endpoint}/${target.airnode}`, {
     headers: { 'user-agent': USER_AGENT },
     signal: AbortSignal.any([AbortSignal.timeout(REQUEST_TIMEOUT_MS), stop]),
   });
-  const request = {
-    airnode: target.airnode,
-    endpoint: target.endpoint,
-    fetchedAt: Date.now(),
-    status: response.status,
-  };
   if (!response.ok) {
-    store.save([], { ...request, received: 0, rejected: 0 });
+    recordFailure(store, target, response.status);
     const retryInSeconds = backOff(target, intervalMs, response.headers.get('retry-after'));
     log.warn('fetch failed', { ...fields, status: response.status, retryInSeconds });
     return null;
   }
+  const fetchedAt = Date.now();
   const body: unknown = await response.json();
   const raw = typeof body === 'object' && body !== null ? (body as { data?: unknown }).data : undefined;
   if (typeof raw !== 'object' || raw === null) throw new Error('response has no data object');
@@ -87,9 +95,11 @@ async function poll(target: Target, store: Store, intervalMs: number, stop: Abor
   if (target.failures > 0) log.info('fetch recovered', { ...fields, failures: target.failures });
   target.failures = 0;
   trackFeeds(target, valid);
-  const saved = store.save(valid, { ...request, received: valid.length + rejected, rejected });
+  const received = valid.length + rejected;
+  const { airnode, endpoint } = target;
+  const saved = store.save(valid, { airnode, endpoint, fetchedAt, status: response.status, received, rejected });
   if (rejected > 0) log.warn('rejected records', { ...fields, rejected });
-  log.debug('fetched', { ...fields, received: valid.length + rejected, saved });
+  log.debug('fetched', { ...fields, received, saved });
   return { saved, rejected };
 }
 
@@ -140,14 +150,7 @@ export async function runArchiver({ intervalSeconds, dbPath }: ArchiverOptions) 
         } catch (error) {
           if (stop.signal.aborted) break;
           failed += 1;
-          store.save([], {
-            airnode: target.airnode,
-            endpoint: target.endpoint,
-            fetchedAt: Date.now(),
-            status: null,
-            received: 0,
-            rejected: 0,
-          });
+          recordFailure(store, target, null);
           const retryInSeconds = backOff(target, intervalMs, null);
           log.warn('fetch failed', {
             provider: target.alias,
