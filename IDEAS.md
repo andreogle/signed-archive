@@ -102,8 +102,8 @@ watching. In order of value:
 2. **Keep it running, in Docker.** A small image with the compiled binary, `restart: unless-stopped`, the archive on a
    named volume and a container health check. Never run the long-lived archive under `--watch`. Add an outside heartbeat
    (for example healthchecks.io) that alerts when no cycle has finished for a few minutes, since a container that is
-   up but stuck looks healthy to Docker. _Status: built (`compose.yaml`, `health` command); the outside alert is
-   still to do._
+   up but stuck looks healthy to Docker. _Status: built (`compose.yaml`, `health` command, `HEARTBEAT_URL`
+   ping)._
 3. **Run more than one archiver.** Two or more instances on different machines and networks. Each record proves itself
    through its signature, so the copies need no trust in each other.
 4. **Read the providers' own Signed APIs too.** Each provider runs its own Signed API (for example
@@ -138,6 +138,41 @@ re-sign every few seconds whether or not the price moved, so polling faster buys
   journalists and posters can embed and readers can verify.
 - **Open data.** The daily files make the history available to researchers and students without anyone running their
   own archiver.
+- **How stale is DeFi right now?** A live map of the gap between each chain's on-chain API3 value and the newest
+  signed value, across the roughly 40 chains API3 serves. It shows at a glance which chains and feeds lag, and
+  nothing shows this today. Needs an RPC endpoint per chain.
+- **A public board for conflicting signatures.** The archive watches for a provider signing two values for one
+  moment, and the board publishes any such pair with the fraud-proof contract (see Research), so anyone can prove it
+  on-chain. It works mostly as a deterrent: likely empty, and still meaningful when it is.
+
+## For developers and other businesses
+
+Products that only past signed prices make possible. API3 itself only exposes the latest value on-chain.
+
+- **Replay real oracle history on a test chain.** The archived signatures are genuine, so a local fork (for example
+  with anvil) accepts them in `Api3ServerV1` as if they were live. Fork just before an event (a crash, a depeg, a
+  glitch), then push the archived records in time order while stepping the fork's clock. Any protocol that uses API3
+  can test its liquidations, caps and circuit breakers against what really happened, signed and byte for byte. Agents
+  can be tested the same way. The contract only accepts a time stamp newer than the stored one and less than an hour
+  ahead, so the fork must start before the replayed stretch; base feeds work this way, OEV updates are harder. It is a
+  CLI command, with nothing to deploy.
+- **Settle a contract at any past moment.** A Solidity library plus the archive's API: a contract checks a signed
+  record against the provider's address and the feed's template ID (about 3k gas per signature). Options expiry,
+  bets, escrow and insurance triggers can then settle on "the price at noon Friday" even if nobody pushed an update
+  on-chain then. A contract cannot prove a record was the latest one at or before the moment, so the submitter could
+  pick a favourable one. Accept any record in a window up to the moment, then hold a challenge period in which anyone
+  can replace it with a later record that is still at or before the moment.
+- **Price certificates for audits and accounting.** Auditors need an independent fair value at the time of a
+  transaction, and today they take an exchange's API or a screenshot on trust. A certificate for a transaction hash or
+  a time (a PDF plus the signed records) gives several independent providers' signed prices, checkable years later.
+  Whether auditors accept it is unproven: ask a firm before building.
+- **Evidence packets for insurance claims and disputes.** DeFi insurers and dispute courts (Nexus Mutual, Kleros, UMA)
+  have to decide what a price was at a moment. One verifiable bundle holds every provider's signed price, the median,
+  the archive's coverage around the moment and when the update landed on-chain.
+- **A TWAP that carries its own proof.** A time-weighted average or volatility figure served together with every
+  evenly spaced signed sample behind it, so a client or a contract can recompute it and check every signature. That
+  gives a verifiable figure without zero-knowledge proofs. On-chain history cannot do this, because it only records
+  updates on large moves.
 
 ## For API3
 
@@ -268,7 +303,9 @@ Public goods for the wider oracle ecosystem that the archive makes possible.
    before new features.
 4. Halmos tests of `Median.sol`. About a day, and a public first.
 5. Daily files with Bitcoin timestamps. They double as the public backup and the open dataset.
-6. Freshness labels, feed health checks and provider report cards.
-7. Agent plug-in (MCP server).
-8. The cherry-picking bound and the fraud-proof contract, once the archive holds enough history to measure.
-9. Liquidation checker and incident reports.
+6. Replay tool and settle-at-a-moment library. Both reuse the signature and feed checks the explorer already runs,
+   and one real event from the archive is enough to show them.
+7. Freshness labels, feed health checks and provider report cards.
+8. Agent plug-in (MCP server).
+9. The cherry-picking bound and the fraud-proof contract, once the archive holds enough history to measure.
+10. Liquidation checker, incident reports, price certificates and evidence packets.
