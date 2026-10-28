@@ -11,3 +11,7 @@
 
 # Local compose settings; may hold the heartbeat URL token.
 /.env
+
+# Foundry build output for proofs/.
+/proofs/out/
+/proofs/cache/

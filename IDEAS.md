@@ -236,9 +236,13 @@ No oracle we could find publishes formal specifications of its contracts, and AP
 tests only (no fuzzing, invariant tests or formal verification). Machine-checked proofs of API3's own rules are
 unclaimed ground. Cheapest first:
 
-1. **Symbolic tests of `Median.sol` with Halmos.** Run against the real Solidity, about a day of work: the overflow-safe
-   average equals `(x + y) / 2` rounded toward zero, the sorting and quickselect paths give the same median, and the
-   median lies between the smallest and largest input. `src/price.ts` already follows the same rounding rule.
+1. **Symbolic tests of `Median.sol` with Halmos.** Run against the real Solidity: the overflow-safe average equals
+   `(x + y) / 2` rounded toward zero, the sorting and quickselect paths give the same median, and the median lies
+   between the smallest and largest input. `src/price.ts` already follows the same rounding rule. _Status: tried, then
+   replaced. Halmos proved the average for every input and the median of up to 4 values, and timed out beyond that.
+   For this project the Foundry fuzz tests (`bun run proofs`, lengths 1 to 21, quickselect included) give nearly the
+   same assurance without a Python toolchain, so Halmos was dropped. Revisit it
+   in a separate repo if machine-checked proofs of API3's code become a goal of their own._
 2. **Majority rules for combined feeds (Lean 4).** Prove that if fewer than half of the providers behind a combined
    feed lie, the median stays between the lowest and highest honest prices. This is the security claim of API3's
    combined feeds, stated as a theorem. Lean's `BitVec 256` matches the EVM's integers exactly.
@@ -310,7 +314,7 @@ Public goods for the wider oracle ecosystem that the archive makes possible.
 3. Reliability, now: coverage log and `merge` _(done)_, then Docker with a heartbeat alert and nightly backups, then a
    second archiver and the providers' own Signed APIs. History only accrues from the day it is recorded, so this comes
    before new features.
-4. Halmos tests of `Median.sol`. About a day, and a public first.
+4. Tests of `Median.sol`. _Done: fuzz tests; Halmos tried and dropped._
 5. Daily files with Bitcoin timestamps. They double as the public backup and the open dataset.
 6. Replay tool and settle-at-a-moment library. Both reuse the signature and feed checks the explorer already runs,
    and one real event from the archive is enough to show them.

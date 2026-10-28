@@ -1,7 +1,17 @@
 {
   "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
   "assist": { "actions": { "source": { "organizeImports": "on" } } },
-  "files": { "includes": ["**", "!**/node_modules/", "!**/data/", "!**/dist/", "!**/.impeccable"] },
+  "files": {
+    "includes": [
+      "**",
+      "!**/node_modules/",
+      "!**/data/",
+      "!**/dist/",
+      "!**/.impeccable",
+      "!**/proofs/out/",
+      "!**/proofs/cache/"
+    ]
+  },
   "formatter": {
     "enabled": true,
     "formatWithErrors": false,

@@ -91,6 +91,15 @@ Each copy is a full archive (hundreds of MB per day of history), so prune old co
 `bun run dev` stays the development loop. Don't point it at the Docker volume: under `--watch` every edit restarts the
 archiver and leaves a gap.
 
+## Fuzz tests
+
+A dev tool checks API3's own Solidity. Foundry is pinned in `mise.toml`, and `@api3/contracts`
+(the contracts as deployed) is a dev dependency.
+
+- `bun run proofs` fuzzes `Median.sol`, unchanged, in under a second: the overflow-safe average equals `(x + y) / 2`
+  rounded toward zero and stays between its inputs, and the median of every length from 1 to 21 (the sorting network
+  and quickselect) matches a plain sort-based reference, ignores input order and handles many equal values.
+
 ## Development
 
 `bun run check` checks the airnode list is current, then runs Biome, the type checker and the tests with coverage.

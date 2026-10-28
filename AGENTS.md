@@ -78,8 +78,14 @@ This file holds what is specific to this project and the invariants that must ne
 - URL search params come from shared links: parse them through `parseFeedSearch` in `web/search.ts`
 - Route components that call `getRouteApi` declare their return type (`JSX.Element`), or the router's registered types collapse to `any` through the import cycle
 
+**Fuzz tests**
+- `proofs/` is a Foundry project that reads API3's Solidity unchanged from `node_modules/@api3/contracts`, compiled with the settings `Api3ServerV1` is deployed with (0.8.17, optimizer 1000 runs, london). Never copy or edit those sources; test them as published
+- Tests there are `testFuzz_` tests against a plain reference. Halmos was tried and dropped: it proved the average and medians of up to 4 values, timed out beyond that, and added a Python toolchain for little the fuzz tests don't already show
+- A fuzz test should fail on a mutated `Median.sol` (e.g. dropping the rounding correction). Check that once when adding one
+
 **Dependencies**
 - Runtime dependencies are `viem` (signature recovery, hashing, hex helpers) and `commander` (CLI), plus React, TanStack Router and TanStack Query for the explorer in `web/`. Reach for Bun's built-ins and the standard library before adding another
 - `bunfig.toml` refuses package versions published less than 3 days ago (`minimumReleaseAge`). Don't bypass it to grab a fresh release
+- `@api3/contracts` is a dev dependency only (MIT): sources for `proofs/`
 - `@api3/api-integrations` is a dev dependency only: it is large (the whole Airnode stack) and `UNLICENSED`. Only `scripts/airnodes.ts` imports it; runtime code reads the generated JSON. Its blocked postinstall stays blocked
 - `tsconfig.json` sets `skipLibCheck`, because a viem dependency ships types that need browser globals

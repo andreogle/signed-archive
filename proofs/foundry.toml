@@ -1,0 +1,17 @@
+# Tests and proofs of API3's own Solidity, read unchanged from @api3/contracts (installed by `bun install`).
+[profile.default]
+src = "test"
+test = "test"
+out = "out"
+cache_path = "cache"
+libs = []
+remappings = ["@api3/contracts/=../node_modules/@api3/contracts/"]
+allow_paths = ["../node_modules/@api3/contracts"]
+# The settings Api3ServerV1 is deployed with on Ethereum (from its deployment record in api3dao/contracts v42.0.1).
+solc_version = "0.8.17"
+optimizer = true
+optimizer_runs = 1000
+evm_version = "london"
+
+[fuzz]
+runs = 20000
