@@ -1,9 +1,9 @@
 import { Database } from 'bun:sqlite';
 import { existsSync, realpathSync } from 'node:fs';
-import { AIRNODES, isEndpoint } from './config.ts';
+import { AIRNODES, isEndpoint, isSource } from './config.ts';
 import { log } from './logger.ts';
 import { hasValidSignature, toSignedDatum } from './signed-data.ts';
-import { hasTable, openStore, type StoredPoll, type StoredRecord } from './store.ts';
+import { hasColumn, hasTable, openStore, type StoredPoll, type StoredRecord } from './store.ts';
 
 const BATCH_SIZE = 1000;
 const PROGRESS_EVERY = 100_000;
@@ -27,6 +27,7 @@ interface SourcePoll {
   received: unknown;
   rejected: unknown;
   saved: unknown;
+  source: unknown;
 }
 
 const isCount = (value: unknown): value is number => Number.isSafeInteger(value) && (value as number) >= 0;
@@ -59,7 +60,7 @@ function toPoll(row: SourcePoll): StoredPoll | null {
   if (!airnode || !KNOWN_AIRNODES.has(airnode) || !isEndpoint(row.endpoint) || !isCount(row.fetchedAt) || !statusOk) {
     return null;
   }
-  if (!isCount(row.received) || !isCount(row.rejected) || !isCount(row.saved)) return null;
+  if (!isCount(row.received) || !isCount(row.rejected) || !isCount(row.saved) || !isSource(row.source)) return null;
   return {
     airnode: airnode as StoredPoll['airnode'],
     endpoint: row.endpoint,
@@ -68,6 +69,7 @@ function toPoll(row: SourcePoll): StoredPoll | null {
     received: row.received,
     rejected: row.rejected,
     saved: row.saved,
+    source: row.source,
   };
 }
 
@@ -108,9 +110,11 @@ export async function mergeArchive({ sourcePath, dbPath }: { sourcePath: string;
     let rejectedPolls = 0;
     let pendingPolls: StoredPoll[] = [];
     if (hasTable(source, 'polls')) {
+      // Archives from before providers' own APIs were read have no source column; all their polls were API3's.
+      const sourceColumn = hasColumn(source, 'polls', 'source') ? 'source' : "'api3' AS source";
       const pollRows = source.query<SourcePoll, []>(
-        `SELECT hex(airnode) AS airnode, endpoint, fetched_at AS fetchedAt, status, received, rejected, saved
-         FROM polls`
+        `SELECT hex(airnode) AS airnode, endpoint, fetched_at AS fetchedAt, status, received, rejected, saved,
+                ${sourceColumn} FROM polls`
       );
       for (const row of pollRows.iterate()) {
         const poll = toPoll(row);

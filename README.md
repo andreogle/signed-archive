@@ -4,7 +4,9 @@ Records API3's public signed data so it has a history. The Signed API (`signed-a
 value per feed, and every record carries the provider's signature, so the archive is evidence anyone can re-check.
 
 Each cycle fetches `/public/<airnode>` (base data, delayed ~15 s) and `/public-oev/<airnode>` for every airnode in
-`src/airnodes.json`, checks each signature the way `Api3ServerV1` does, and stores new records in SQLite.
+`src/airnodes.json`, from two sources: API3's Signed API and the provider's own (every provider pushes the same signed
+data to both). It checks each signature the way `Api3ServerV1` does and stores new records in SQLite. A record both
+sources served is stored once.
 
 ## Run
 
@@ -101,7 +103,8 @@ result.
 
 ## Being polite
 
-One request at a time, spread across the interval (22 requests per minute by default). Failed targets back off
+One request at a time, spread across the interval: 44 requests per minute by default, of which 22 go to
+`signed-api.api3.org` and 2 to each provider's own Signed API. Failed targets back off
 exponentially up to 30 minutes and honour `Retry-After`.
 
 ## Coverage and redundancy

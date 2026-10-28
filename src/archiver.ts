@@ -7,6 +7,8 @@ import {
   type Endpoint,
   MAX_BACKOFF_MS,
   REQUEST_TIMEOUT_MS,
+  SOURCES,
+  type Source,
   USER_AGENT,
 } from './config.ts';
 import { sendHeartbeat } from './heartbeat.ts';
@@ -18,6 +20,9 @@ interface Target {
   alias: string;
   airnode: Address;
   endpoint: Endpoint;
+  source: Source;
+  // Signed API base URL for this source: API3's, or the provider's own.
+  baseUrl: string;
   failures: number;
   retryAt: number;
   // Template IDs seen so far; null until the first successful fetch.
@@ -40,8 +45,10 @@ function backOff(target: Target, intervalMs: number, retryAfter: string | null) 
   return Math.round((target.retryAt - Date.now()) / 1000);
 }
 
+const fieldsOf = ({ alias, endpoint, source }: Target) => ({ provider: alias, endpoint, source });
+
 function trackFeeds(target: Target, data: readonly SignedDatum[]) {
-  const fields = { provider: target.alias, endpoint: target.endpoint };
+  const fields = fieldsOf(target);
   if (!target.feeds) {
     target.feeds = new Set(data.map(({ templateId }) => templateId));
     log.info('feeds found', { ...fields, feeds: target.feeds.size });
@@ -60,6 +67,7 @@ function recordFailure(store: Store, target: Target, status: number | null) {
   store.save([], {
     airnode: target.airnode,
     endpoint: target.endpoint,
+    source: target.source,
     fetchedAt: Date.now(),
     status,
     received: 0,
@@ -68,8 +76,8 @@ function recordFailure(store: Store, target: Target, status: number | null) {
 }
 
 async function poll(target: Target, store: Store, intervalMs: number, stop: AbortSignal) {
-  const fields = { provider: target.alias, endpoint: target.endpoint };
-  const response = await fetch(`${BASE_URL}/${target.endpoint}/${target.airnode}`, {
+  const fields = fieldsOf(target);
+  const response = await fetch(`${target.baseUrl}/${target.endpoint}/${target.airnode}`, {
     headers: { 'user-agent': USER_AGENT },
     signal: AbortSignal.any([AbortSignal.timeout(REQUEST_TIMEOUT_MS), stop]),
   });
@@ -98,8 +106,16 @@ async function poll(target: Target, store: Store, intervalMs: number, stop: Abor
   target.failures = 0;
   trackFeeds(target, valid);
   const received = valid.length + rejected;
-  const { airnode, endpoint } = target;
-  const saved = store.save(valid, { airnode, endpoint, fetchedAt, status: response.status, received, rejected });
+  const { airnode, endpoint, source } = target;
+  const saved = store.save(valid, {
+    airnode,
+    endpoint,
+    source,
+    fetchedAt,
+    status: response.status,
+    received,
+    rejected,
+  });
   if (rejected > 0) log.warn('rejected records', { ...fields, rejected });
   log.debug('fetched', { ...fields, received, saved });
   return { saved, rejected };
@@ -107,9 +123,14 @@ async function poll(target: Target, store: Store, intervalMs: number, stop: Abor
 
 export async function runArchiver({ intervalSeconds, dbPath, heartbeatUrl }: ArchiverOptions) {
   const intervalMs = intervalSeconds * 1000;
-  const targets: Target[] = AIRNODES.flatMap(({ alias, airnode }) =>
-    ENDPOINTS.map((endpoint) => ({ alias, airnode, endpoint, failures: 0, retryAt: 0, feeds: null }))
-  );
+  const targets: Target[] = AIRNODES.flatMap(({ alias, airnode, signedApiUrl }) => {
+    return ENDPOINTS.flatMap((endpoint) => {
+      return SOURCES.map((source) => {
+        const baseUrl = source === 'api3' ? BASE_URL : signedApiUrl;
+        return { alias, airnode, endpoint, source, baseUrl, failures: 0, retryAt: 0, feeds: null };
+      });
+    });
+  });
   // One request at a time, spread evenly across the interval, so the API sees a steady trickle.
   const gapMs = intervalMs / targets.length;
   const store = openStore(dbPath);
@@ -163,8 +184,7 @@ export async function runArchiver({ intervalSeconds, dbPath, heartbeatUrl }: Arc
           recordFailure(store, target, null);
           const retryInSeconds = backOff(target, intervalMs, null);
           log.warn('fetch failed', {
-            provider: target.alias,
-            endpoint: target.endpoint,
+            ...fieldsOf(target),
             error: errorMessage(error),
             retryInSeconds,
           });

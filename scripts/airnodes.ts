@@ -6,7 +6,10 @@ import { apisData, deriveTemplateId, getAllDataFeeds, getSupportedProvidersForDa
 
 // Mock providers have no Signed API URL and never serve real data.
 const apis = Object.values(apisData).filter((api) => api.signedApiUrl !== '');
-const airnodes = apis.map(({ alias, airnode }) => ({ alias, airnode })).sort((a, b) => a.alias.localeCompare(b.alias));
+// Each provider also serves its signed data from its own Signed API, a second source beside API3's.
+const airnodes = apis
+  .map(({ alias, airnode, signedApiUrl }) => ({ alias, airnode, signedApiUrl }))
+  .sort((a, b) => a.alias.localeCompare(b.alias));
 
 // Feed name -> provider alias -> base template ID. OEV template IDs are derived from these at runtime.
 const byAlias = new Map(apis.map((api) => [api.alias, api.airnode]));

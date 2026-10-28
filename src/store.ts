@@ -2,7 +2,7 @@ import { Database } from 'bun:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { type Address, hexToBytes } from 'viem';
-import type { Endpoint } from './config.ts';
+import type { Endpoint, Source } from './config.ts';
 import type { SignedDatum } from './signed-data.ts';
 
 // Hex fields are stored as bytes (about half the size); read them back with SQL `hex()`.
@@ -24,7 +24,8 @@ const DATAPOINTS = `
 // One row per request, failed or not, so the archive knows when it was watching. A stretch with no
 // polls means the archiver was down; polls with a failed status mean the provider was. `fetched_at`
 // matches the datapoints that request saved. `status` is the HTTP status, or NULL when the request
-// failed without a usable response (network error, timeout, unreadable body).
+// failed without a usable response (network error, timeout, unreadable body). `source` is which Signed API answered;
+// archives from before providers' own APIs were read only polled API3's, so that is the default.
 const POLLS = `
   CREATE TABLE IF NOT EXISTS polls (
     airnode    BLOB    NOT NULL,
@@ -34,6 +35,7 @@ const POLLS = `
     received   INTEGER NOT NULL,
     rejected   INTEGER NOT NULL,
     saved      INTEGER NOT NULL,
+    source     TEXT    NOT NULL DEFAULT 'api3',
     PRIMARY KEY (airnode, endpoint, fetched_at)
   ) WITHOUT ROWID
 `;
@@ -49,9 +51,18 @@ export const hasTable = (db: Database, name: string) => {
   );
 };
 
+// Whether a table has a column; archives written before a column was added lack it.
+export const hasColumn = (db: Database, table: string, column: string) => {
+  return db
+    .query<{ name: string }, []>(`PRAGMA table_info(${table})`)
+    .all()
+    .some(({ name }) => name === column);
+};
+
 export interface Poll {
   airnode: Address;
   endpoint: Endpoint;
+  source: Source;
   // Unix milliseconds, set by us.
   fetchedAt: number;
   status: number | null;
@@ -91,6 +102,8 @@ export function openStore(path: string) {
   db.run('PRAGMA busy_timeout = 10000');
   db.run(DATAPOINTS);
   db.run(POLLS);
+  // A new column only: existing polls keep their rows and read as API3's.
+  if (!hasColumn(db, 'polls', 'source')) db.run("ALTER TABLE polls ADD COLUMN source TEXT NOT NULL DEFAULT 'api3'");
   db.run('CREATE INDEX IF NOT EXISTS polls_by_time ON polls (fetched_at)');
 
   const insert = db.prepare(
@@ -105,8 +118,8 @@ export function openStore(path: string) {
      WHERE airnode = $airnode AND template_id = $templateId AND timestamp = $timestamp AND value = $value`
   );
   const insertPoll = db.prepare(
-    `INSERT OR IGNORE INTO polls (airnode, endpoint, fetched_at, status, received, rejected, saved)
-     VALUES ($airnode, $endpoint, $fetchedAt, $status, $received, $rejected, $saved)`
+    `INSERT OR IGNORE INTO polls (airnode, endpoint, fetched_at, status, received, rejected, saved, source)
+     VALUES ($airnode, $endpoint, $fetchedAt, $status, $received, $rejected, $saved, $source)`
   );
 
   // Inserts one verified record; returns 1 if it was new, 0 if the archive already had it.

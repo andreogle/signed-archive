@@ -126,6 +126,7 @@ describe('gaps', () => {
     store.save([], {
       airnode: coingecko.airnode,
       endpoint: 'public',
+      source: 'api3',
       fetchedAt: seconds * 1000,
       status: 200,
       received: 0,

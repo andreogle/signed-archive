@@ -109,7 +109,8 @@ watching. In order of value:
 4. **Read the providers' own Signed APIs too.** Each provider runs its own Signed API (for example
    `signed-api.coingecko.com`, listed as `signedApiUrl` in `@api3/api-integrations`) alongside API3's
    `signed-api.api3.org`. Archiving both gives a second source if one goes down, and shows whether API3's copy ever
-   leaves out data the provider published. The same politeness rules apply to every host.
+   leaves out data the provider published. The same politeness rules apply to every host. _Status: built (each
+   poll records its `source`). The first comparison already found conflicting values; see Research._
 5. **Merge archives.** A `merge` command reads another archive, re-checks every signature, and adds only records that
    are missing. It never overwrites, so two different values for the same moment both survive as evidence. This fills
    one archive's gaps from another, and is the base of the community archive network below. _Status: built._
@@ -273,6 +274,14 @@ Public goods for the wider oracle ecosystem that the archive makes possible.
 - **Fraud proof for conflicting signatures.** Two valid signatures from one provider for the same feed and time stamp
   with different values are a self-contained proof of misbehaviour. A small contract can check such a pair for about
   6k gas. The archive is where such pairs would be found, and the reader already keeps both.
+- **Conflicting values are real, between a provider's two copies.** On 2026-10-28, within 12 seconds of the archiver
+  starting to read providers' own Signed APIs as well as API3's, it found the same key signing different values for
+  the same feed and second: 660 moments in 35 minutes (ncfx 521, blocksize 92, coinmetrics 38, nodary 9), none in the
+  23 hours of API3-only data before. Example: blocksize signed ETH/USD at both 2351.3505 and 2351.6995 for one second.
+  The likely cause is a separate signing pipeline per Signed API, each fetching its own upstream price, which is not
+  misbehaviour in itself. It does mean two genuine signed prices exist for one moment, so whoever pushes an update
+  on-chain (Airseeker, or an OEV auction winner) can pick between them. Measure how far apart such pairs are, ask the
+  providers and API3 whether it is intended, and feed it into the cherry-picking bound.
 - **A static check for oracle consumers.** Slither has detectors for unchecked Pyth and Chronicle prices but none for
   API3. An `api3-unchecked-timestamp` detector (a contract that ignores the time stamp `read()` returns) matters
   because nothing on-chain rejects stale API3 data. Merged upstream, it reaches every Slither user.

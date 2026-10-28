@@ -58,6 +58,7 @@ export function fixtureDb() {
     store.save([datum], {
       airnode: datum.airnode,
       endpoint: 'public',
+      source: 'api3',
       fetchedAt: 1_793_207_000_000,
       status: 200,
       received: 1,
@@ -67,6 +68,7 @@ export function fixtureDb() {
   store.save([coingeckoOev], {
     airnode: coingeckoOev.airnode,
     endpoint: 'public-oev',
+    source: 'api3',
     fetchedAt: 1_793_207_000_000,
     status: 200,
     received: 1,

@@ -12,11 +12,11 @@ This file holds what is specific to this project and the invariants that must ne
 - The primary key includes the value, so two different values signed for the same feed and timestamp both survive. That pair is the equivocation evidence the archive exists to catch: never "fix" it with an upsert or a key without the value
 - Never delete or rewrite stored rows. A schema change adds a table or column; it never migrates signed data in place
 - Hex fields are stored as bytes. Read them with SQL `hex()` and write them with `hexToBytes`
-- Every request writes a `polls` row in the same transaction as its records, failures included. Without it a gap in the history is indistinguishable from a provider that stopped signing
+- Every request writes a `polls` row in the same transaction as its records, failures included, with the `source` that answered (`api3` or the provider's own Signed API). Without it a gap in the history is indistinguishable from a provider that stopped signing
 - Another archive is untrusted input: `merge` re-checks shape, known airnode and signature for every record before adding it, exactly as the archiver does. Never add a fast path that copies rows unverified
 
 **Be polite to the Signed API**
-- One request at a time, spread evenly across the poll interval. Never fetch in parallel or in bursts
+- One request at a time, spread evenly across the poll interval. Never fetch in parallel or in bursts. Each provider is polled on two hosts (API3's Signed API and its own `signedApiUrl` from `src/airnodes.json`); a failing host backs off on its own without slowing the other
 - Keep the `POLL_INTERVAL_SECONDS` floor (15 s). Feeds are re-signed every few seconds whether or not the price moved, so polling faster buys rows, not data
 - A failed target backs off exponentially (capped at 30 min) and honours `Retry-After`. Never retry in a tight loop
 - Every request has a timeout and our `User-Agent`
