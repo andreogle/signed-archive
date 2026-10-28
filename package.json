@@ -11,6 +11,7 @@
     "format": "biome check --write .",
     "lint": "biome check .",
     "proofs": "forge test --root proofs",
+    "replay": "bun scripts/replay.ts",
     "serve": "NODE_ENV=production bun src/cli.ts serve",
     "start": "bun src/cli.ts",
     "test": "bun test --coverage",

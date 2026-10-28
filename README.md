@@ -91,14 +91,18 @@ Each copy is a full archive (hundreds of MB per day of history), so prune old co
 `bun run dev` stays the development loop. Don't point it at the Docker volume: under `--watch` every edit restarts the
 archiver and leaves a gap.
 
-## Fuzz tests
+## Fuzz tests and replay
 
-A dev tool checks API3's own Solidity. Foundry is pinned in `mise.toml`, and `@api3/contracts`
+Two dev tools check API3's own Solidity against the archive. Foundry is pinned in `mise.toml`, and `@api3/contracts`
 (the contracts as deployed) is a dev dependency.
 
 - `bun run proofs` fuzzes `Median.sol`, unchanged, in under a second: the overflow-safe average equals `(x + y) / 2`
   rounded toward zero and stays between its inputs, and the median of every length from 1 to 21 (the sorting network
   and quickselect) matches a plain sort-based reference, ignores input order and handles many equal values.
+- `bun run replay -- --feed ETH/USD [--from <unix s>] [--to <unix s>]` starts a local anvil chain, deploys
+  `Api3ServerV1` from `@api3/contracts` (byte for byte the bytecode on Ethereum), replays the feed's archived records
+  through `updateBeaconWithSignedData` in time order, and after each one checks the beacon set value against the median
+  in `src/price.ts`. It defaults to the last 10 minutes and takes a few seconds.
 
 ## Development
 

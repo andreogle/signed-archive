@@ -77,6 +77,22 @@ describe('at', () => {
   });
 });
 
+describe('records', () => {
+  test('returns every record in range, oldest first, still verifiable', async () => {
+    const records = reader.records(eth.public, 1_793_206_900, 1_793_206_960);
+    expect(records.map(({ provider, timestamp }) => [provider, timestamp])).toEqual([
+      ['blocksize', '1793206903'],
+      ['coingecko', '1793206907'],
+      ['coinmetrics', '1793206912'],
+      ['blocksize', '1793206951'],
+    ]);
+    for (const record of records) expect(await hasValidSignature(record)).toBe(true);
+    expect(reader.records(eth.public, 1_793_206_904, 1_793_206_910).map(({ provider }) => provider)).toEqual([
+      'coingecko',
+    ]);
+  });
+});
+
 describe('history', () => {
   test('returns ordered points per provider in range', () => {
     const providers = reader.history(eth.public, 1_793_206_900, 1_793_206_960);

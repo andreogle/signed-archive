@@ -1,4 +1,5 @@
 [tools]
 bun = "1.4.4"
-# Dev tool for proofs/ (fuzz tests of API3's Median.sol). The archiver and its Docker image need only Bun.
+# Dev tool for proofs/ (fuzz tests of API3's Median.sol) and the replay script's local chain (anvil). The archiver and
+# its Docker image need only Bun.
 foundry = "1.8.6"

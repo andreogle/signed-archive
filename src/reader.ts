@@ -68,6 +68,11 @@ export function openReader(path: string) {
      WHERE airnode = $airnode AND template_id = $templateId AND timestamp BETWEEN $from AND $to
      GROUP BY timestamp / $bucket ORDER BY timestamp`
   );
+  const rangeQuery = db.prepare<Row, { airnode: Uint8Array; templateId: Uint8Array; from: number; to: number }>(
+    `SELECT timestamp, hex(value) AS value, hex(signature) AS signature FROM datapoints
+     WHERE airnode = $airnode AND template_id = $templateId AND timestamp BETWEEN $from AND $to
+     ORDER BY timestamp, value`
+  );
   const earliestQuery = db.prepare<{ timestamp: number }, { airnode: Uint8Array; templateId: Uint8Array }>(
     `SELECT timestamp FROM datapoints WHERE airnode = $airnode AND template_id = $templateId
      ORDER BY timestamp LIMIT 1`
@@ -94,6 +99,26 @@ export function openReader(path: string) {
         };
       });
     });
+  }
+
+  // Every record of the sources signed in [from, to] (unix seconds), oldest first, with everything needed to
+  // re-check or replay it. Two values signed for the same moment both come back.
+  function records(sources: readonly FeedSource[], from: number, to: number): SignedPrice[] {
+    const rows = sources.flatMap((source) => {
+      return rangeQuery.all({ ...keyOf(source), from, to }).map((row) => {
+        const encodedValue = toHex(row.value);
+        return {
+          provider: source.provider,
+          airnode: source.airnode,
+          templateId: source.templateId,
+          timestamp: String(row.timestamp),
+          encodedValue,
+          signature: toHex(row.signature),
+          price: decodePrice(encodedValue),
+        };
+      });
+    });
+    return rows.sort((a, b) => Number(a.timestamp) - Number(b.timestamp));
   }
 
   function history(sources: readonly FeedSource[], from: number, to: number) {
@@ -132,7 +157,7 @@ export function openReader(path: string) {
     return last < to - GAP_SECONDS ? [...found, { from: Math.max(last, start), to }] : found;
   }
 
-  return { at, history, earliest, gaps, lastPoll, close: () => db.close() };
+  return { at, records, history, earliest, gaps, lastPoll, close: () => db.close() };
 }
 
 export type Reader = ReturnType<typeof openReader>;
