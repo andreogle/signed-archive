@@ -9,6 +9,7 @@ import {
   REQUEST_TIMEOUT_MS,
   USER_AGENT,
 } from './config.ts';
+import { sendHeartbeat } from './heartbeat.ts';
 import { errorMessage, log } from './logger.ts';
 import { hasValidSignature, type SignedDatum, toSignedDatum } from './signed-data.ts';
 import { openStore } from './store.ts';
@@ -28,6 +29,7 @@ type Store = ReturnType<typeof openStore>;
 export interface ArchiverOptions {
   intervalSeconds: number;
   dbPath: string;
+  heartbeatUrl?: URL | undefined;
 }
 
 function backOff(target: Target, intervalMs: number, retryAfter: string | null) {
@@ -103,7 +105,7 @@ async function poll(target: Target, store: Store, intervalMs: number, stop: Abor
   return { saved, rejected };
 }
 
-export async function runArchiver({ intervalSeconds, dbPath }: ArchiverOptions) {
+export async function runArchiver({ intervalSeconds, dbPath, heartbeatUrl }: ArchiverOptions) {
   const intervalMs = intervalSeconds * 1000;
   const targets: Target[] = AIRNODES.flatMap(({ alias, airnode }) =>
     ENDPOINTS.map((endpoint) => ({ alias, airnode, endpoint, failures: 0, retryAt: 0, feeds: null }))
@@ -126,13 +128,20 @@ export async function runArchiver({ intervalSeconds, dbPath }: ArchiverOptions) 
     });
   }
 
-  log.info('archiver started', { providers: AIRNODES.length, targets: targets.length, intervalSeconds, db: dbPath });
+  log.info('archiver started', {
+    providers: AIRNODES.length,
+    targets: targets.length,
+    intervalSeconds,
+    db: dbPath,
+    heartbeat: heartbeatUrl?.host,
+  });
   while (!stop.signal.aborted) {
     const cycleStartedAt = Date.now();
     let saved = 0;
     let rejected = 0;
     let failed = 0;
     let backingOff = 0;
+    let succeeded = 0;
     for (const target of targets) {
       if (stop.signal.aborted) break;
       const startedAt = Date.now();
@@ -142,6 +151,7 @@ export async function runArchiver({ intervalSeconds, dbPath }: ArchiverOptions) 
         try {
           const result = await poll(target, store, intervalMs, stop.signal);
           if (result) {
+            succeeded += 1;
             saved += result.saved;
             rejected += result.rejected;
           } else {
@@ -173,6 +183,8 @@ export async function runArchiver({ intervalSeconds, dbPath }: ArchiverOptions) 
       backingOff,
       durationMs: Date.now() - cycleStartedAt,
     });
+    // Only a cycle that reached the API counts as alive, so the monitor also alerts when every request fails.
+    if (heartbeatUrl && succeeded > 0 && !stop.signal.aborted) await sendHeartbeat(heartbeatUrl);
   }
   store.close();
   log.info('archiver stopped');

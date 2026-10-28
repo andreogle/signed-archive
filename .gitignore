@@ -8,3 +8,6 @@
 
 # Cache from the impeccable design plugin.
 /.impeccable/
+
+# Local compose settings; may hold the heartbeat URL token.
+/.env

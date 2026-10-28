@@ -8,6 +8,7 @@ import {
   DEFAULT_PORT,
   MIN_INTERVAL_SECONDS,
 } from './config.ts';
+import { parseHeartbeatUrl } from './heartbeat.ts';
 import { errorMessage, LOG_LEVELS, type LogLevel, log, setLogLevel } from './logger.ts';
 
 function parseInterval(value: string) {
@@ -69,12 +70,27 @@ program
       .env('POLL_INTERVAL_SECONDS')
   )
   .addOption(dbOption())
+  .addOption(
+    new Option('--heartbeat-url <url>', "URL to ping after each cycle that reached the API (dead man's switch)")
+      .argParser((value) => {
+        try {
+          return parseHeartbeatUrl(value);
+        } catch (error) {
+          throw new InvalidArgumentError(errorMessage(error));
+        }
+      })
+      .env('HEARTBEAT_URL')
+  )
   .addOption(new Option('--serve', 'also serve the explorer, as the serve command does').env('SERVE'))
   .addOption(hostOption())
   .addOption(portOption())
-  .action(async (options: ServeOptions & { interval: number; serve?: boolean }) => {
+  .action(async (options: ServeOptions & { interval: number; serve?: boolean; heartbeatUrl?: URL }) => {
     // runArchiver creates the database before its first await, so the read-only server can open it.
-    const archiving = runArchiver({ intervalSeconds: options.interval, dbPath: options.db });
+    const archiving = runArchiver({
+      intervalSeconds: options.interval,
+      dbPath: options.db,
+      heartbeatUrl: options.heartbeatUrl,
+    });
     const server = options.serve ? await serve(options) : null;
     await archiving;
     // An open server keeps the process alive, so close it, and any open connections, once archiving stops.

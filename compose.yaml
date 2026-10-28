@@ -17,6 +17,8 @@ services:
     environment:
       LOG_LEVEL: ${LOG_LEVEL:-info}
       POLL_INTERVAL_SECONDS: ${POLL_INTERVAL_SECONDS:-60}
+      # Optional outside alert, e.g. a healthchecks.io ping URL. Set it in a .env file next to this one.
+      HEARTBEAT_URL: ${HEARTBEAT_URL:-}
     volumes:
       - archive:/data
     # Unhealthy when no request was recorded for 5 minutes. Docker reports this but does not restart on it,

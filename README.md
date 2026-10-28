@@ -17,14 +17,15 @@ bun run dev                    # archiver + explorer, restarting on file changes
 bun run dev -- --interval 120  # flags override env vars
 ```
 
-| Flag                   | Env var                 | Default               | Notes                                    |
-| ---------------------- | ----------------------- | --------------------- | ---------------------------------------- |
-| `--interval <seconds>` | `POLL_INTERVAL_SECONDS` | `60`                  | Minimum 15. Requests are spread evenly.  |
-| `--db <path>`          | `DB_PATH`               | `data/archive.sqlite` |                                          |
-| `--log-level <level>`  | `LOG_LEVEL`             | `info`                | `debug`, `info`, `warn` or `error`.      |
-| `--serve`              | `SERVE`                 | off                   | `archive` only: also serve the explorer. |
-| `--host <host>`        | `HOST`                  | `127.0.0.1`           | Explorer address.                        |
-| `--port <port>`        | `PORT`                  | `3000`                | Explorer port.                           |
+| Flag                    | Env var                 | Default               | Notes                                    |
+| ----------------------- | ----------------------- | --------------------- | ---------------------------------------- |
+| `--interval <seconds>`  | `POLL_INTERVAL_SECONDS` | `60`                  | Minimum 15. Requests are spread evenly.  |
+| `--db <path>`           | `DB_PATH`               | `data/archive.sqlite` |                                          |
+| `--log-level <level>`   | `LOG_LEVEL`             | `info`                | `debug`, `info`, `warn` or `error`.      |
+| `--serve`               | `SERVE`                 | off                   | `archive` only: also serve the explorer. |
+| `--heartbeat-url <url>` | `HEARTBEAT_URL`         | none                  | `archive` only: ping after each cycle.   |
+| `--host <host>`         | `HOST`                  | `127.0.0.1`           | Explorer address.                        |
+| `--port <port>`         | `PORT`                  | `3000`                | Explorer port.                           |
 
 Logs go to stderr, one line per event, with `key=value` fields:
 
@@ -70,7 +71,10 @@ docker compose logs -f archiver
 docker compose run --rm backup    # one consistent copy into the `backups` volume
 ```
 
-Docker reports an unhealthy container but does not restart it, so add an outside alert as well.
+Docker reports an unhealthy container but does not restart it, so add an outside alert as well: create a check on
+healthchecks.io (or an Uptime Kuma push monitor) and put its URL in a `.env` file next to `compose.yaml` as
+`HEARTBEAT_URL=...`. The archiver pings it after every cycle that reached the API, so the monitor alerts when pings
+stop. `.env` is gitignored, since the URL is a secret.
 
 **Backups.** `backup` writes a timestamped `VACUUM INTO` copy, which is safe while the archiver runs; never copy the
 live file. Run it nightly from the host's cron and move the copies off the machine, for example:
