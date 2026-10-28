@@ -157,6 +157,10 @@ describe('gaps', () => {
     ]);
   });
 
+  test('lastPoll returns the newest request in unix milliseconds', () => {
+    expect(gapReader.lastPoll()).toBe(1_500_000);
+  });
+
   test('reports nothing before the first poll, or for an archive made before polls were recorded', () => {
     expect(reader.gaps(0, 10)).toEqual([]);
     const oldPath = join(dir, 'old.sqlite');
@@ -167,6 +171,7 @@ describe('gaps', () => {
     old.close();
     const oldReader = openReader(oldPath);
     expect(oldReader.gaps(0, 2000)).toEqual([]);
+    expect(oldReader.lastPoll()).toBeNull();
     oldReader.close();
   });
 });

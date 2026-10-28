@@ -102,7 +102,8 @@ watching. In order of value:
 2. **Keep it running, in Docker.** A small image with the compiled binary, `restart: unless-stopped`, the archive on a
    named volume and a container health check. Never run the long-lived archive under `--watch`. Add an outside heartbeat
    (for example healthchecks.io) that alerts when no cycle has finished for a few minutes, since a container that is
-   up but stuck looks healthy to Docker.
+   up but stuck looks healthy to Docker. _Status: built (`compose.yaml`, `health` command); the outside alert is
+   still to do._
 3. **Run more than one archiver.** Two or more instances on different machines and networks. Each record proves itself
    through its signature, so the copies need no trust in each other.
 4. **Read the providers' own Signed APIs too.** Each provider runs its own Signed API (for example
@@ -117,7 +118,8 @@ watching. In order of value:
    transactions recovers verifiable records, including from before this archive started. They are sparse (only when a
    feed was updated on-chain), but they fill gaps with real evidence.
 7. **Back up.** A nightly `VACUUM INTO` copy of the volume's database, kept off the machine. Copying the live file is
-   not a backup in WAL mode. The daily files from the foundation double as a public backup.
+   not a backup in WAL mode. The daily files from the foundation double as a public backup. _Status: `backup` command
+   and compose service built; scheduling and moving copies off the machine are up to the host._
 
 Polling samples each feed about once a minute. Records signed between polls are not captured by design: providers
 re-sign every few seconds whether or not the price moved, so polling faster buys rows, not data.

@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 import { mkdirSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { dirname, join } from 'node:path';
 import { type Address, hexToBytes } from 'viem';
 import type { Endpoint } from './config.ts';
 import type { SignedDatum } from './signed-data.ts';
@@ -67,6 +67,20 @@ export interface StoredRecord {
   datum: SignedDatum;
   endpoint: Endpoint;
   fetchedAt: number;
+}
+
+// Writes a consistent copy of the archive into `dir` and returns its path. In WAL mode a plain file copy of a live
+// archive can miss committed data, so this uses VACUUM INTO, which also runs while the archiver keeps writing.
+export function backupArchive(dbPath: string, dir: string, now = new Date()) {
+  mkdirSync(dir, { recursive: true });
+  const path = join(dir, `archive-${now.toISOString().replace(/[:.]/g, '-')}.sqlite`);
+  const db = new Database(dbPath, { readonly: true, strict: true });
+  try {
+    db.run('VACUUM INTO ?', [path]);
+  } finally {
+    db.close();
+  }
+  return path;
 }
 
 export function openStore(path: string) {

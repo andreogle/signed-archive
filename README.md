@@ -55,6 +55,36 @@ run it). The airnode list is baked in, so rebuild after updating it.
 The binary is about 110 MB because it embeds the whole Bun runtime (about 107 MB); the app itself is under 100 KB.
 `--bytecode` compiles the code ahead of time, which cuts startup from about 11 ms to 4 ms.
 
+## Docker
+
+This is the way to run the long-lived archive. `compose.yaml` runs two services from one image (the compiled binary on
+a distroless base, as a non-root user):
+
+- **archiver**: polls and writes the archive to the `archive` volume. It restarts unless stopped, stops cleanly on
+  `SIGTERM`, and reports unhealthy when no request was recorded for 5 minutes (`signed-archive health`).
+- **explorer**: serves the explorer from the same volume, published on `127.0.0.1:3000` (`PORT` changes the host port).
+
+```sh
+docker compose up -d --build
+docker compose logs -f archiver
+docker compose run --rm backup    # one consistent copy into the `backups` volume
+```
+
+Docker reports an unhealthy container but does not restart it, so add an outside alert as well.
+
+**Backups.** `backup` writes a timestamped `VACUUM INTO` copy, which is safe while the archiver runs; never copy the
+live file. Run it nightly from the host's cron and move the copies off the machine, for example:
+
+```sh
+0 3 * * * cd /path/to/signed-archive && docker compose run --rm backup
+docker run --rm -v signed-archive_backups:/backups -v "$PWD":/out busybox cp -r /backups/. /out/
+```
+
+Each copy is a full archive (hundreds of MB per day of history), so prune old copies once they are stored elsewhere.
+
+`bun run dev` stays the development loop. Don't point it at the Docker volume: under `--watch` every edit restarts the
+archiver and leaves a gap.
+
 ## Development
 
 `bun run check` checks the airnode list is current, then runs Biome, the type checker and the tests with coverage.

@@ -114,6 +114,12 @@ export function openReader(path: string) {
 
   // Stretches inside [from, to] when the archiver was not polling, in unix seconds. Coverage is only
   // known since the first recorded poll, so earlier time is never reported as a gap.
+  // When the archiver last recorded a request, in unix milliseconds, or null if it never has.
+  function lastPoll() {
+    if (!hasTable(db, 'polls')) return null;
+    return db.query<{ last: number | null }, []>('SELECT max(fetched_at) AS last FROM polls').get()?.last ?? null;
+  }
+
   function gaps(from: number, to: number): Gap[] {
     if (!hasTable(db, 'polls')) return [];
     const range = db.query<{ first: number | null; last: number | null }, []>(POLL_RANGE).get();
@@ -126,7 +132,7 @@ export function openReader(path: string) {
     return last < to - GAP_SECONDS ? [...found, { from: Math.max(last, start), to }] : found;
   }
 
-  return { at, history, earliest, gaps, close: () => db.close() };
+  return { at, history, earliest, gaps, lastPoll, close: () => db.close() };
 }
 
 export type Reader = ReturnType<typeof openReader>;

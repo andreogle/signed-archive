@@ -24,6 +24,12 @@ function parsePort(value: string) {
   return port;
 }
 
+function parseSeconds(value: string) {
+  const seconds = Number(value);
+  if (!Number.isInteger(seconds) || seconds < 1) throw new InvalidArgumentError('must be a whole number of seconds');
+  return seconds;
+}
+
 const dbOption = () => new Option('--db <path>', 'SQLite database path').default(DEFAULT_DB_PATH).env('DB_PATH');
 const hostOption = () => new Option('--host <host>', 'address to listen on').default(DEFAULT_HOST).env('HOST');
 const portOption = () => {
@@ -96,6 +102,42 @@ program
     const result = await mergeArchive({ sourcePath: source, dbPath: db });
     const rejected = result.rejected + result.rejectedPolls;
     (rejected > 0 ? log.warn : log.info)('merge done', { source, ...result });
+  });
+
+program
+  .command('health')
+  .description('exit 0 if the archiver recorded a request recently, 1 otherwise (for container health checks)')
+  .addOption(dbOption())
+  .addOption(
+    new Option('--max-age <seconds>', 'oldest acceptable last request')
+      .argParser(parseSeconds)
+      .default(300)
+      .env('HEALTH_MAX_AGE_SECONDS')
+  )
+  .action(async ({ db, maxAge }: { db: string; maxAge: number }) => {
+    const { openReader } = await import('./reader.ts');
+    const reader = openReader(db);
+    const last = reader.lastPoll();
+    reader.close();
+    const lastPollAgeSeconds = last === null ? undefined : Math.round((Date.now() - last) / 1000);
+    if (lastPollAgeSeconds === undefined || lastPollAgeSeconds > maxAge) {
+      log.warn('unhealthy', { lastPollAgeSeconds, maxAgeSeconds: maxAge });
+      process.exitCode = 1;
+    } else {
+      log.debug('healthy', { lastPollAgeSeconds });
+    }
+  });
+
+program
+  .command('backup')
+  .description('write a consistent, timestamped copy of the archive into a directory (safe while archiving)')
+  .argument('<dir>', 'directory to write the copy into')
+  .addOption(dbOption())
+  .action(async (dir: string, { db }: { db: string }) => {
+    const { backupArchive } = await import('./store.ts');
+    const startedAt = Date.now();
+    const path = backupArchive(db, dir);
+    log.info('backup done', { path, durationMs: Date.now() - startedAt });
   });
 
 try {

@@ -1,0 +1,56 @@
+# docker compose up -d --build      start the archiver and the explorer (http://127.0.0.1:3000)
+# docker compose run --rm backup    write one consistent copy of the archive into the backups volume
+name: signed-archive
+
+x-image: &image
+  build: .
+  image: signed-archive:local
+  init: true
+
+services:
+  archiver:
+    <<: *image
+    command: ["archive"]
+    restart: unless-stopped
+    # SIGTERM cancels the request in flight and finishes the current save; this is ample.
+    stop_grace_period: 30s
+    environment:
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      POLL_INTERVAL_SECONDS: ${POLL_INTERVAL_SECONDS:-60}
+    volumes:
+      - archive:/data
+    # Unhealthy when no request was recorded for 5 minutes. Docker reports this but does not restart on it,
+    # so pair it with an outside alert.
+    healthcheck:
+      test: ["CMD", "/app/signed-archive", "health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 2m
+
+  explorer:
+    <<: *image
+    command: ["serve", "--host", "0.0.0.0"]
+    restart: unless-stopped
+    # Published on loopback only. Put a reverse proxy in front to expose it.
+    ports:
+      - "127.0.0.1:${PORT:-3000}:3000"
+    # Read-only in practice (the server opens the database read-only), but SQLite readers in WAL mode
+    # still need to write the shared-memory file, so the volume is mounted read-write.
+    volumes:
+      - archive:/data
+    depends_on:
+      archiver:
+        condition: service_started
+
+  backup:
+    <<: *image
+    command: ["backup", "/backups"]
+    profiles: ["backup"]
+    volumes:
+      - archive:/data
+      - backups:/backups
+
+volumes:
+  archive:
+  backups:

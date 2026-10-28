@@ -44,7 +44,8 @@ This file holds what is specific to this project and the invariants that must ne
 - `bun run build` compiles a native binary to `dist/signed-archive`. JSON imported by the source (the airnode list, `package.json`) is bundled into it, so rebuild after `bun run airnodes`
 - Biome runs strict, with every React rule on. Fix the code, don't disable the rule. The one exception is `noJsxPropsBind`, off on purpose: inline handlers are idiomatic React
 - `bun dev` runs the archiver and explorer under `--watch`, so every edit to `src/` restarts the archiver and leaves a gap. Use it for development only; the long-running archive runs `bun start` or the binary
-- **Never start, restart or kill a running archiver** (`bun start`). Ask the user. Stopping it leaves a gap in the history that can never be filled
+- **Never start, restart or kill a running archiver** (`bun start`, `bun dev`, or the `archiver` container). Ask the user. Stopping it leaves a gap in the history that can never be filled. Test Docker changes under another project name (`docker compose -p sa-test ...`, then `down -v`), never the real one
+- The long-lived archive runs in Docker (`compose.yaml`), not under a host service manager. The image is the compiled binary on distroless, as uid 65532, with no shell: health checks and backups are CLI commands (`health`, `backup`), not shell scripts. The Dockerfile's `BUN_VERSION` must match `mise.toml` (`test/versions.test.ts`)
 - Don't `sleep` waiting for a background command: it notifies when it exits
 - Commit or push only when the user asks
 - Never add a `Co-Authored-By` line (or any AI attribution) to commits or PRs
