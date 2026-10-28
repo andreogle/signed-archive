@@ -12,18 +12,33 @@ Three groups can use the archive:
 
 ## Why this matters now
 
-- **Oracle failures were frequent in 2026.** Aave (about $27M of wrong liquidations in March), Moonwell (cbETH priced at
-  $1 in February), Vesu on Starknet ($3M liquidated in September) and Switchboard (halted after manipulation in August)
-  all lost money to wrong prices or wrong settings, not to bugs in contract code. Ostium lost up to about $24M when an
-  attacker stole a signing key and posted prices dated in the future. After each incident, people asked "what was the
-  real price?" and had nowhere neutral to look.
-- **API3 has no historical price service.** The Signed API only serves the latest value. Pyth sells signed historical
-  prices (Pyth Benchmarks); API3 has nothing equivalent.
-- **API3 publishes few public numbers.** Its homepage shows total OEV rewards paid. DefiLlama estimates the value API3
-  secures in the low tens of millions, down from about $470M in 2024. Independent, believable numbers would help API3
-  win users back.
-- **API3 holds every role in its Morpho vaults.** It is owner, curator, allocator and sentinel, and its own feeds price
-  the markets. An outside record of what those feeds signed is the natural check on that.
+- **Oracle failures were frequent in 2026**, and most came from wrong prices or wrong settings, not bugs in contract
+  code:
+  - February: a faulty oracle configuration on Moonwell priced cbETH at about $1.12 instead of about $2,200, leaving
+    about $1.8M of bad debt ([CoinDesk](https://www.coindesk.com/tech/2026/02/18/ether-briefly-priced-at-usd1-on-defi-app-moonwell-glitch-triggering-usd1-8m-in-bad-debt)).
+  - March: a misconfigured price-cap setting undervalued wstETH on Aave by about 2.85%, triggering about $27M of
+    liquidations that should not have happened ([Rekt](https://rekt.news/aave-rekt)).
+  - July: an attacker used a stolen Ostium oracle-signer key to post prices dated in the future and drained about
+    $23.75M USDC ([The Block](https://www.theblock.co/post/410122/ostium-post-mortem-exploit)).
+  - August and September: a signing-key compromise let an attacker manipulate prices on Switchboard's Move-chain feeds,
+    and Switchboard deprecated all its deployments on September 19
+    ([Crypto Briefing](https://cryptobriefing.com/switchboard-halts-operations-oracle-compromise/),
+    [Solana Compass](https://solanacompass.com/news/switchboard-oracle-protocol-shuts-down-giving-solana-defi-six-days-to-migrate)).
+  - September: a two-minute pricing fault in Pragma's feed caused Vesu on Starknet to liquidate about $3M across 47
+    positions ([Pragma](https://www.pragma.build/updates/vesu-incident)).
+
+  After each incident, people asked "what was the real price?" and had nowhere neutral to look.
+- **API3 has no historical price service.** The Signed API only serves the latest value. Pyth offers signed,
+  verifiable historical prices through Pyth Benchmarks, a paid API since 2026
+  ([Pyth docs](https://docs.pyth.network/price-feeds/core/use-historical-price-data)); API3 does not document an
+  equivalent.
+- **API3 publishes few public numbers.** Its homepage shows total OEV rewards paid. DefiLlama's oracle ranking showed
+  API3 securing about $22M in October 2026, down from a peak of about $470M in early 2024
+  ([DefiLlama](https://defillama.com/oracles)). Independent, believable numbers would help API3 win users back.
+- **API3 holds every role in its Morpho vaults.** API3 entities are owner, curator, allocator and sentinel, and API3
+  says it is also the oracle provider for those markets
+  ([API3 docs](https://docs.api3.org/curation/roles-and-operations.html)). An outside record of what those feeds signed
+  is the natural check on that.
 - **AirnodeHub launched in October 2026** as a marketplace where AI agents find, pay for and verify data. Its docs say
   there is no format yet for bundling several signed answers together, and its catalogue only answers "what is it now?".
 
@@ -69,6 +84,11 @@ These pieces serve all three groups, so they come first.
 5. **Feed health checks.** Flag the things the archive is built to catch: two different prices signed for the same
    moment, time stamps that go backwards or sit in the future, providers that stop signing, providers that drift from
    their peers, and base and OEV feeds that disagree.
+6. **Say how fresh and how complete an answer is.** "Price at a moment" returns each provider's latest record at or
+   before that time, however old. When a record is much older than the chosen time, show it plainly, not only in a
+   tooltip. Also say what the browser check does and does not prove: a valid signature proves a record is genuine, not
+   that the archive holds every record (a server could leave some out). The coverage log and a second archive are what
+   answer completeness.
 
 ## Reliability and redundancy
 
@@ -79,20 +99,25 @@ watching. In order of value:
 1. **Record coverage.** Log every polling cycle (when it ran and which providers answered) in a new table. Gaps then
    become known facts, and the explorer can shade them, instead of looking like silent providers. This is a new table,
    so it does not touch stored records. _Status: built (`polls` table, gaps shaded in the explorer)._
-2. **Keep it running.** Run the compiled binary under a supervisor (launchd on macOS, systemd on Linux) that restarts
-   it if it crashes, never under `--watch`. Add an outside heartbeat (for example healthchecks.io) that alerts when no
-   cycle has finished for a few minutes.
+2. **Keep it running, in Docker.** A small image with the compiled binary, `restart: unless-stopped`, the archive on a
+   named volume and a container health check. Never run the long-lived archive under `--watch`. Add an outside heartbeat
+   (for example healthchecks.io) that alerts when no cycle has finished for a few minutes, since a container that is
+   up but stuck looks healthy to Docker.
 3. **Run more than one archiver.** Two or more instances on different machines and networks. Each record proves itself
    through its signature, so the copies need no trust in each other.
-4. **Merge archives.** A `merge` command reads another archive, re-checks every signature, and adds only records that
+4. **Read the providers' own Signed APIs too.** Each provider runs its own Signed API (for example
+   `signed-api.coingecko.com`, listed as `signedApiUrl` in `@api3/api-integrations`) alongside API3's
+   `signed-api.api3.org`. Archiving both gives a second source if one goes down, and shows whether API3's copy ever
+   leaves out data the provider published. The same politeness rules apply to every host.
+5. **Merge archives.** A `merge` command reads another archive, re-checks every signature, and adds only records that
    are missing. It never overwrites, so two different values for the same moment both survive as evidence. This fills
    one archive's gaps from another, and is the base of the community archive network below. _Status: built._
-5. **Recover history from the chain.** Every on-chain feed update carries a signed record in its transaction data
+6. **Recover history from the chain.** Every on-chain feed update carries a signed record in its transaction data
    (`updateBeaconWithSignedData(airnode, templateId, timestamp, data, signature)`). Decoding past `Api3ServerV1`
    transactions recovers verifiable records, including from before this archive started. They are sparse (only when a
    feed was updated on-chain), but they fill gaps with real evidence.
-6. **Back up.** A nightly `VACUUM INTO` copy kept off the machine. The daily files from the foundation double as a
-   public backup.
+7. **Back up.** A nightly `VACUUM INTO` copy of the volume's database, kept off the machine. Copying the live file is
+   not a backup in WAL mode. The daily files from the foundation double as a public backup.
 
 Polling samples each feed about once a minute. Records signed between polls are not captured by design: providers
 re-sign every few seconds whether or not the price moved, so polling faster buys rows, not data.
@@ -121,14 +146,15 @@ re-sign every few seconds whether or not the price moved, so polling faster buys
   curates, aimed at depositors. It builds the trust that holding every role makes hard to earn alone.
 - **"What if" simulator for risk settings.** Replay real history under different settings: if this feed updated on a
   0.5% move instead of 1%, how many liquidations would change? Useful for the curation team when setting caps and
-  loan-to-value limits.
+  loan-to-value limits. The same replay can measure what the deliberate ~15 second delay on base data costs lenders
+  during sharp moves.
 - **On-chain match-up.** Compare every on-chain feed update with the signed record it came from. Measure how quickly
   updates land and whether each one was triggered by a price move or by the regular heartbeat.
 - **OEV freshness.** The OEV Dashboard already covers auctions and liquidations. The archive can add one thing it
   does not show: how much fresher OEV data is than base data, measured from both feeds' signed time stamps.
 - **Early-warning bot.** A bot on X or Telegram that posts "provider X stopped signing BTC/USD 12 minutes ago", plus a
-  weekly feed-health summary. It could also flag feeds at risk of being shut down, as happened to USDB/USD when its
-  market dried up.
+  weekly feed-health summary. It could also flag feeds at risk of being shut down for low liquidity, as API3
+  reportedly did with Blast USDB/USD in 2025 (only aggregators report this; confirm with API3 before relying on it).
 - **Archive network.** If several people run signed-archive, they can merge their records. Each record proves itself
   through its signature, so nobody has to trust anybody, and one archive's gap is filled by another. Today a stopped
   archiver loses that stretch of history for good.
@@ -163,39 +189,84 @@ AI agents can make up numbers and often cannot show where a fact came from. Sign
 - **Referee for agreements.** Two parties agree "if BTC is above $X at noon Friday, you pay me". The archive's signed
   noon price settles it, and a contract can check the signatures itself.
 - **Historical prices on AirnodeHub.** List "signed price at any past moment" as an AirnodeHub service. It would be the
-  first community-run listing.
+  first community-run listing. _Needs API3:_ API3 builds and hosts every listing today, and providers running their
+  own nodes is still a plan, so this starts as a proposal to them, not something this project can ship alone.
 
-## Formal verification
+## Proofs
 
-Lean, a tool for writing machine-checked mathematical proofs, cannot check this TypeScript directly, but it can prove
-the rules the project relies on.
+No oracle we could find publishes formal specifications of its contracts, and API3's public repositories have unit
+tests only (no fuzzing, invariant tests or formal verification). Machine-checked proofs of API3's own rules are
+unclaimed ground. Cheapest first:
 
-1. **Majority rules for combined feeds.** Prove that if fewer than half of the providers behind a combined feed lie,
-   the combined price (the median) stays between the lowest and highest honest prices. This is the security claim of
-   API3's combined feeds, stated as a theorem. Check the exact rule in `Api3ServerV1` before writing it.
-2. **Messages cannot be confused.** Prove that the way a signed message is assembled (template, time, value) can never
+1. **Symbolic tests of `Median.sol` with Halmos.** Run against the real Solidity, about a day of work: the overflow-safe
+   average equals `(x + y) / 2` rounded toward zero, the sorting and quickselect paths give the same median, and the
+   median lies between the smallest and largest input. `src/price.ts` already follows the same rounding rule.
+2. **Majority rules for combined feeds (Lean 4).** Prove that if fewer than half of the providers behind a combined
+   feed lie, the median stays between the lowest and highest honest prices. This is the security claim of API3's
+   combined feeds, stated as a theorem. Lean's `BitVec 256` matches the EVM's integers exactly.
+3. **A rule the contract only implies.** `updateBeaconSetWithBeacons` never checks that a combined feed's time stamp
+   goes up. It follows from each provider's time stamp only going up and from the median keeping order, and that
+   chain is worth proving. Related: a combined feed's value can change while its time stamp stays the same, which
+   breaks any consumer that caches by time stamp.
+4. **A model of base versus OEV updates (Quint).** A few hundred lines covering signing, the delayed base push, auction
+   awards and OEV updates. Check that what a dApp reads never goes back in time, is never older than the base feed,
+   and never uses data from after the auction's cutoff. Timing bugs like these are invisible to contract-level tools.
+5. **Messages cannot be confused.** Prove that the way a signed message is assembled (template, time, value) can never
    produce the same bytes for two different messages. The harder and more valuable target is the canonical JSON behind
    AirnodeHub's request hash, and any bundle format proposed above.
-3. **A reference checker run against the archive.** Write the signature check in Lean, run it over every stored
-   record and require it to agree with the TypeScript check. That ties the proofs to real data.
-4. **Verify the contracts.** Tools such as Verity, EVMYulLean and EquiVM can prove properties of the on-chain code.
-   This is weeks of work and comes after the first three.
-5. **Safety margins for lending markets.** Bound how far the on-chain price can lag the signed price, given how often
+6. **A reference checker run against the archive.** Write the signature check in Lean, run it over every stored
+   record and require it to agree with the TypeScript check. That ties the proofs to real data. Test vectors
+   generated from the Lean model can also be checked against `Median.sol` in Foundry.
+7. **Verify the contracts end to end.** Tools such as Verity, EVMYulLean and EquiVM can prove properties of the
+   deployed code. This is weeks of work and comes after the items above.
+8. **Safety margins for lending markets.** Bound how far the on-chain price can lag the signed price, given how often
    feeds update, and turn that into a safety condition for loan limits. Check it against archive data.
+
+Bend was considered and set aside for now: it has no signed 256-bit integers, no proof library and no link to
+Solidity. Lean 4 covers the same ground with a mature toolchain.
+
+## Research and security tools
+
+Public goods for the wider oracle ecosystem that the archive makes possible.
+
+- **How much can an updater cherry-pick?** An OEV auction winner updating a combined feed may skip any provider or
+  choose any signed value up to the auction's cutoff before the median is taken. Prove a bound on how far that choice
+  can move the result, then measure it on archived data. The same question applies to other pull oracles (Pyth,
+  RedStone). This is the idea most likely to become a paper.
+- **Fraud proof for conflicting signatures.** Two valid signatures from one provider for the same feed and time stamp
+  with different values are a self-contained proof of misbehaviour. A small contract can check such a pair for about
+  6k gas. The archive is where such pairs would be found, and the reader already keeps both.
+- **A static check for oracle consumers.** Slither has detectors for unchecked Pyth and Chronicle prices but none for
+  API3. An `api3-unchecked-timestamp` detector (a contract that ignores the time stamp `read()` returns) matters
+  because nothing on-chain rejects stale API3 data. Merged upstream, it reaches every Slither user.
+- **Drop-in specs for oracle consumers.** Reusable Halmos and Certora rules that any protocol can run: freshness bound,
+  positive value, decimals, L2 sequencer grace period, and no action on a value that changed under an unchanged time
+  stamp.
+- **Oracle comparison.** With Chainlink and Pyth updates recorded beside API3's, publish who was fastest and closest
+  during sharp moves. Independent numbers here are rare; vendor comparisons are not neutral.
 
 ## Deliberately not doing
 
 - **A trading bot.** The public data is about 15 seconds behind by design, the fast version is auctioned to approved
   partners, and conditional orders already exist elsewhere. The archive's value is as a referee, not a trader.
 - **Paying for on-chain storage of every day.** Free Bitcoin timestamps give the same tamper evidence.
+- **Zero-knowledge proofs of derived prices.** Checking a few signatures directly costs about 3k gas each, far less
+  than verifying a proof (about 270k gas), and demand for proven averages or volatility is thin.
+- **Tools for OEV searchers.** OEV updates are limited to API3's partnered searchers since the public OEV Network was
+  retired in November 2025, so there is no open market to serve.
+- **Staking-backed guarantees for providers.** API3 designed this in 2021-22 and never shipped it, and other oracles'
+  penalties are token-sized. Published reliability scores give most of the value.
 
 ## Suggested order
 
 1. Price names and price at any moment with proof. _Done._
 2. Website with the price explorer and in-browser checks. _First version done._
-3. Reliability: coverage log and `merge` _(done)_, then a supervisor, a heartbeat alert and a second archiver.
-   History only accrues from the day it is recorded, so this comes before new features.
-4. Agent plug-in (MCP server).
-5. Daily files with Bitcoin timestamps.
-6. Feed health checks and provider report cards.
-7. Liquidation checker and incident reports, once the archive has enough history.
+3. Reliability, now: coverage log and `merge` _(done)_, then Docker with a heartbeat alert and nightly backups, then a
+   second archiver and the providers' own Signed APIs. History only accrues from the day it is recorded, so this comes
+   before new features.
+4. Halmos tests of `Median.sol`. About a day, and a public first.
+5. Daily files with Bitcoin timestamps. They double as the public backup and the open dataset.
+6. Freshness labels, feed health checks and provider report cards.
+7. Agent plug-in (MCP server).
+8. The cherry-picking bound and the fraud-proof contract, once the archive holds enough history to measure.
+9. Liquidation checker and incident reports.
