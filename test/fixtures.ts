@@ -57,6 +57,27 @@ export const coingeckoOev: SignedDatum = {
     '0x392cb9cd6ad6341cad89abc1176f0e8ba167a95913d46d26c3b928c1d1b14ec66a071f53612539e2bdc6532152e8c9c4b84d021e090f10f87c5664187da1a2f31b',
 };
 
+// Two values blocksize signed for ZEC/USD at the same second, served by API3's Signed API (first) and blocksize's
+// own (second), archived 2026-10-28. Both signatures are valid.
+export const zecConflict: [SignedDatum, SignedDatum] = [
+  {
+    airnode: '0xBA910Eb2867977A0a651FE3D2607237ff4116B1C',
+    templateId: '0x0b467ca80281a7e17ae7ad1f987ec1b2adfce9badf8dd42b22999b13b9c521fc',
+    timestamp: '1793219956',
+    encodedValue: '0x000000000000000000000000000000000000000000000045cbb6e106c1568c60',
+    signature:
+      '0xc12dde3123d81f221a197beaf75a52dd4c8e37e4650e2117186c719aa274441d2b311d0120925ad4120139876f28cb362e43a5980dd7ccc68bf2653f26fb75231b',
+  },
+  {
+    airnode: '0xBA910Eb2867977A0a651FE3D2607237ff4116B1C',
+    templateId: '0x0b467ca80281a7e17ae7ad1f987ec1b2adfce9badf8dd42b22999b13b9c521fc',
+    timestamp: '1793219956',
+    encodedValue: '0x000000000000000000000000000000000000000000000045cbe248092e84c740',
+    signature:
+      '0x149dc4b0f13e3c6ca86874d756561bcea2171d6d7cf71e7f27f2650ba3841e5e60369a8661793a066d013d9196758afbe3d13ec1cf1bd358bcfa2a490b4fda351b',
+  },
+];
+
 // Writes the fixtures through the archiver's own store, so tests read exactly what it writes.
 export function fixtureDb() {
   const dir = mkdtempSync(join(tmpdir(), 'signed-archive-'));

@@ -137,6 +137,17 @@ The Signed API only serves the latest value, so a moment the archiver misses is 
   overwritten. Records the target already has are skipped, so merging again is fast. Polls are merged too; they are
   the other archiver's unsigned claim of when it was watching, so only merge archives you run or trust.
 
+## Conflicting values
+
+`signed-archive conflicts [--from <unix s>] [--to <unix s>] [--json]` reports, per provider and endpoint, the moments
+when a provider signed more than one value for the same feed and second: how many (and out of how many archived
+moments), how far apart the values were in basis points (median, 90th percentile, widest), and which Signed APIs served
+each side, matched through the poll that saved each record. It reads the archive read-only, so it is safe beside a
+running archiver.
+
+The rate is a lower bound. Each host is polled about once a minute, so a conflict only shows when both copies happen
+to be serving a record from the same second.
+
 ## Peer repair
 
 A moment the archiver misses can never be fetched from the Signed API again, but another archive that was polling

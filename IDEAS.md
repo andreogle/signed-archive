@@ -290,6 +290,14 @@ Public goods for the wider oracle ecosystem that the archive makes possible.
   misbehaviour in itself. It does mean two genuine signed prices exist for one moment, so whoever pushes an update
   on-chain (Airseeker, or an OEV auction winner) can pick between them. Measure how far apart such pairs are, ask the
   providers and API3 whether it is intended, and feed it into the cherry-picking bound.
+
+  _Measured with `signed-archive conflicts` over about a day (2026-10-28 to 10-29):_ every conflict paired API3's copy
+  with the provider's own; none were within one copy. Six providers (alchemy, ankr, coingecko, coinpaprika, drpc,
+  infura) never conflicted, so they likely sign once and push the same record to both. ncfx conflicted on 2.77% of
+  its OEV moments and 1.35% of its base ones, blocksize on 0.64% and 0.08%; shiftmarkets, coinmetrics and nodary less.
+  The typical gap is tiny (median 0.06 to 1.35 bps), the widest is not: DAI/USD signed at 0.99929 and 1.00285
+  (35.5 bps, a stablecoin), ETH/USD at 2291.29 and 2298.41 (31 bps), DEGEN/USD 74 bps apart. These rates are a lower
+  bound, since a conflict only shows when both copies are sampled at the same signed second.
 - **A static check for oracle consumers.** Slither has detectors for unchecked Pyth and Chronicle prices but none for
   API3. An `api3-unchecked-timestamp` detector (a contract that ignores the time stamp `read()` returns) matters
   because nothing on-chain rejects stale API3 data. Merged upstream, it reaches every Slither user.

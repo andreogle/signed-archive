@@ -3,7 +3,7 @@ import { type Hex, hexToBytes } from 'viem';
 import type { FeedSource } from './catalog.ts';
 import { decodePrice } from './price.ts';
 import type { SignedDatum } from './signed-data.ts';
-import { hasTable } from './store.ts';
+import { hasColumn, hasTable } from './store.ts';
 
 // Charts get at most this many points per provider; longer ranges keep the last record per bucket.
 export const MAX_POINTS = 500;
@@ -169,6 +169,59 @@ export function openReader(path: string) {
     return found !== null;
   }
 
+  // Every record of every (airnode, template, timestamp) that has more than one signed value in [from, to] (unix
+  // seconds), with the Signed API that served it: matched through the poll that saved it. Records merged or repaired
+  // from another archive have no matching poll, so their source is null.
+  function conflictRecords(from: number, to: number) {
+    const sourced = hasTable(db, 'polls') && hasColumn(db, 'polls', 'source');
+    const source = sourced ? 'p.source' : 'NULL';
+    const join = sourced
+      ? 'LEFT JOIN polls p ON p.airnode = d.airnode AND p.endpoint = d.endpoint AND p.fetched_at = d.fetched_at'
+      : '';
+    return db
+      .query<
+        {
+          airnode: string;
+          templateId: string;
+          timestamp: number;
+          endpoint: string;
+          value: string;
+          source: string | null;
+        },
+        { from: number; to: number }
+      >(
+        `WITH conflicted AS (
+           SELECT airnode, template_id, timestamp FROM datapoints WHERE timestamp BETWEEN $from AND $to
+           GROUP BY airnode, template_id, timestamp HAVING count(*) > 1
+         )
+         SELECT hex(d.airnode) AS airnode, hex(d.template_id) AS templateId, d.timestamp, d.endpoint,
+                hex(d.value) AS value, ${source} AS source
+         FROM datapoints d JOIN conflicted c
+           ON c.airnode = d.airnode AND c.template_id = d.template_id AND c.timestamp = d.timestamp
+         ${join}
+         ORDER BY d.airnode, d.template_id, d.timestamp, d.value`
+      )
+      .all({ from, to })
+      .map((row) => ({
+        ...row,
+        airnode: toHex(row.airnode),
+        templateId: toHex(row.templateId),
+        value: toHex(row.value),
+      }));
+  }
+
+  // How many distinct signed moments (template and timestamp) each airnode and endpoint has in [from, to].
+  function momentCounts(from: number, to: number) {
+    return db
+      .query<{ airnode: string; endpoint: string; moments: number }, { from: number; to: number }>(
+        `SELECT hex(airnode) AS airnode, endpoint, count(*) AS moments FROM (
+           SELECT DISTINCT airnode, endpoint, template_id, timestamp FROM datapoints WHERE timestamp BETWEEN $from AND $to
+         ) GROUP BY airnode, endpoint`
+      )
+      .all({ from, to })
+      .map((row) => ({ ...row, airnode: toHex(row.airnode) }));
+  }
+
   // When the archiver last recorded a request, in unix milliseconds, or null if it never has.
   function lastPoll() {
     if (!hasTable(db, 'polls')) return null;
@@ -197,7 +250,18 @@ export function openReader(path: string) {
     return subtractCovered(all, covered, GAP_SECONDS);
   }
 
-  return { at, records, history, earliest, gaps, lastPoll, watched, close: () => db.close() };
+  return {
+    at,
+    records,
+    history,
+    earliest,
+    gaps,
+    lastPoll,
+    watched,
+    conflictRecords,
+    momentCounts,
+    close: () => db.close(),
+  };
 }
 
 export type Reader = ReturnType<typeof openReader>;
