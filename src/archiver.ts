@@ -13,6 +13,7 @@ import {
 } from './config.ts';
 import { sendHeartbeat } from './heartbeat.ts';
 import { errorMessage, log } from './logger.ts';
+import { repairGaps } from './repair.ts';
 import { hasValidSignature, type SignedDatum, toSignedDatum } from './signed-data.ts';
 import { openStore } from './store.ts';
 
@@ -35,7 +36,11 @@ export interface ArchiverOptions {
   intervalSeconds: number;
   dbPath: string;
   heartbeatUrl?: URL | undefined;
+  peers?: readonly URL[];
 }
+
+// Repair runs after the first cycle, which closes the gap a restart left, then at most this often.
+const REPAIR_EVERY_MS = 10 * 60 * 1000;
 
 function backOff(target: Target, intervalMs: number, retryAfter: string | null) {
   target.failures += 1;
@@ -121,7 +126,7 @@ async function poll(target: Target, store: Store, intervalMs: number, stop: Abor
   return { saved, rejected };
 }
 
-export async function runArchiver({ intervalSeconds, dbPath, heartbeatUrl }: ArchiverOptions) {
+export async function runArchiver({ intervalSeconds, dbPath, heartbeatUrl, peers = [] }: ArchiverOptions) {
   const intervalMs = intervalSeconds * 1000;
   const targets: Target[] = AIRNODES.flatMap(({ alias, airnode, signedApiUrl }) => {
     return ENDPOINTS.flatMap((endpoint) => {
@@ -155,7 +160,9 @@ export async function runArchiver({ intervalSeconds, dbPath, heartbeatUrl }: Arc
     intervalSeconds,
     db: dbPath,
     heartbeat: heartbeatUrl?.host,
+    peers: peers.length,
   });
+  let lastRepair = 0;
   while (!stop.signal.aborted) {
     const cycleStartedAt = Date.now();
     let saved = 0;
@@ -205,6 +212,15 @@ export async function runArchiver({ intervalSeconds, dbPath, heartbeatUrl }: Arc
     });
     // Only a cycle that reached the API counts as alive, so the monitor also alerts when every request fails.
     if (heartbeatUrl && succeeded > 0 && !stop.signal.aborted) await sendHeartbeat(heartbeatUrl);
+    if (peers.length > 0 && !stop.signal.aborted && Date.now() - lastRepair >= REPAIR_EVERY_MS) {
+      lastRepair = Date.now();
+      try {
+        const result = await repairGaps({ store, peers, intervalMs });
+        if (result.requests > 0) log.info('repair run', result);
+      } catch (error) {
+        log.warn('repair run failed', { error: errorMessage(error) });
+      }
+    }
   }
   store.close();
   log.info('archiver stopped');

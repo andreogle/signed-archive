@@ -139,6 +139,19 @@ export function openReader(path: string) {
 
   // Stretches inside [from, to] when the archiver was not polling, in unix seconds. Coverage is only
   // known since the first recorded poll, so earlier time is never reported as a gap.
+  // Whether this archive had a successful request for the airnode and endpoint in [from, to] (unix seconds), so a peer
+  // asking for records can tell "nothing was signed" from "this archive wasn't watching either".
+  function watched(airnode: Hex, endpoint: string, from: number, to: number) {
+    if (!hasTable(db, 'polls')) return false;
+    const found = db
+      .query<{ found: 1 }, { airnode: Uint8Array; endpoint: string; from: number; to: number }>(
+        `SELECT 1 AS found FROM polls WHERE airnode = $airnode AND endpoint = $endpoint AND status = 200
+         AND fetched_at BETWEEN $from AND $to LIMIT 1`
+      )
+      .get({ airnode: hexToBytes(airnode), endpoint, from: from * 1000, to: to * 1000 });
+    return found !== null;
+  }
+
   // When the archiver last recorded a request, in unix milliseconds, or null if it never has.
   function lastPoll() {
     if (!hasTable(db, 'polls')) return null;
@@ -157,7 +170,7 @@ export function openReader(path: string) {
     return last < to - GAP_SECONDS ? [...found, { from: Math.max(last, start), to }] : found;
   }
 
-  return { at, records, history, earliest, gaps, lastPoll, close: () => db.close() };
+  return { at, records, history, earliest, gaps, lastPoll, watched, close: () => db.close() };
 }
 
 export type Reader = ReturnType<typeof openReader>;

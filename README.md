@@ -29,6 +29,10 @@ bun run dev -- --interval 120  # flags override env vars
 | `--host <host>`         | `HOST`                  | `127.0.0.1`           | Explorer address.                        |
 | `--port <port>`         | `PORT`                  | `3000`                | Explorer port.                           |
 
+**Config file.** Every setting can also live in a YAML file: `signed-archive.yaml` in the working directory if it
+exists, or the file named by `--config` / `CONFIG`. Start from `signed-archive.example.yaml`. A flag beats an env var,
+which beats the file, which beats the default, and a misspelled key is an error. Peers are set only in the file.
+
 Logs go to stderr, one line per event, with `key=value` fields:
 
 ```
@@ -137,6 +141,27 @@ The Signed API only serves the latest value, so a moment the archiver misses is 
   Every record is checked as if it came from the network (shape, known airnode, signature) and only added, never
   overwritten. Records the target already has are skipped, so merging again is fast. Polls are merged too; they are
   the other archiver's unsigned claim of when it was watching, so only merge archives you run or trust.
+
+## Peer repair
+
+A moment the archiver misses can never be fetched from the Signed API again, but another archive that was polling
+then may have it. List other archives under `peers` in the config file (the base URL of their explorer). After the
+first cycle, and then every 10 minutes, the archiver:
+
+1. finds stretches of the last 7 days with no successful request for an airnode and endpoint, longer than three
+   intervals, that have since ended;
+2. asks each peer once per stretch, through `GET /api/records?airnode=&endpoint=&from=&to=` (windows of at most 15
+   minutes, at most 10 requests per run);
+3. checks every record it gets back like any other input (shape, the asked airnode, a known template on the asked
+   endpoint, inside the window, valid signature) and adds the ones that pass.
+
+A peer that answers is never asked about that stretch again: one that missed it too can never gain it later. Only
+failures are retried (network errors, 429 and 5xx), three times with backoff from 5 minutes. Progress is kept in the
+`repairs` table, so restarts don't repeat requests. Peers' polls are not imported, because coverage claims aren't
+signed: the stretch stays a gap in `polls`, and `repairs` records what was filled and from whom.
+
+To be someone's peer, expose your explorer (only `/api/records` is needed) where they can reach it, for example
+through a reverse proxy in front of the `explorer` container.
 
 ## Querying
 

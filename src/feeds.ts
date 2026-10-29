@@ -23,6 +23,18 @@ export const FEEDS: ReadonlyMap<string, Record<Endpoint, FeedSource[]>> = new Ma
   })
 );
 
+// Every known feed source signed by one airnode on one endpoint, one per template ID. Peer repair asks by airnode, and
+// querying by template keeps each lookup on the archive's primary key instead of scanning the whole airnode.
+export function sourcesOfAirnode(airnode: string, endpoint: Endpoint): FeedSource[] {
+  const byTemplate = new Map<string, FeedSource>();
+  for (const sources of FEEDS.values()) {
+    for (const source of sources[endpoint]) {
+      if (isAddressEqual(source.airnode, airnode as Address)) byTemplate.set(source.templateId.toLowerCase(), source);
+    }
+  }
+  return [...byTemplate.values()];
+}
+
 // Whether a record belongs to this feed: signed by the provider's listed airnode, under the feed's template ID for
 // this endpoint. A valid signature alone only proves who signed; this ties the signer and template to the feed name,
 // so the web app can check a record without trusting the server's labels.

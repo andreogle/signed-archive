@@ -1,0 +1,32 @@
+# signed-archive settings. Copy to signed-archive.yaml (gitignored, as it can hold the heartbeat URL) or point
+# --config / CONFIG at another file. Every key is optional. A command-line flag beats an environment variable, which
+# beats this file, which beats the built-in default. A misspelled key is an error, not ignored.
+
+# SQLite archive (DB_PATH).
+db: data/archive.sqlite
+
+# debug, info, warn or error (LOG_LEVEL).
+logLevel: info
+
+archive:
+  # Seconds per polling cycle, at least 15 (POLL_INTERVAL_SECONDS).
+  interval: 60
+  # Pinged after every cycle that reached the API, e.g. a healthchecks.io check (HEARTBEAT_URL).
+  # heartbeatUrl: https://hc-ping.com/your-check-id
+  # Also serve the explorer from the archiver process (SERVE).
+  serve: false
+
+# The explorer and its JSON API, including /api/records for peers (HOST, PORT).
+serve:
+  host: 127.0.0.1
+  port: 3000
+
+health:
+  # `health` fails when the newest request is older than this many seconds (HEALTH_MAX_AGE_SECONDS).
+  maxAge: 300
+
+# Other archives to ask for records this one missed, by the base URL of their explorer. Each peer is asked about each
+# gap once; a peer that missed the stretch too can never gain it later. Records are re-checked like any other input,
+# so a peer needs no trust. Peers must expose their explorer (only /api/records is used) where this archive can reach it.
+peers: []
+#  - https://archive.example.org

@@ -40,6 +40,51 @@ const POLLS = `
   ) WITHOUT ROWID
 `;
 
+// Asking peers for records this archive missed. One row per gap and peer, so each peer is asked about a gap once:
+// a peer that missed it too never gains it later, because the Signed API only serves the latest value. `next_from`
+// (unix seconds) is where the next window starts; `attempts` counts failures on that window; `retry_at` is unix ms.
+// Status: `pending` (windows left, or a retry due), `filled` (records added), `none` (the peer had nothing) or
+// `failed` (gave up). These rows are bookkeeping, not signed data, so they are updated in place.
+const REPAIRS = `
+  CREATE TABLE IF NOT EXISTS repairs (
+    airnode   BLOB    NOT NULL,
+    endpoint  TEXT    NOT NULL,
+    gap_from  INTEGER NOT NULL,
+    gap_to    INTEGER NOT NULL,
+    peer      TEXT    NOT NULL,
+    status    TEXT    NOT NULL,
+    next_from INTEGER NOT NULL,
+    attempts  INTEGER NOT NULL,
+    retry_at  INTEGER NOT NULL,
+    records   INTEGER NOT NULL,
+    PRIMARY KEY (airnode, endpoint, gap_from, peer)
+  ) WITHOUT ROWID
+`;
+
+// Stretches with no successful request for an airnode and endpoint (from either source) longer than `threshold`,
+// that have since closed, in unix milliseconds. A gap still open has nothing to ask about yet.
+const CLOSED_GAPS = `
+  SELECT hex(airnode) AS airnode, endpoint, previous AS "from", fetched_at AS "to" FROM (
+    SELECT airnode, endpoint, fetched_at,
+           lag(fetched_at) OVER (PARTITION BY airnode, endpoint ORDER BY fetched_at) AS previous
+    FROM polls WHERE status = 200 AND fetched_at >= $since
+  ) WHERE fetched_at - previous > $threshold
+  ORDER BY "from"`;
+
+export type RepairStatus = 'pending' | 'filled' | 'none' | 'failed';
+export interface Repair {
+  airnode: Address;
+  endpoint: Endpoint;
+  gapFrom: number;
+  gapTo: number;
+  peer: string;
+  status: RepairStatus;
+  nextFrom: number;
+  attempts: number;
+  retryAt: number;
+  records: number;
+}
+
 // Archives written before a table was added don't have it, and a read-only connection can't create it.
 export const hasTable = (db: Database, name: string) => {
   return (
@@ -102,6 +147,7 @@ export function openStore(path: string) {
   db.run('PRAGMA busy_timeout = 10000');
   db.run(DATAPOINTS);
   db.run(POLLS);
+  db.run(REPAIRS);
   // A new column only: existing polls keep their rows and read as API3's.
   if (!hasColumn(db, 'polls', 'source')) db.run("ALTER TABLE polls ADD COLUMN source TEXT NOT NULL DEFAULT 'api3'");
   db.run('CREATE INDEX IF NOT EXISTS polls_by_time ON polls (fetched_at)');
@@ -164,5 +210,37 @@ export function openStore(path: string) {
     return exists.get(key) !== null;
   };
 
-  return { save, add, has, close: () => db.close() };
+  const gapsQuery = db.prepare<
+    { airnode: string; endpoint: Endpoint; from: number; to: number },
+    { since: number; threshold: number }
+  >(CLOSED_GAPS);
+  const closedGaps = (since: number, threshold: number) => {
+    return gapsQuery
+      .all({ since, threshold })
+      .map((gap) => ({ ...gap, airnode: `0x${gap.airnode.toLowerCase()}` as Address }));
+  };
+
+  const repairQuery = db.prepare<
+    Omit<Repair, 'airnode' | 'endpoint' | 'gapFrom' | 'peer'>,
+    { airnode: Uint8Array; endpoint: string; gapFrom: number; peer: string }
+  >(
+    `SELECT gap_to AS gapTo, status, next_from AS nextFrom, attempts, retry_at AS retryAt, records FROM repairs
+     WHERE airnode = $airnode AND endpoint = $endpoint AND gap_from = $gapFrom AND peer = $peer`
+  );
+  const repairUpsert = db.prepare(
+    `INSERT OR REPLACE INTO repairs (airnode, endpoint, gap_from, gap_to, peer, status, next_from, attempts, retry_at, records)
+     VALUES ($airnode, $endpoint, $gapFrom, $gapTo, $peer, $status, $nextFrom, $attempts, $retryAt, $records)`
+  );
+  const getRepair = ({
+    airnode,
+    endpoint,
+    gapFrom,
+    peer,
+  }: Pick<Repair, 'airnode' | 'endpoint' | 'gapFrom' | 'peer'>) => {
+    const row = repairQuery.get({ airnode: hexToBytes(airnode), endpoint, gapFrom, peer });
+    return row ? ({ airnode, endpoint, gapFrom, peer, ...row } satisfies Repair) : null;
+  };
+  const putRepair = (repair: Repair) => repairUpsert.run({ ...repair, airnode: hexToBytes(repair.airnode) });
+
+  return { save, add, has, closedGaps, getRepair, putRepair, close: () => db.close() };
 }

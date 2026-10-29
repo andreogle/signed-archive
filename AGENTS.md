@@ -13,7 +13,8 @@ This file holds what is specific to this project and the invariants that must ne
 - Never delete or rewrite stored rows. A schema change adds a table or column; it never migrates signed data in place
 - Hex fields are stored as bytes. Read them with SQL `hex()` and write them with `hexToBytes`
 - Every request writes a `polls` row in the same transaction as its records, failures included, with the `source` that answered (`api3` or the provider's own Signed API). Without it a gap in the history is indistinguishable from a provider that stopped signing
-- Another archive is untrusted input: `merge` re-checks shape, known airnode and signature for every record before adding it, exactly as the archiver does. Never add a fast path that copies rows unverified
+- Another archive is untrusted input: `merge` and peer repair (`src/repair.ts`) re-check shape, known airnode and signature for every record before adding it, exactly as the archiver does. Repair also requires the asked airnode, a known template on the asked endpoint and the asked window. Never add a fast path that copies rows unverified, and never import a peer's polls as our own coverage
+- Ask each peer about each gap once (`repairs` table). Retry only transient failures, with backoff and a cap; a finished answer is final, because a peer that missed a stretch can never gain it from the Signed API later
 
 **Be polite to the Signed API**
 - One request at a time, spread evenly across the poll interval. Never fetch in parallel or in bursts. Each provider is polled on two hosts (API3's Signed API and its own `signedApiUrl` from `src/airnodes.json`); a failing host backs off on its own without slowing the other
@@ -40,7 +41,7 @@ This file holds what is specific to this project and the invariants that must ne
 
 - Tools are pinned in `mise.toml`; run commands through it (`mise exec -- bun ...`) if the shell doesn't activate mise
 - Run `bun run check` (airnode list, Biome, `tsc`, tests with coverage) when done and read its **whole** output
-- The CLI is `src/cli.ts` (commander). Every option has a flag and an env var (`.env()`), with the flag winning. Validate options in their `argParser`, so bad input fails before anything runs
+- The CLI is `src/cli.ts` (commander). Every option has a flag and an env var (`.env()`), and a key in the YAML config file (`src/settings.ts`), which supplies commander's defaults: flag beats env beats file beats default. Lists (peers) live only in the file. Validate with one parser shared by the flag and the file, so both accept exactly the same values, and reject unknown config keys
 - `bun run build` compiles a native binary to `dist/signed-archive`. JSON imported by the source (the airnode list, `package.json`) is bundled into it, so rebuild after `bun run airnodes`
 - Biome runs strict, with every React rule on. Fix the code, don't disable the rule. The one exception is `noJsxPropsBind`, off on purpose: inline handlers are idiomatic React
 - `bun dev` runs the archiver and explorer under `--watch`, so every edit to `src/` restarts the archiver and leaves a gap. Use it for development only; the long-running archive runs `bun start` or the binary

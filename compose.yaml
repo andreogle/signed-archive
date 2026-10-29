@@ -19,8 +19,12 @@ services:
       POLL_INTERVAL_SECONDS: ${POLL_INTERVAL_SECONDS:-60}
       # Optional outside alert, e.g. a healthchecks.io ping URL. Set it in a .env file next to this one.
       HEARTBEAT_URL: ${HEARTBEAT_URL:-}
+      # Optional settings file (peers live only there): create signed-archive.yaml next to this file, then
+      # uncomment this line and the mount below.
+      # CONFIG: /config/signed-archive.yaml
     volumes:
       - archive:/data
+      # - ./signed-archive.yaml:/config/signed-archive.yaml:ro
     # Unhealthy when no request was recorded for 5 minutes. Docker reports this but does not restart on it,
     # so pair it with an outside alert.
     healthcheck:

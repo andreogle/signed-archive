@@ -1,40 +1,42 @@
 import { Command, InvalidArgumentError, Option } from 'commander';
 import pkg from '../package.json' with { type: 'json' };
 import { runArchiver } from './archiver.ts';
-import {
-  DEFAULT_DB_PATH,
-  DEFAULT_HOST,
-  DEFAULT_INTERVAL_SECONDS,
-  DEFAULT_PORT,
-  MIN_INTERVAL_SECONDS,
-} from './config.ts';
+import { DEFAULT_DB_PATH, DEFAULT_HOST, DEFAULT_INTERVAL_SECONDS, DEFAULT_PORT } from './config.ts';
 import { parseHeartbeatUrl } from './heartbeat.ts';
 import { errorMessage, LOG_LEVELS, type LogLevel, log, setLogLevel } from './logger.ts';
+import { DEFAULT_CONFIG_PATH, loadSettings, parseInterval, parsePort, parseSeconds } from './settings.ts';
 
-function parseInterval(value: string) {
-  const seconds = Number(value);
-  if (!Number.isFinite(seconds) || seconds < MIN_INTERVAL_SECONDS) {
-    throw new InvalidArgumentError(`must be a number >= ${MIN_INTERVAL_SECONDS}`);
-  }
-  return seconds;
+// Command-line parsers report problems through commander, so bad input fails before anything runs.
+const argParser = <T>(parse: (value: string) => T) => {
+  return (value: string) => {
+    try {
+      return parse(value);
+    } catch (error) {
+      throw new InvalidArgumentError(errorMessage(error));
+    }
+  };
+};
+
+let config: Awaited<ReturnType<typeof loadSettings>>;
+try {
+  config = await loadSettings(process.argv, process.env);
+} catch (error) {
+  log.error('fatal', { error: errorMessage(error) });
+  process.exit(1);
 }
+const { settings } = config;
 
-function parsePort(value: string) {
-  const port = Number(value);
-  if (!Number.isInteger(port) || port < 1 || port > 65_535) throw new InvalidArgumentError('must be 1-65535');
-  return port;
-}
-
-function parseSeconds(value: string) {
-  const seconds = Number(value);
-  if (!Number.isInteger(seconds) || seconds < 1) throw new InvalidArgumentError('must be a whole number of seconds');
-  return seconds;
-}
-
-const dbOption = () => new Option('--db <path>', 'SQLite database path').default(DEFAULT_DB_PATH).env('DB_PATH');
-const hostOption = () => new Option('--host <host>', 'address to listen on').default(DEFAULT_HOST).env('HOST');
+const dbOption = () => {
+  return new Option('--db <path>', 'SQLite database path').default(settings.db ?? DEFAULT_DB_PATH).env('DB_PATH');
+};
+const hostOption = () => {
+  return new Option('--host <host>', 'address to listen on').default(settings.serve?.host ?? DEFAULT_HOST).env('HOST');
+};
 const portOption = () => {
-  return new Option('--port <port>', 'port to listen on').argParser(parsePort).default(DEFAULT_PORT).env('PORT');
+  return new Option('--port <port>', 'port to listen on')
+    .argParser(argParser(parsePort))
+    .default(settings.serve?.port ?? DEFAULT_PORT)
+    .env('PORT');
 };
 
 interface ServeOptions {
@@ -54,10 +56,17 @@ const program = new Command()
   .description("Record API3's public signed data so it has a verifiable history")
   .version(pkg.version)
   .addOption(
-    new Option('--log-level <level>', 'minimum log level').choices(LOG_LEVELS).default('info').env('LOG_LEVEL')
+    new Option('--config <path>', `YAML config file (default: ${DEFAULT_CONFIG_PATH} if it exists)`).env('CONFIG')
+  )
+  .addOption(
+    new Option('--log-level <level>', 'minimum log level')
+      .choices(LOG_LEVELS)
+      .default(settings.logLevel ?? 'info')
+      .env('LOG_LEVEL')
   )
   .hook('preAction', (command) => {
     setLogLevel(command.opts<{ logLevel: LogLevel }>().logLevel);
+    if (config.path) log.debug('config loaded', { path: config.path });
   });
 
 program
@@ -65,23 +74,22 @@ program
   .description('poll the Signed API and store every new signed record')
   .addOption(
     new Option('--interval <seconds>', 'seconds per polling cycle')
-      .argParser(parseInterval)
-      .default(DEFAULT_INTERVAL_SECONDS)
+      .argParser(argParser(parseInterval))
+      .default(settings.archive?.interval ?? DEFAULT_INTERVAL_SECONDS)
       .env('POLL_INTERVAL_SECONDS')
   )
   .addOption(dbOption())
   .addOption(
     new Option('--heartbeat-url <url>', "URL to ping after each cycle that reached the API (dead man's switch)")
-      .argParser((value) => {
-        try {
-          return parseHeartbeatUrl(value);
-        } catch (error) {
-          throw new InvalidArgumentError(errorMessage(error));
-        }
-      })
+      .argParser(argParser(parseHeartbeatUrl))
+      .default(settings.archive?.heartbeatUrl)
       .env('HEARTBEAT_URL')
   )
-  .addOption(new Option('--serve', 'also serve the explorer, as the serve command does').env('SERVE'))
+  .addOption(
+    new Option('--serve', 'also serve the explorer, as the serve command does')
+      .default(settings.archive?.serve ?? false)
+      .env('SERVE')
+  )
   .addOption(hostOption())
   .addOption(portOption())
   .action(async (options: ServeOptions & { interval: number; serve?: boolean; heartbeatUrl?: URL }) => {
@@ -90,6 +98,7 @@ program
       intervalSeconds: options.interval,
       dbPath: options.db,
       heartbeatUrl: options.heartbeatUrl,
+      peers: settings.peers ?? [],
     });
     const server = options.serve ? await serve(options) : null;
     await archiving;
@@ -126,8 +135,8 @@ program
   .addOption(dbOption())
   .addOption(
     new Option('--max-age <seconds>', 'oldest acceptable last request')
-      .argParser(parseSeconds)
-      .default(300)
+      .argParser(argParser(parseSeconds))
+      .default(settings.health?.maxAge ?? 300)
       .env('HEALTH_MAX_AGE_SECONDS')
   )
   .action(async ({ db, maxAge }: { db: string; maxAge: number }) => {

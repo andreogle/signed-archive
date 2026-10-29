@@ -1,7 +1,9 @@
-import { ENDPOINTS, type Endpoint, isEndpoint } from './config.ts';
-import { FEEDS, PROVIDER_SLOTS } from './feeds.ts';
+import { type Address, isAddress, isAddressEqual } from 'viem';
+import { AIRNODES, ENDPOINTS, type Endpoint, isEndpoint } from './config.ts';
+import { FEEDS, PROVIDER_SLOTS, sourcesOfAirnode } from './feeds.ts';
 import { medianPrice } from './price.ts';
 import type { Gap, PricePoint, Reader, SignedPrice } from './reader.ts';
+import type { SignedDatum } from './signed-data.ts';
 
 // Response shapes, shared with the web app through type-only imports.
 export interface FeedSummary {
@@ -33,6 +35,19 @@ export interface MomentResponse {
   records: SignedPrice[];
 }
 
+// GET /api/records: what another archive asks for when it missed a stretch. Windows are short so a response stays
+// small; the asking side splits a long gap into windows.
+export const PEER_WINDOW_SECONDS = 900;
+export interface RecordsResponse {
+  airnode: Address;
+  endpoint: Endpoint;
+  from: number;
+  to: number;
+  // Whether this archive was polling then. No records and `watched: false` means it missed the stretch too.
+  watched: boolean;
+  records: SignedDatum[];
+}
+
 const json = (body: unknown, status = 200) => Response.json(body, { status });
 const fail = (status: number, error: string) => json({ error }, status);
 
@@ -58,6 +73,24 @@ export function handleApi(reader: Reader, url: URL, now = Math.floor(Date.now() 
       return [{ feed, providers: providerCount(records), latest, median: medianPrice(records) }];
     });
     return json({ endpoint, feeds } satisfies FeedsResponse);
+  }
+
+  if (url.pathname === '/api/records') {
+    const airnode = params.get('airnode') ?? '';
+    const known = isAddress(airnode) && AIRNODES.some((entry) => isAddressEqual(entry.airnode, airnode));
+    if (!known) return fail(404, 'unknown airnode');
+    const from = parseSeconds(params.get('from'), -1);
+    const to = parseSeconds(params.get('to'), -1);
+    if (from === null || to === null || from < 0 || to < from || to - from > PEER_WINDOW_SECONDS) {
+      return fail(400, `from and to must be unix seconds, from <= to, at most ${PEER_WINDOW_SECONDS} s apart`);
+    }
+    const records = reader
+      .records(sourcesOfAirnode(airnode, endpoint), from, to)
+      .map(({ airnode, templateId, timestamp, encodedValue, signature }) => {
+        return { airnode, templateId, timestamp, encodedValue, signature };
+      });
+    const watched = reader.watched(airnode, endpoint, from, to);
+    return json({ airnode, endpoint, from, to, watched, records } satisfies RecordsResponse);
   }
 
   const feed = params.get('feed') ?? '';

@@ -114,6 +114,8 @@ watching. In order of value:
 5. **Merge archives.** A `merge` command reads another archive, re-checks every signature, and adds only records that
    are missing. It never overwrites, so two different values for the same moment both survive as evidence. This fills
    one archive's gaps from another, and is the base of the community archive network below. _Status: built._
+   Peers also repair each other automatically: an archive asks each peer in its config file once for any stretch it
+   missed, through `/api/records`, and checks every record it gets. _Status: built (`peers`, `repairs` table)._
 6. **Recover history from the chain.** Every on-chain feed update carries a signed record in its transaction data
    (`updateBeaconWithSignedData(airnode, templateId, timestamp, data, signature)`). Decoding past `Api3ServerV1`
    transactions recovers verifiable records, including from before this archive started. They are sparse (only when a
