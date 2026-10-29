@@ -102,14 +102,6 @@ Each copy is a full archive (hundreds of MB per day of history), so prune old co
 `bun run dev` stays the development loop. Don't point it at the Docker volume: under `--watch` every edit restarts the
 archiver and leaves a gap.
 
-## Replay
-
-`bun run replay -- --feed ETH/USD [--from <unix s>] [--to <unix s>]` starts a local anvil chain, deploys
-`Api3ServerV1` from `@api3/contracts` (byte for byte the bytecode on Ethereum), replays the feed's archived records
-through `updateBeaconWithSignedData` in time order, and after each one checks the beacon set value against the median
-in `src/price.ts`. It defaults to the last 10 minutes and takes a few seconds. Foundry (for anvil) is pinned in
-`mise.toml`, and `@api3/contracts` is a dev dependency.
-
 ## Development
 
 `bun run check` checks the airnode list is current, then runs Biome, the type checker and the tests with coverage.

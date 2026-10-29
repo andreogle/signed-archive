@@ -158,9 +158,10 @@ Products that only past signed prices make possible. API3 itself only exposes th
   can test its liquidations, caps and circuit breakers against what really happened, signed and byte for byte. Agents
   can be tested the same way. The contract only accepts a time stamp newer than the stored one and less than an hour
   ahead, so the fork must start before the replayed stretch; base feeds work this way, OEV updates are harder. It is a
-  CLI command, with nothing to deploy. _Status: prototype built (`bun run replay`) on a fresh local chain with the
-  real `Api3ServerV1`: every archived record tried so far was accepted on-chain, and every beacon set median matched
-  `src/price.ts`. Replaying into a fork of a real chain is next and needs an archive node._
+  CLI command, with nothing to deploy. _Status: a prototype on a fresh local chain (not a fork) was built and removed.
+  Run through the real `Api3ServerV1` bytecode, it accepted every archived record except the second of a conflicting
+  pair, and all 252 beacon set medians matched `src/price.ts`, which shows the archive stores signatures exactly and
+  computes the contract's median. The useful version forks a real chain, needs an archive node, and is new work._
 - **Settle a contract at any past moment.** A Solidity library plus the archive's API: a contract checks a signed
   record against the provider's address and the feed's template ID (about 3k gas per signature). Options expiry,
   bets, escrow and insurance triggers can then settle on "the price at noon Friday" even if nobody pushed an update
@@ -244,8 +245,8 @@ unclaimed ground. Cheapest first:
    `(x + y) / 2` rounded toward zero, the sorting and quickselect paths give the same median, and the median lies
    between the smallest and largest input. `src/price.ts` already follows the same rounding rule. _Status: tried here and
    removed. Halmos proved the average for every input and the median of up to 4 values, then timed out; Foundry fuzz
-   tests covered lengths 1 to 21. For the archive, the replay against the deployed bytecode already shows its median
-   matches the contract, so these belong in a separate repo if proofs of API3's code become a goal of their own._
+   tests covered lengths 1 to 21. For the archive, a replay against the deployed bytecode showed its median matches
+   the contract, so these belong in a separate repo if proofs of API3's code become a goal of their own._
 2. **Majority rules for combined feeds (Lean 4).** Prove that if fewer than half of the providers behind a combined
    feed lie, the median stays between the lowest and highest honest prices. This is the security claim of API3's
    combined feeds, stated as a theorem. Lean's `BitVec 256` matches the EVM's integers exactly.
@@ -318,7 +319,7 @@ Public goods for the wider oracle ecosystem that the archive makes possible.
    second archiver and the providers' own Signed APIs. History only accrues from the day it is recorded, so this comes
    before new features.
 4. Daily files with Bitcoin timestamps. They double as the public backup and the open dataset.
-5. Replay tool _(prototype done)_ and settle-at-a-moment library. Both reuse the signature and feed checks the explorer already runs,
+5. Replay into a fork, and the settle-at-a-moment library. Both reuse the signature and feed checks the explorer already runs,
    and one real event from the archive is enough to show them.
 6. Freshness labels, feed health checks and provider report cards.
 7. Agent plug-in (MCP server).
