@@ -17,6 +17,9 @@ export function Layout() {
           <Link to="/feed" search={{ feed: 'ETH/USD', range: '24h', endpoint: 'public' }}>
             Explorer
           </Link>
+          <Link to="/conflicts" search={{ range: '24h' }}>
+            Conflicts
+          </Link>
           <Link to="/about">About</Link>
         </nav>
       </header>

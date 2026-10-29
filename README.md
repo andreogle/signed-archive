@@ -139,11 +139,12 @@ The Signed API only serves the latest value, so a moment the archiver misses is 
 
 ## Conflicting values
 
-`signed-archive conflicts [--from <unix s>] [--to <unix s>] [--json]` reports, per provider and endpoint, the moments
-when a provider signed more than one value for the same feed and second: how many (and out of how many archived
-moments), how far apart the values were in basis points (median, 90th percentile, widest), and which Signed APIs served
-each side, matched through the poll that saved each record. It reads the archive read-only, so it is safe beside a
-running archiver.
+The explorer's **Conflicts** page (`/conflicts`, or `/api/conflicts?from=&to=` as JSON) lists, per provider and
+endpoint, the moments when a provider signed more than one value for the same feed and second: how many (and out of
+how many archived moments), how far apart the values were in basis points (median, 90th percentile, widest), and which
+Signed APIs served each side, matched through the poll that saved each record. Each provider's widest conflict links to
+the feed at that second, where both signed values are shown and checked in the browser. Counting scans every record in
+the range, so the page refreshes every 5 minutes rather than every 30 seconds.
 
 The rate is a lower bound. Each host is polled about once a minute, so a conflict only shows when both copies happen
 to be serving a record from the same second.

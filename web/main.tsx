@@ -3,10 +3,11 @@ import { createRootRoute, createRoute, createRouter, RouterProvider } from '@tan
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { AboutPage } from './pages/About.tsx';
+import { ConflictsPage } from './pages/Conflicts.tsx';
 import { FeedPage } from './pages/Feed.tsx';
 import { FeedsPage } from './pages/Feeds.tsx';
 import { Layout, NotFound } from './pages/Layout.tsx';
-import { parseFeedSearch } from './search.ts';
+import { parseConflictsSearch, parseFeedSearch } from './search.ts';
 
 const rootRoute = createRootRoute({ component: Layout, notFoundComponent: NotFound });
 const feedsRoute = createRoute({ getParentRoute: () => rootRoute, path: '/', component: FeedsPage });
@@ -16,8 +17,14 @@ const feedRoute = createRoute({
   component: FeedPage,
   validateSearch: parseFeedSearch,
 });
+const conflictsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/conflicts',
+  component: ConflictsPage,
+  validateSearch: parseConflictsSearch,
+});
 const aboutRoute = createRoute({ getParentRoute: () => rootRoute, path: '/about', component: AboutPage });
-const routeTree = rootRoute.addChildren([feedsRoute, feedRoute, aboutRoute]);
+const routeTree = rootRoute.addChildren([feedsRoute, feedRoute, conflictsRoute, aboutRoute]);
 const router = createRouter({ routeTree, defaultPreload: 'intent' });
 
 declare module '@tanstack/react-router' {

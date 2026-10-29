@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { type FeedSearch, parseFeedSearch } from '../web/search.ts';
+import { type FeedSearch, parseConflictsSearch, parseFeedSearch } from '../web/search.ts';
 
 describe('parseFeedSearch', () => {
   test('keeps valid search params from a shared link', () => {
@@ -18,4 +18,10 @@ describe('parseFeedSearch', () => {
     expect(parseFeedSearch({ feed: 42, range: 7, time: '1793206910' })).toEqual(defaults);
     expect(parseFeedSearch({ time: -5 })).toEqual(defaults);
   });
+});
+
+test('parseConflictsSearch keeps a known range and falls back to the last day', () => {
+  expect(parseConflictsSearch({ range: '7d' })).toEqual({ range: '7d' });
+  expect(parseConflictsSearch({ range: 'forever' })).toEqual({ range: '24h' });
+  expect(parseConflictsSearch({})).toEqual({ range: '24h' });
 });

@@ -4,6 +4,7 @@ import type { MomentResponse } from '../../src/api.ts';
 import { decodePrice, medianPrice } from '../../src/price.ts';
 import { useCatalog, useFeeds, useHistory, useMoment, useSignatureChecks } from '../api.ts';
 import { Chart } from '../components/Chart.tsx';
+import { Segmented } from '../components/Segmented.tsx';
 import { UpdatedAgo } from '../components/UpdatedAgo.tsx';
 import { formatAge, formatPrice, formatTime, fromLocalInput, toLocalInput } from '../format.ts';
 import { type FeedSearch, RANGES, type Range } from '../search.ts';
@@ -95,29 +96,6 @@ export function FeedPage(): JSX.Element {
 
       <MomentPanel search={search} onTime={(time) => update({ time })} />
     </>
-  );
-}
-
-interface SegmentedProps<T extends string> {
-  label: string;
-  options: readonly T[];
-  value: T;
-  display: (option: T) => string;
-  onChange: (option: T) => void;
-}
-
-function Segmented<T extends string>({ label, options, value, display, onChange }: SegmentedProps<T>) {
-  return (
-    <div className="field">
-      <span>{label}</span>
-      <fieldset className="segmented" aria-label={label}>
-        {options.map((option) => (
-          <button key={option} type="button" aria-pressed={option === value} onClick={() => onChange(option)}>
-            {display(option)}
-          </button>
-        ))}
-      </fieldset>
-    </div>
   );
 }
 

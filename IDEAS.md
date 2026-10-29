@@ -291,7 +291,7 @@ Public goods for the wider oracle ecosystem that the archive makes possible.
   on-chain (Airseeker, or an OEV auction winner) can pick between them. Measure how far apart such pairs are, ask the
   providers and API3 whether it is intended, and feed it into the cherry-picking bound.
 
-  _Measured with `signed-archive conflicts` over about a day (2026-10-28 to 10-29):_ every conflict paired API3's copy
+  _Measured with the explorer's Conflicts page over about a day (2026-10-28 to 10-29):_ every conflict paired API3's copy
   with the provider's own; none were within one copy. Six providers (alchemy, ankr, coingecko, coinpaprika, drpc,
   infura) never conflicted, so they likely sign once and push the same record to both. ncfx conflicted on 2.77% of
   its OEV moments and 1.35% of its base ones, blocksize on 0.64% and 0.08%; shiftmarkets, coinmetrics and nodary less.

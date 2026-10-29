@@ -144,40 +144,6 @@ program
   });
 
 program
-  .command('conflicts')
-  .description('report moments when a provider signed more than one value for the same feed and second')
-  .addOption(dbOption())
-  .addOption(
-    new Option('--from <seconds>', 'start, unix seconds (default: the beginning)').argParser(argParser(parseSeconds))
-  )
-  .addOption(new Option('--to <seconds>', 'end, unix seconds (default: now)').argParser(argParser(parseSeconds)))
-  .addOption(new Option('--json', 'print JSON instead of a table'))
-  .action(
-    async ({
-      db,
-      from = 1,
-      to = Math.floor(Date.now() / 1000),
-      json,
-    }: {
-      db: string;
-      from?: number;
-      to?: number;
-      json?: boolean;
-    }) => {
-      const [{ openReader }, { formatConflicts, summarizeConflicts }] = await Promise.all([
-        import('./reader.ts'),
-        import('./conflicts.ts'),
-      ]);
-      const reader = openReader(db);
-      const summaries = summarizeConflicts(reader, requireCatalog(), from, to);
-      reader.close();
-      process.stdout.write(
-        json ? `${JSON.stringify({ from, to, summaries }, null, 2)}\n` : formatConflicts(summaries, from, to)
-      );
-    }
-  );
-
-program
   .command('health')
   .description('exit 0 if the archiver recorded a request recently, 1 otherwise (for container health checks)')
   .addOption(dbOption())

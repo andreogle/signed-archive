@@ -22,3 +22,11 @@ export function parseFeedSearch(search: Record<string, unknown>): FeedSearch {
     time: typeof time === 'number' && Number.isInteger(time) && time > 0 ? time : undefined,
   };
 }
+
+export interface ConflictsSearch {
+  range: Range;
+}
+
+export const parseConflictsSearch = (search: Record<string, unknown>): ConflictsSearch => {
+  return { range: isRange(search.range) ? search.range : '24h' };
+};

@@ -1,6 +1,7 @@
 import { type Address, isAddress } from 'viem';
 import type { Catalog } from './catalog.ts';
 import { ENDPOINTS, type Endpoint, isEndpoint } from './config.ts';
+import { type ConflictSummary, summarizeConflicts } from './conflicts.ts';
 import { medianPrice } from './price.ts';
 import type { Gap, PricePoint, Reader, SignedPrice } from './reader.ts';
 import type { SignedDatum } from './signed-data.ts';
@@ -46,6 +47,14 @@ export interface RecordsResponse {
   // Whether this archive was polling then. No records and `watched: false` means it missed the stretch too.
   watched: boolean;
   records: SignedDatum[];
+}
+
+// GET /api/conflicts: moments when a provider signed more than one value for one feed and second, per provider and
+// endpoint. It scans every record in the range, so the web app asks for it rarely.
+export interface ConflictsResponse {
+  from: number;
+  to: number;
+  summaries: ConflictSummary[];
 }
 
 const json = (body: unknown, status = 200) => Response.json(body, { status });
@@ -94,6 +103,13 @@ export function handleApi(reader: Reader, catalog: Catalog, url: URL, now = Math
       });
     const watched = reader.watched(airnode, endpoint, from, to);
     return json({ airnode, endpoint, from, to, watched, records } satisfies RecordsResponse);
+  }
+
+  if (url.pathname === '/api/conflicts') {
+    const to = parseSeconds(params.get('to'), now);
+    const from = parseSeconds(params.get('from'), (to ?? now) - 24 * 60 * 60);
+    if (from === null || to === null || from > to) return fail(400, 'from and to must be unix seconds, from <= to');
+    return json({ from, to, summaries: summarizeConflicts(reader, catalog, from, to) } satisfies ConflictsResponse);
   }
 
   const feed = params.get('feed') ?? '';

@@ -1,5 +1,5 @@
 import { keepPreviousData, useQueries, useQuery } from '@tanstack/react-query';
-import type { FeedsResponse, HistoryResponse, MomentResponse } from '../src/api.ts';
+import type { ConflictsResponse, FeedsResponse, HistoryResponse, MomentResponse } from '../src/api.ts';
 import { type Catalog, type CatalogInput, createCatalog } from '../src/catalog.ts';
 import type { Endpoint } from '../src/config.ts';
 import type { SignedPrice } from '../src/reader.ts';
@@ -41,6 +41,20 @@ export function useHistory(feed: string, endpoint: Endpoint, range: Range) {
     },
     placeholderData: keepPreviousData,
     refetchInterval: REFRESH_MS,
+  });
+}
+
+// Conflicting values over a range. Counting them scans every record in the range, so they refresh every 5 minutes.
+export function useConflicts(range: Range) {
+  return useQuery({
+    queryKey: ['conflicts', range],
+    queryFn: () => {
+      const to = now();
+      const span = RANGES[range];
+      return get<ConflictsResponse>('/api/conflicts', { from: span === null ? 0 : to - span, to });
+    },
+    placeholderData: keepPreviousData,
+    refetchInterval: 5 * 60_000,
   });
 }
 

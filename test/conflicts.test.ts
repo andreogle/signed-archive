@@ -2,7 +2,8 @@ import { afterAll, describe, expect, test } from 'bun:test';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { formatConflicts, summarizeConflicts } from '../src/conflicts.ts';
+import { handleApi } from '../src/api.ts';
+import { summarizeConflicts } from '../src/conflicts.ts';
 import { openReader } from '../src/reader.ts';
 import { hasValidSignature } from '../src/signed-data.ts';
 import { openStore } from '../src/store.ts';
@@ -78,12 +79,18 @@ describe('summarizeConflicts', () => {
   });
 });
 
-describe('formatConflicts', () => {
-  test('prints a table and the widest conflict, or says there were none', () => {
-    const text = formatConflicts(summarizeConflicts(reader, catalog, 1, 1_800_000_000), 1, 1_800_000_000);
-    expect(text).toContain('blocksize');
-    expect(text).toContain('api3+provider 1');
-    expect(text).toContain('ZEC/USD at 2026-10-28');
-    expect(formatConflicts([], 1, 2)).toStartWith('No conflicting values');
+describe('GET /api/conflicts', () => {
+  const get = (query: string) => handleApi(reader, catalog, new URL(`http://x/api/conflicts?${query}`), 1_793_400_000);
+
+  test('returns the summaries for the range, the last day by default', async () => {
+    const all = await get('from=0&to=1800000000').json();
+    expect(all.summaries.map(({ provider }: { provider: string }) => provider)).toEqual(['blocksize', 'coingecko']);
+    // The fixtures were signed more than a day before `now`, so the default range has none.
+    expect(await get('').json()).toEqual({ from: 1_793_313_600, to: 1_793_400_000, summaries: [] });
+  });
+
+  test('refuses a reversed or malformed range', () => {
+    expect(get('from=5&to=2').status).toBe(400);
+    expect(get('from=soon').status).toBe(400);
   });
 });
