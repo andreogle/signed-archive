@@ -1,11 +1,12 @@
 import { Link } from '@tanstack/react-router';
 import { useState } from 'react';
 import { now, useFeeds } from '../api.ts';
+import { UpdatedAgo } from '../components/UpdatedAgo.tsx';
 import { formatAge, formatPrice } from '../format.ts';
 
 export function FeedsPage() {
   const [filter, setFilter] = useState('');
-  const { data, error, isPending } = useFeeds('public');
+  const { data, error, isPending, dataUpdatedAt } = useFeeds('public');
   const needle = filter.trim().toUpperCase();
   const feeds = data?.feeds.filter(({ feed }) => feed.includes(needle)) ?? [];
 
@@ -30,7 +31,11 @@ export function FeedsPage() {
             spellCheck={false}
           />
         </label>
-        {data ? <p className="muted">{data.feeds.length} feeds archived</p> : null}
+        {data ? (
+          <p className="muted">
+            {data.feeds.length} feeds archived · <UpdatedAgo at={dataUpdatedAt} />
+          </p>
+        ) : null}
       </section>
 
       {isPending ? <p className="muted">Loading feeds…</p> : null}

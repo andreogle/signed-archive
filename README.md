@@ -48,7 +48,11 @@ so it can run beside the archiver.
 
 - **Feeds**: every archived feed with its current median price.
 - **Explorer**: price history per provider, base or OEV data, and every provider's signed price at any moment. Each
-  signature is re-checked in your browser, and "Download proof" saves the raw signed records.
+  signature is re-checked in your browser, and "Download proof" saves the raw signed records. Until you pick a time it
+  shows the latest signed prices.
+
+The feed list, the chart and the latest prices refresh every 30 seconds while the tab is open, and each says when it
+last updated.
 - **API**: `/api/feeds`, `/api/history?feed=ETH/USD&from=&to=` and `/api/at?feed=ETH/USD&time=` (unix seconds; add
   `endpoint=public-oev` for OEV data).
 

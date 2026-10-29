@@ -6,8 +6,9 @@ import type { SignedPrice } from '../src/reader.ts';
 import { hasValidSignature } from '../src/signed-data.ts';
 import { RANGES, type Range } from './search.ts';
 
-// The archiver adds records every cycle, so live views refresh about as often.
-const REFRESH_MS = 60_000;
+// The archiver adds records about once a minute; refreshing twice as often keeps live views at most half a cycle
+// behind. TanStack Query pauses the refresh while the tab is hidden.
+export const REFRESH_MS = 30_000;
 
 async function get<T>(path: string, query: Record<string, string | number>): Promise<T> {
   const search = new URLSearchParams(Object.entries(query).map(([key, value]) => [key, String(value)]));
@@ -43,11 +44,13 @@ export function useHistory(feed: string, endpoint: Endpoint, range: Range) {
   });
 }
 
+// Prices at a chosen time, or the latest prices (refreshing) when no time is chosen.
 export function useMoment(feed: string, endpoint: Endpoint, time: number | undefined) {
   return useQuery({
-    queryKey: ['moment', feed, endpoint, time],
+    queryKey: ['moment', feed, endpoint, time ?? 'latest'],
     queryFn: () => get<MomentResponse>('/api/at', { feed, endpoint, time: time ?? now() }),
-    enabled: time !== undefined,
+    placeholderData: time === undefined ? keepPreviousData : undefined,
+    refetchInterval: time === undefined ? REFRESH_MS : false,
   });
 }
 

@@ -4,6 +4,7 @@ import type { MomentResponse } from '../../src/api.ts';
 import { decodePrice, medianPrice } from '../../src/price.ts';
 import { useCatalog, useFeeds, useHistory, useMoment, useSignatureChecks } from '../api.ts';
 import { Chart } from '../components/Chart.tsx';
+import { UpdatedAgo } from '../components/UpdatedAgo.tsx';
 import { formatAge, formatPrice, formatTime, fromLocalInput, toLocalInput } from '../format.ts';
 import { type FeedSearch, RANGES, type Range } from '../search.ts';
 
@@ -66,11 +67,16 @@ export function FeedPage(): JSX.Element {
           <div>
             <h2 id={titleId}>{search.feed}</h2>
             <p className="muted">
-              {history.data?.earliest
-                ? `${history.data.providers.length} providers · archived since ${formatTime(history.data.earliest)}`
-                : history.isPending
-                  ? 'Loading…'
-                  : 'No records archived yet'}
+              {history.data?.earliest ? (
+                <>
+                  {history.data.providers.length} providers · archived since {formatTime(history.data.earliest)} ·{' '}
+                  <UpdatedAgo at={history.dataUpdatedAt} />
+                </>
+              ) : history.isPending ? (
+                'Loading…'
+              ) : (
+                'No records archived yet'
+              )}
             </p>
           </div>
           <p className="big">{newest ? formatPrice(newest.price) : ''}</p>
@@ -115,7 +121,7 @@ function Segmented<T extends string>({ label, options, value, display, onChange 
   );
 }
 
-function MomentPanel({ search, onTime }: { search: FeedSearch; onTime: (time: number) => void }) {
+function MomentPanel({ search, onTime }: { search: FeedSearch; onTime: (time: number | undefined) => void }) {
   const titleId = useId();
   const moment = useMoment(search.feed, search.endpoint, search.time);
   const data = moment.data;
@@ -132,6 +138,9 @@ function MomentPanel({ search, onTime }: { search: FeedSearch; onTime: (time: nu
   const verified = records.filter((_, index) => checks[index]?.data === 'valid');
   const median = medianPrice(verified);
   // A provider with more than one record signed different values for the same moment: equivocation.
+  // Without a chosen time the panel follows the latest prices; ages are measured from when they were fetched.
+  const live = search.time === undefined;
+  const reference = search.time ?? data?.time ?? 0;
   const conflicted = new Set(
     records.map(({ provider }) => provider).filter((provider, index, all) => all.indexOf(provider) !== index)
   );
@@ -140,8 +149,17 @@ function MomentPanel({ search, onTime }: { search: FeedSearch; onTime: (time: nu
     <section className="card" aria-labelledby={titleId}>
       <div className="card-head">
         <div>
-          <h2 id={titleId}>Prices at a moment</h2>
-          <p className="muted">Each provider's latest signed price at or before the chosen time.</p>
+          <h2 id={titleId}>{live ? 'Latest signed prices' : 'Prices at a moment'}</h2>
+          <p className="muted">
+            {live ? (
+              <>
+                Each provider's newest signed price, refreshed every 30 seconds ·{' '}
+                <UpdatedAgo at={moment.dataUpdatedAt} />
+              </>
+            ) : (
+              "Each provider's latest signed price at or before the chosen time."
+            )}
+          </p>
         </div>
         <form
           className="moment"
@@ -163,6 +181,11 @@ function MomentPanel({ search, onTime }: { search: FeedSearch; onTime: (time: nu
           <button type="submit" className="primary">
             Show
           </button>
+          {live ? null : (
+            <button type="button" onClick={() => onTime(undefined)}>
+              Back to latest
+            </button>
+          )}
         </form>
       </div>
 
@@ -198,7 +221,7 @@ function MomentPanel({ search, onTime }: { search: FeedSearch; onTime: (time: nu
             {records.map((record, index) => {
               const check = checks[index]?.data;
               const price = decodePrice(record.encodedValue);
-              const age = (search.time ?? 0) - Number(record.timestamp);
+              const age = reference - Number(record.timestamp);
               return (
                 <tr key={`${record.provider}-${record.encodedValue}`}>
                   <td>
@@ -213,7 +236,9 @@ function MomentPanel({ search, onTime }: { search: FeedSearch; onTime: (time: nu
                   <td className="num" title={price}>
                     {formatPrice(price)}
                   </td>
-                  <td title={`${formatAge(age)} before the chosen time`}>{formatTime(Number(record.timestamp))}</td>
+                  <td title={`${formatAge(Math.max(0, age))} ${live ? 'old when fetched' : 'before the chosen time'}`}>
+                    {formatTime(Number(record.timestamp))}
+                  </td>
                   <td className={check === undefined ? 'muted' : check === 'valid' ? 'ok' : 'bad'}>
                     <span title={`Signer ${record.airnode}`}>{CHECK_LABELS[check ?? 'pending']}</span>
                   </td>
@@ -223,11 +248,10 @@ function MomentPanel({ search, onTime }: { search: FeedSearch; onTime: (time: nu
             {records.length === 0 ? (
               <tr>
                 <td colSpan={4} className="muted">
-                  {search.time === undefined
-                    ? 'Pick a time, or click the chart.'
-                    : moment.isPending
-                      ? 'Loading…'
-                      : (moment.error?.message ?? 'No signed records at or before this time.')}
+                  {moment.isPending
+                    ? 'Loading…'
+                    : (moment.error?.message ??
+                      (live ? 'No signed records archived yet.' : 'No signed records at or before this time.'))}
                 </td>
               </tr>
             ) : null}
