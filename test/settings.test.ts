@@ -1,8 +1,9 @@
 import { afterAll, describe, expect, test } from 'bun:test';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { loadSettings, parseSettings } from '../src/settings.ts';
+import { fileURLToPath } from 'node:url';
+import { loadConfig, loadSettings, parseAirnodes, parseFeeds, parseSettings } from '../src/settings.ts';
 
 const dir = mkdtempSync(join(tmpdir(), 'signed-archive-settings-'));
 
@@ -64,45 +65,67 @@ peers:
   });
 });
 
-describe('airnodes and feeds', () => {
+describe('airnode and feed lists', () => {
   const airnode = '0x9dB03a07bE313B3C08261B1d1606D511f3560D9e';
   const template = '0xdeda2f7938bf877d2f011aa550852d3459794e16944ea0b7513465479752ba93';
-  const lists = (airnodes: string, feeds = '') => parseSettings(`airnodes:\n${airnodes}\nfeeds:\n${feeds}`);
   const entry = (alias: string, address = `"${airnode}"`, url = 'https://signed-api.coingecko.com') =>
     `  - alias: ${alias}\n    airnode: ${address}\n    signedApiUrl: ${url}`;
+  const airnodeList = (...entries: string[]) => parseAirnodes(`airnodes:\n${entries.join('\n')}`);
+  const feedList = (body: string) => parseFeeds(`feeds:\n${body}`, airnodeList(entry('coingecko')));
 
-  test('reads providers and feeds, and the committed config file parses', async () => {
-    const settings = lists(entry('coingecko'), `  ETH/USD:\n    coingecko: "${template}"`);
-    expect(settings.airnodes).toEqual([
+  test('reads providers and feeds, and the committed files parse', async () => {
+    expect(airnodeList(entry('coingecko'))).toEqual([
       { alias: 'coingecko', airnode, signedApiUrl: 'https://signed-api.coingecko.com' },
     ]);
-    expect(settings.feeds).toEqual({ 'ETH/USD': { coingecko: template } });
-    const committed = parseSettings(await Bun.file(new URL('../signed-archive.yaml', import.meta.url)).text());
-    expect(committed.airnodes?.length).toBeGreaterThan(0);
+    expect(feedList(`  ETH/USD:\n    coingecko: "${template}"`)).toEqual({ 'ETH/USD': { coingecko: template } });
+    const committed = await loadConfig(fileURLToPath(new URL('../signed-archive.yaml', import.meta.url)));
+    expect(committed.catalog.airnodes.length).toBeGreaterThan(0);
+    expect(Object.keys(committed.catalog.feeds).length).toBeGreaterThan(0);
+    expect(parseAirnodes('')).toEqual([]);
+    expect(parseFeeds('', [])).toEqual({});
   });
 
   test('rejects unquoted hex, missing fields, duplicate aliases and feeds naming unknown providers', () => {
     // YAML reads a short unquoted 0x... as a number, which has lost the value's exact digits.
-    expect(() => lists(entry('coingecko', '0x12'))).toThrow('airnodes[0].airnode must be an address, quoted');
-    expect(() => lists('  - alias: coingecko')).toThrow('airnodes[0].airnode is required');
-    expect(() => lists(`${entry('coingecko')}\n${entry('coingecko')}`)).toThrow('has alias coingecko twice');
-    expect(() => lists(entry('coingecko', `"${airnode}"`, 'ftp://x'))).toThrow('signedApiUrl must be an http(s) URL');
-    expect(() => lists(entry('coingecko'), `  ETH/USD:\n    nobody: "${template}"`)).toThrow(
-      'feeds.ETH/USD.nobody is not an alias listed under airnodes'
+    expect(() => airnodeList(entry('coingecko', '0x12'))).toThrow('airnodes[0].airnode must be an address, quoted');
+    expect(() => airnodeList('  - alias: coingecko')).toThrow('airnodes[0].airnode is required');
+    expect(() => airnodeList(entry('coingecko'), entry('coingecko'))).toThrow('has alias coingecko twice');
+    expect(() => airnodeList(entry('coingecko', `"${airnode}"`, 'ftp://x'))).toThrow(
+      'signedApiUrl must be an http(s) URL'
     );
-    expect(() => lists(entry('coingecko'), '  ETH/USD:\n    coingecko: 0x12')).toThrow('must be a 32-byte hex string');
-    expect(() => lists(entry('coingecko'), '  ETH/USD:\n    coingecko: "0x12"')).toThrow(
-      'must be a 32-byte hex string'
+    expect(() => feedList(`  ETH/USD:\n    nobody: "${template}"`)).toThrow(
+      'feeds.ETH/USD.nobody is not an alias listed in the airnodes file'
     );
-    expect(() => lists(entry('coingecko'), '  ETH/USD: 5')).toThrow('feeds.ETH/USD must map provider aliases');
-    expect(() => parseSettings('airnodes: 5')).toThrow('airnodes must be a list');
-    expect(() => parseSettings('feeds: [1]')).toThrow('feeds must be a mapping');
+    expect(() => feedList('  ETH/USD:\n    coingecko: 0x12')).toThrow('must be a 32-byte hex string');
+    expect(() => feedList('  ETH/USD:\n    coingecko: "0x12"')).toThrow('must be a 32-byte hex string');
+    expect(() => feedList('  ETH/USD: 5')).toThrow('feeds.ETH/USD must map provider aliases');
+    expect(() => parseAirnodes('airnodes: 5')).toThrow('airnodes must be a list');
+    expect(() => parseFeeds('feeds: [1]', [])).toThrow('feeds must be a mapping');
+    // Each list file holds only its own key.
+    expect(() => parseAirnodes('feeds: {}')).toThrow('feeds is not a known setting');
   });
 });
 
 describe('loadSettings', () => {
+  // A settings file with its list files beside it, at paths relative to the settings file.
   const path = join(dir, 'archive.yaml');
-  writeFileSync(path, 'archive:\n  interval: 90\n');
+  writeFileSync(path, 'archive:\n  interval: 90\ncatalog:\n  airnodes: lists/a.yaml\n  feeds: lists/f.yaml\n');
+  mkdirSync(join(dir, 'lists'), { recursive: true });
+  writeFileSync(
+    join(dir, 'lists/a.yaml'),
+    'airnodes:\n  - alias: x\n    airnode: "0x9dB03a07bE313B3C08261B1d1606D511f3560D9e"\n    signedApiUrl: https://x.example\n'
+  );
+  writeFileSync(join(dir, 'lists/f.yaml'), 'feeds:\n  X/USD: {}\n');
+  const expected: Awaited<ReturnType<typeof loadConfig>> = {
+    path,
+    settings: { archive: { interval: 90 }, catalog: { airnodes: 'lists/a.yaml', feeds: 'lists/f.yaml' } },
+    catalog: {
+      airnodes: [
+        { alias: 'x', airnode: '0x9dB03a07bE313B3C08261B1d1606D511f3560D9e', signedApiUrl: 'https://x.example' },
+      ],
+      feeds: { 'X/USD': {} },
+    },
+  };
 
   test('reads the file named by --config, --config=, or CONFIG', async () => {
     for (const [argv, env] of [
@@ -110,7 +133,7 @@ describe('loadSettings', () => {
       [['bun', 'cli.ts', `--config=${path}`], {}],
       [['bun', 'cli.ts'], { CONFIG: path }],
     ] as const) {
-      expect(await loadSettings(argv, env)).toEqual({ path, settings: { archive: { interval: 90 } } });
+      expect(await loadSettings(argv, env)).toEqual(expected);
     }
   });
 
@@ -119,12 +142,20 @@ describe('loadSettings', () => {
     const cwd = process.cwd();
     process.chdir(dir);
     try {
-      expect(await loadSettings(['bun', 'cli.ts'], {})).toEqual({ path: null, settings: {} });
+      expect(await loadSettings(['bun', 'cli.ts'], {})).toEqual({
+        path: null,
+        settings: {},
+        catalog: { airnodes: [], feeds: {} },
+      });
     } finally {
       process.chdir(cwd);
     }
     await expect(loadSettings(['bun', 'cli.ts', '--config', join(dir, 'nope.yaml')], {})).rejects.toThrow(
       'config file not found'
     );
+    // A settings file whose list files are missing names the path it looked for.
+    const lonely = join(dir, 'lonely.yaml');
+    writeFileSync(lonely, 'logLevel: info\n');
+    await expect(loadConfig(lonely)).rejects.toThrow(`catalog file not found: ${join(dir, 'config/airnodes.yaml')}`);
   });
 });

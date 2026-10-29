@@ -29,11 +29,11 @@ bun run dev -- --interval 120  # flags override env vars
 | `--host <host>`         | `HOST`                  | `127.0.0.1`           | Explorer address.                        |
 | `--port <port>`         | `PORT`                  | `3000`                | Explorer port.                           |
 
-**Config file.** One YAML file holds the settings and what to archive: `signed-archive.yaml` (committed, and shipped
-in the Docker image), or any copy passed with `--config <path>` / `CONFIG`. Settings come first, then the `airnodes`
-and `feeds` lists below a marker line. A flag beats an env var, which beats the file, which beats the default, and a
-misspelled key is an error. Peers are set only in the file. The committed copy is public, so keep the heartbeat URL
-out of it: set `HEARTBEAT_URL`, or use a private copy.
+**Config files.** Settings live in `signed-archive.yaml` (committed, and shipped in the Docker image), or any copy
+passed with `--config <path>` / `CONFIG`. What to archive lives in two generated files it names under `catalog`:
+`config/airnodes.yaml` and `config/feeds.yaml`, resolved relative to the settings file. A flag beats an env var, which
+beats the file, which beats the default, and a misspelled key is an error. Peers are set only in the file. The
+committed copy is public, so keep the heartbeat URL out of it: set `HEARTBEAT_URL`, or use a private copy.
 
 Logs go to stderr, one line per event, with `key=value` fields:
 
@@ -52,7 +52,7 @@ so it can run beside the archiver.
 - **API**: `/api/feeds`, `/api/history?feed=ETH/USD&from=&to=` and `/api/at?feed=ETH/USD&time=` (unix seconds; add
   `endpoint=public-oev` for OEV data).
 
-Feed names come from the `feeds` list in the config file. The page fetches the airnode and feed lists from
+Feed names come from `config/feeds.yaml`. The page fetches the airnode and feed lists from
 `/api/catalog` and checks every record against them in the browser.
 
 See [IDEAS.md](IDEAS.md) for where the project could go next.
@@ -112,10 +112,10 @@ in `src/price.ts`. It defaults to the last 10 minutes and takes a few seconds. F
 
 ## Airnodes and feeds
 
-The `airnodes` and `feeds` lists in `signed-archive.yaml` are generated from API3's provider list in
-`@api3/api-integrations` (mock providers excluded). After bumping that package, run `bun run airnodes` and commit the
-result; it rewrites everything below the marker line and leaves the settings above it as they are. To archive a
-different set, edit a copy of the file and pass it with `--config`; no rebuild is needed.
+`config/airnodes.yaml` and `config/feeds.yaml` are generated from API3's provider list in `@api3/api-integrations`
+(mock providers excluded). After bumping that package, run `bun run airnodes` and commit the result; `bun run check`
+fails while they are stale. To archive a different set, point `catalog.airnodes` / `catalog.feeds` in the settings file
+at your own copies; no rebuild is needed.
 
 ## Being polite
 

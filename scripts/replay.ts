@@ -26,7 +26,7 @@ import { DEFAULT_DB_PATH } from '../src/config.ts';
 import { log } from '../src/logger.ts';
 import { decodeValue, median } from '../src/price.ts';
 import { openReader, type SignedPrice } from '../src/reader.ts';
-import { catalogInput, DEFAULT_CONFIG_PATH, parseSettings } from '../src/settings.ts';
+import { DEFAULT_CONFIG_PATH, loadConfig } from '../src/settings.ts';
 
 const { values: args } = parseArgs({
   options: {
@@ -39,7 +39,7 @@ const { values: args } = parseArgs({
   },
 });
 
-const catalog = createCatalog(catalogInput(parseSettings(await Bun.file(args.config).text())));
+const catalog = createCatalog((await loadConfig(args.config)).catalog);
 const sources = catalog.feeds.get(args.feed)?.public;
 if (!sources) throw new Error(`unknown feed ${args.feed}`);
 const reader = openReader(args.db);

@@ -5,7 +5,7 @@ import { createCatalog } from './catalog.ts';
 import { DEFAULT_DB_PATH, DEFAULT_HOST, DEFAULT_INTERVAL_SECONDS, DEFAULT_PORT } from './config.ts';
 import { parseHeartbeatUrl } from './heartbeat.ts';
 import { errorMessage, LOG_LEVELS, type LogLevel, log, setLogLevel } from './logger.ts';
-import { catalogInput, DEFAULT_CONFIG_PATH, loadSettings, parseInterval, parsePort, parseSeconds } from './settings.ts';
+import { DEFAULT_CONFIG_PATH, loadSettings, parseInterval, parsePort, parseSeconds } from './settings.ts';
 
 // Command-line parsers report problems through commander, so bad input fails before anything runs.
 const argParser = <T>(parse: (value: string) => T) => {
@@ -26,7 +26,7 @@ try {
   process.exit(1);
 }
 const { settings } = config;
-const catalog = createCatalog(catalogInput(settings));
+const catalog = createCatalog(config.catalog);
 
 // Archiving, serving and merging need to know which airnodes and feeds exist; they come only from the config file.
 function requireCatalog() {

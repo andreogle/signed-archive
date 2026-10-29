@@ -43,7 +43,7 @@ This file holds what is specific to this project and the invariants that must ne
 - Tools are pinned in `mise.toml`; run commands through it (`mise exec -- bun ...`) if the shell doesn't activate mise
 - Run `bun run check` (airnode list, Biome, `tsc`, tests with coverage) when done and read its **whole** output
 - The CLI is `src/cli.ts` (commander). Every option has a flag and an env var (`.env()`), and a key in the YAML config file (`src/settings.ts`), which supplies commander's defaults: flag beats env beats file beats default. Lists (peers) live only in the file. Validate with one parser shared by the flag and the file, so both accept exactly the same values, and reject unknown config keys
-- `bun run build` compiles a native binary to `dist/signed-archive`. The airnode and feed lists are not bundled: they come from the config file at run time, and the Docker image ships `signed-archive.yaml` at `/app/signed-archive.yaml`
+- `bun run build` compiles a native binary to `dist/signed-archive`. The airnode and feed lists are not bundled: they come from the config file at run time, and the Docker image ships `signed-archive.yaml` and `config/` under `/app`
 - Biome runs strict, with every React rule on. Fix the code, don't disable the rule. The one exception is `noJsxPropsBind`, off on purpose: inline handlers are idiomatic React
 - `bun dev` runs the archiver and explorer under `--watch`, so every edit to `src/` restarts the archiver and leaves a gap. Use it for development only; the long-running archive runs `bun start` or the binary
 - **Never start, restart or kill a running archiver** (`bun start`, `bun dev`, or the `archiver` container). Ask the user. Stopping it leaves a gap in the history that can never be filled. Test Docker changes under another project name (`docker compose -p sa-test ...`, then `down -v`), never the real one
@@ -65,7 +65,7 @@ This file holds what is specific to this project and the invariants that must ne
 
 **Signed API**
 - `/public/<airnode>` serves base data delayed ~15 s; `/public-oev/<airnode>` serves fresher data already under the OEV template ID (`keccak256(templateId)`). Both verify with the same scheme
-- The API's `/airnodes` route is disabled. The one config file, `signed-archive.yaml`, holds the settings and, below a marker line, the `airnodes` and `feeds` lists generated from `@api3/api-integrations` by `bun run airnodes`. Never edit below the marker by hand; `bun run check` fails if it's stale (e.g. after a Dependabot bump of that package). The lists reach code only through a `Catalog` (`src/catalog.ts`), passed in, never module-level state. Addresses and template IDs stay quoted: YAML may read an unquoted `0x...` as a number
+- The API's `/airnodes` route is disabled. Settings live in `signed-archive.yaml`; what to archive lives in `config/airnodes.yaml` and `config/feeds.yaml`, which the settings file names under `catalog` (paths relative to it) and `bun run airnodes` generates from `@api3/api-integrations`. Never edit the generated files by hand; `bun run check` fails if they're stale (e.g. after a Dependabot bump of that package). The lists reach code only through a `Catalog` (`src/catalog.ts`), passed in, never module-level state. Addresses and template IDs stay quoted: YAML may read an unquoted `0x...` as a number
 - Responses carry `Cache-Control: max-age=1`; a fresh fetch per cycle is expected
 
 **Bun and SQLite**
@@ -87,5 +87,5 @@ This file holds what is specific to this project and the invariants that must ne
 - Runtime dependencies are `viem` (signature recovery, hashing, hex helpers) and `commander` (CLI), plus React, TanStack Router and TanStack Query for the explorer in `web/`. Reach for Bun's built-ins and the standard library before adding another
 - `bunfig.toml` refuses package versions published less than 3 days ago (`minimumReleaseAge`). Don't bypass it to grab a fresh release
 - `@api3/contracts` is a dev dependency only (MIT): the `Api3ServerV1` ABI and bytecode for the replay script. Tests of API3's own Solidity (Halmos, then Foundry fuzz tests of `Median.sol`) were tried here and removed; the replay against the deployed bytecode covers what this project needs
-- `@api3/api-integrations` is a dev dependency only: it is large (the whole Airnode stack) and `UNLICENSED`. Only `scripts/airnodes.ts` imports it; runtime code reads the lists it writes into the config file. Its blocked postinstall stays blocked
+- `@api3/api-integrations` is a dev dependency only: it is large (the whole Airnode stack) and `UNLICENSED`. Only `scripts/airnodes.ts` imports it; runtime code reads the list files it writes. Its blocked postinstall stays blocked
 - `tsconfig.json` sets `skipLibCheck`, because a viem dependency ships types that need browser globals

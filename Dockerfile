@@ -15,8 +15,10 @@ RUN bun run build && mkdir -p /out/data /out/backups
 # The compiled binary embeds Bun and links only glibc. The nonroot variant has no shell and runs as uid 65532.
 FROM gcr.io/distroless/base-debian12:nonroot
 COPY --from=build /src/dist/signed-archive /app/signed-archive
-# The default config: settings plus the airnode and feed lists. Mount your own copy over it, or set CONFIG.
+# The default config: the settings file and, under config/, the airnode and feed lists it names. Mount your own
+# copies over them, or set CONFIG.
 COPY signed-archive.yaml /app/signed-archive.yaml
+COPY config /app/config
 # Named volumes copy these directories, ownership included, the first time they are mounted.
 COPY --from=build --chown=65532:65532 /out/data /data
 COPY --from=build --chown=65532:65532 /out/backups /backups
