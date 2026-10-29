@@ -1,6 +1,6 @@
-import { type Address, isAddress, isAddressEqual } from 'viem';
-import { AIRNODES, ENDPOINTS, type Endpoint, isEndpoint } from './config.ts';
-import { FEEDS, PROVIDER_SLOTS, sourcesOfAirnode } from './feeds.ts';
+import { type Address, isAddress } from 'viem';
+import type { Catalog } from './catalog.ts';
+import { ENDPOINTS, type Endpoint, isEndpoint } from './config.ts';
 import { medianPrice } from './price.ts';
 import type { Gap, PricePoint, Reader, SignedPrice } from './reader.ts';
 import type { SignedDatum } from './signed-data.ts';
@@ -22,7 +22,7 @@ export interface HistoryResponse {
   from: number;
   to: number;
   earliest: number | null;
-  // `slot` is the provider's fixed colour slot (see PROVIDER_SLOTS), so the web app colours it the same everywhere.
+  // `slot` is the provider's fixed colour slot (see catalog.slots), so the web app colours it the same everywhere.
   providers: { provider: string; slot: number; points: PricePoint[] }[];
   // When the archiver was not polling: missing points there are unknown, not unchanged.
   gaps: Gap[];
@@ -60,13 +60,16 @@ function parseSeconds(value: string | null, fallback: number) {
 const providerCount = (records: readonly SignedPrice[]) => new Set(records.map(({ provider }) => provider)).size;
 
 // GET /api/feeds, /api/history and /api/at. Times are unix seconds, like the signed timestamps.
-export function handleApi(reader: Reader, url: URL, now = Math.floor(Date.now() / 1000)): Response {
+export function handleApi(reader: Reader, catalog: Catalog, url: URL, now = Math.floor(Date.now() / 1000)): Response {
+  // The airnodes and feeds this archive keeps, so the web app checks records against the same lists.
+  if (url.pathname === '/api/catalog') return json(catalog.input);
+
   const params = url.searchParams;
   const endpoint = params.get('endpoint') ?? 'public';
   if (!isEndpoint(endpoint)) return fail(400, `endpoint must be one of ${ENDPOINTS.join(', ')}`);
 
   if (url.pathname === '/api/feeds') {
-    const feeds = [...FEEDS].flatMap(([feed, sources]): FeedSummary[] => {
+    const feeds = [...catalog.feeds].flatMap(([feed, sources]): FeedSummary[] => {
       const records = reader.at(sources[endpoint], now);
       if (records.length === 0) return [];
       const latest = Math.max(...records.map(({ timestamp }) => Number(timestamp)));
@@ -77,7 +80,7 @@ export function handleApi(reader: Reader, url: URL, now = Math.floor(Date.now() 
 
   if (url.pathname === '/api/records') {
     const airnode = params.get('airnode') ?? '';
-    const known = isAddress(airnode) && AIRNODES.some((entry) => isAddressEqual(entry.airnode, airnode));
+    const known = isAddress(airnode) && catalog.knows(airnode);
     if (!known) return fail(404, 'unknown airnode');
     const from = parseSeconds(params.get('from'), -1);
     const to = parseSeconds(params.get('to'), -1);
@@ -85,7 +88,7 @@ export function handleApi(reader: Reader, url: URL, now = Math.floor(Date.now() 
       return fail(400, `from and to must be unix seconds, from <= to, at most ${PEER_WINDOW_SECONDS} s apart`);
     }
     const records = reader
-      .records(sourcesOfAirnode(airnode, endpoint), from, to)
+      .records(catalog.sourcesOfAirnode(airnode, endpoint), from, to)
       .map(({ airnode, templateId, timestamp, encodedValue, signature }) => {
         return { airnode, templateId, timestamp, encodedValue, signature };
       });
@@ -94,7 +97,7 @@ export function handleApi(reader: Reader, url: URL, now = Math.floor(Date.now() 
   }
 
   const feed = params.get('feed') ?? '';
-  const sources = FEEDS.get(feed)?.[endpoint];
+  const sources = catalog.feeds.get(feed)?.[endpoint];
   if (!sources) return fail(404, 'unknown feed');
 
   if (url.pathname === '/api/history') {
@@ -108,7 +111,7 @@ export function handleApi(reader: Reader, url: URL, now = Math.floor(Date.now() 
     const from = Math.min(to, Math.max(requested, earliest ?? requested));
     const providers = reader
       .history(sources, from, to)
-      .map((series) => ({ ...series, slot: PROVIDER_SLOTS.get(series.provider) ?? 0 }));
+      .map((series) => ({ ...series, slot: catalog.slots.get(series.provider) ?? 0 }));
     return json({
       feed,
       endpoint,

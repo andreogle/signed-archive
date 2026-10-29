@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { mergeArchive } from '../src/merge.ts';
 import { openStore } from '../src/store.ts';
-import { coingecko } from './fixtures.ts';
+import { catalog, coingecko } from './fixtures.ts';
 
 const dir = mkdtempSync(join(tmpdir(), 'signed-archive-sources-'));
 const airnode = `x'${coingecko.airnode.slice(2)}'`;
@@ -55,7 +55,10 @@ test('opening a legacy archive adds the source column, and its existing polls re
 test('merging a legacy archive keeps its polls as API3, and polls from an unknown source are rejected', async () => {
   const legacy = legacyArchive('legacy-source.sqlite');
   const target = join(dir, 'target.sqlite');
-  expect(await mergeArchive({ sourcePath: legacy, dbPath: target })).toMatchObject({ polls: 1, rejectedPolls: 0 });
+  expect(await mergeArchive({ sourcePath: legacy, dbPath: target, catalog })).toMatchObject({
+    polls: 1,
+    rejectedPolls: 0,
+  });
   expect(sources(target)).toEqual(['api3']);
 
   const current = join(dir, 'current.sqlite');
@@ -63,5 +66,8 @@ test('merging a legacy archive keeps its polls as API3, and polls from an unknow
   const db = new Database(current);
   db.run(`INSERT INTO polls VALUES (${airnode}, 'public', 3000, 200, 0, 0, 0, 'somewhere-else')`);
   db.close();
-  expect(await mergeArchive({ sourcePath: current, dbPath: target })).toMatchObject({ polls: 0, rejectedPolls: 1 });
+  expect(await mergeArchive({ sourcePath: current, dbPath: target, catalog })).toMatchObject({
+    polls: 0,
+    rejectedPolls: 1,
+  });
 });

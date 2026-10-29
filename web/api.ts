@@ -1,7 +1,7 @@
 import { keepPreviousData, useQueries, useQuery } from '@tanstack/react-query';
 import type { FeedsResponse, HistoryResponse, MomentResponse } from '../src/api.ts';
+import { type Catalog, type CatalogInput, createCatalog } from '../src/catalog.ts';
 import type { Endpoint } from '../src/config.ts';
-import { isFeedRecord } from '../src/feeds.ts';
 import type { SignedPrice } from '../src/reader.ts';
 import { hasValidSignature } from '../src/signed-data.ts';
 import { RANGES, type Range } from './search.ts';
@@ -51,13 +51,29 @@ export function useMoment(feed: string, endpoint: Endpoint, time: number | undef
   });
 }
 
+// The archive's airnodes and feeds, fetched once. It comes from the same server as this page's code, so it is trusted
+// as far as the page itself is; what it rules out is a record relabelled as another provider or feed.
+export function useCatalog() {
+  return useQuery({
+    queryKey: ['catalog'],
+    queryFn: async () => createCatalog(await get<CatalogInput>('/api/catalog', {})),
+    staleTime: Number.POSITIVE_INFINITY,
+  });
+}
+
 export type SignatureCheck = 'valid' | 'wrong-source' | 'bad-signature';
 
 // The server's word is not trusted. Each record is checked in the browser: its signer and template must be the
-// feed's own (from API3's provider list, bundled into the page), and the signature must recover to that signer.
-export function useSignatureChecks(feed: string, endpoint: Endpoint, records: readonly SignedPrice[]) {
+// feed's own (from the catalog), and the signature must recover to that signer. Checks wait for the catalog.
+export function useSignatureChecks(
+  catalog: Catalog | undefined,
+  feed: string,
+  endpoint: Endpoint,
+  records: readonly SignedPrice[]
+) {
   return useQueries({
     queries: records.map((record) => ({
+      enabled: catalog !== undefined,
       queryKey: [
         'signature',
         feed,
@@ -70,7 +86,7 @@ export function useSignatureChecks(feed: string, endpoint: Endpoint, records: re
         record.signature,
       ],
       queryFn: async (): Promise<SignatureCheck> => {
-        if (!isFeedRecord(feed, endpoint, record)) return 'wrong-source';
+        if (!catalog?.isFeedRecord(feed, endpoint, record)) return 'wrong-source';
         return (await hasValidSignature(record)) ? 'valid' : 'bad-signature';
       },
       staleTime: Number.POSITIVE_INFINITY,

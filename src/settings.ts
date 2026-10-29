@@ -1,11 +1,14 @@
 import { existsSync } from 'node:fs';
+import { type Hex, isAddress } from 'viem';
+import type { AirnodeEntry, CatalogInput } from './catalog.ts';
 import { MIN_INTERVAL_SECONDS } from './config.ts';
 import { parseHeartbeatUrl } from './heartbeat.ts';
 import { LOG_LEVELS, type LogLevel } from './logger.ts';
 
-// The optional config file. Every key mirrors a command-line option; precedence is flag, then environment variable,
-// then this file, then the built-in default. A missing default file is fine; a misspelled key is an error, so a typo
-// never silently falls back to a default.
+// The config file: the one place for settings and for what to archive. Setting keys mirror command-line options;
+// precedence is flag, then environment variable, then this file, then the built-in default. `airnodes` and `feeds`
+// are generated below a marker line by `bun run airnodes`. A misspelled key is an error, so a typo never silently
+// falls back to a default.
 export const DEFAULT_CONFIG_PATH = 'signed-archive.yaml';
 
 export interface Settings {
@@ -16,6 +19,8 @@ export interface Settings {
   health?: { maxAge?: number };
   // Other archives to ask for records this one missed. See src/repair.ts.
   peers?: URL[];
+  airnodes?: AirnodeEntry[];
+  feeds?: CatalogInput['feeds'];
 }
 
 export function parseInterval(value: string) {
@@ -86,6 +91,52 @@ const peers = (value: unknown, path: string) => {
   return [...new Map(urls.map((url) => [url.href, url])).values()];
 };
 
+// Addresses and template IDs are hex strings. Quote them: YAML may read an unquoted 0x... as a number (Bun does for
+// short values, other tools for any), and a number has lost the value's exact digits.
+const hexString = (bytes: number) => {
+  return (value: unknown, path: string) => {
+    const ok = typeof value === 'string' && value.length === 2 + bytes * 2 && /^0x[0-9a-fA-F]+$/.test(value);
+    return ok ? value : fail(path, `must be a ${bytes}-byte hex string, quoted`);
+  };
+};
+
+const airnodes = (value: unknown, path: string) => {
+  if (!Array.isArray(value)) return fail(path, 'must be a list');
+  const entry = section({
+    alias: text,
+    airnode: (field, at) =>
+      isAddress(String(field)) ? hexString(20)(field, at) : fail(at, 'must be an address, quoted'),
+    signedApiUrl: (field, at) => (scalar(parsePeerUrl)(field, at) as URL).href.replace(/\/$/, ''),
+  });
+  const list = value.map((item, index) => entry(item, `${path}[${index}]`) as Partial<AirnodeEntry>);
+  list.forEach((item, index) => {
+    for (const key of ['alias', 'airnode', 'signedApiUrl'] as const) {
+      if (item[key] === undefined) fail(`${path}[${index}].${key}`, 'is required');
+    }
+  });
+  const aliases = list.map(({ alias }) => alias);
+  const duplicate = aliases.find((alias, index) => aliases.indexOf(alias) !== index);
+  if (duplicate) fail(path, `has alias ${duplicate} twice`);
+  return list as AirnodeEntry[];
+};
+
+const feeds = (value: unknown, path: string) => {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return fail(path, 'must be a mapping');
+  const result: Record<string, Record<string, Hex>> = {};
+  for (const [name, providers] of Object.entries(value)) {
+    if (typeof providers !== 'object' || providers === null || Array.isArray(providers)) {
+      fail(`${path}.${name}`, 'must map provider aliases to template IDs');
+    }
+    result[name] = Object.fromEntries(
+      Object.entries(providers as object).map(([alias, id]) => [
+        alias,
+        hexString(32)(id, `${path}.${name}.${alias}`) as Hex,
+      ])
+    );
+  }
+  return result;
+};
+
 const SETTINGS = section({
   db: text,
   logLevel: (value, path) =>
@@ -94,13 +145,28 @@ const SETTINGS = section({
   serve: section({ host: text, port: scalar(parsePort) }),
   health: section({ maxAge: scalar(parseSeconds) }),
   peers,
+  airnodes,
+  feeds,
 });
 
 // Parses and checks the YAML text of a config file. An empty file means no settings.
 export function parseSettings(yaml: string): Settings {
   const document: unknown = Bun.YAML.parse(yaml);
-  return document === null || document === undefined ? {} : (SETTINGS(document, '') as Settings);
+  const settings = document === null || document === undefined ? {} : (SETTINGS(document, '') as Settings);
+  // Every feed provider must be a configured airnode, or its records could never be checked.
+  const known = new Set((settings.airnodes ?? []).map(({ alias }) => alias));
+  for (const [name, providers] of Object.entries(settings.feeds ?? {})) {
+    for (const alias of Object.keys(providers)) {
+      if (!known.has(alias)) fail(`feeds.${name}.${alias}`, 'is not an alias listed under airnodes');
+    }
+  }
+  return settings;
 }
+
+// What to archive, from the settings. Empty when the config file has no airnodes.
+export const catalogInput = (settings: Settings): CatalogInput => {
+  return { airnodes: settings.airnodes ?? [], feeds: settings.feeds ?? {} };
+};
 
 // Reads the config file named by --config or CONFIG, or the default file if it exists. The path is found before
 // commander runs, because the file supplies commander's defaults.

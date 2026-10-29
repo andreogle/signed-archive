@@ -16,5 +16,3 @@
 /proofs/out/
 /proofs/cache/
 
-# Local settings; may hold the heartbeat URL. signed-archive.example.yaml is the committed template.
-/signed-archive.yaml

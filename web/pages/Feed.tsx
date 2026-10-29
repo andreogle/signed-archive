@@ -2,7 +2,7 @@ import { getRouteApi } from '@tanstack/react-router';
 import { type JSX, useId } from 'react';
 import type { MomentResponse } from '../../src/api.ts';
 import { decodePrice, medianPrice } from '../../src/price.ts';
-import { useFeeds, useHistory, useMoment, useSignatureChecks } from '../api.ts';
+import { useCatalog, useFeeds, useHistory, useMoment, useSignatureChecks } from '../api.ts';
 import { Chart } from '../components/Chart.tsx';
 import { formatAge, formatPrice, formatTime, fromLocalInput, toLocalInput } from '../format.ts';
 import { type FeedSearch, RANGES, type Range } from '../search.ts';
@@ -120,7 +120,13 @@ function MomentPanel({ search, onTime }: { search: FeedSearch; onTime: (time: nu
   const moment = useMoment(search.feed, search.endpoint, search.time);
   const data = moment.data;
   const records = data?.records ?? [];
-  const checks = useSignatureChecks(data?.feed ?? search.feed, data?.endpoint ?? search.endpoint, records);
+  const catalog = useCatalog();
+  const checks = useSignatureChecks(
+    catalog.data,
+    data?.feed ?? search.feed,
+    data?.endpoint ?? search.endpoint,
+    records
+  );
   // Prices and the median are decoded here from the signed values, never taken from the server's strings, and the
   // median only counts records that passed the checks above.
   const verified = records.filter((_, index) => checks[index]?.data === 'valid');

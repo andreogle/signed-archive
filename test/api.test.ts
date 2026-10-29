@@ -2,19 +2,26 @@ import { afterAll, describe, expect, test } from 'bun:test';
 import { handleApi } from '../src/api.ts';
 import { openReader } from '../src/reader.ts';
 import { openStore } from '../src/store.ts';
-import { coinmetrics, fixtureDb } from './fixtures.ts';
+import { catalog, coinmetrics, fixtureDb } from './fixtures.ts';
 
 const db = fixtureDb();
 const reader = openReader(db.path);
 const now = 1_793_207_000;
 const get = async (path: string) => {
-  const response = handleApi(reader, new URL(path, 'http://localhost'), now);
+  const response = handleApi(reader, catalog, new URL(path, 'http://localhost'), now);
   return { status: response.status, body: await response.json() };
 };
 
 afterAll(() => {
   reader.close();
   db.remove();
+});
+
+describe('GET /api/catalog', () => {
+  test('returns the configured airnodes and feeds, so the web app checks against the same lists', async () => {
+    const body = await handleApi(reader, catalog, new URL('http://localhost/api/catalog'), 0).json();
+    expect(body).toEqual(catalog.input);
+  });
 });
 
 describe('/api/feeds', () => {
@@ -78,11 +85,11 @@ describe('a provider that signed two values for one moment', () => {
   });
 
   test('shows both records, but gives the provider one vote and counts it once', async () => {
-    const at = handleApi(conflicted, new URL('http://localhost/api/at?feed=ETH/USD&time=1793206960'), now);
+    const at = handleApi(conflicted, catalog, new URL('http://localhost/api/at?feed=ETH/USD&time=1793206960'), now);
     const body = await at.json();
     expect(body.records.filter(({ provider }: { provider: string }) => provider === 'coinmetrics')).toHaveLength(2);
     expect(body.median).toBe('2332.2122749432156');
-    const feeds = await handleApi(conflicted, new URL('http://localhost/api/feeds'), now).json();
+    const feeds = await handleApi(conflicted, catalog, new URL('http://localhost/api/feeds'), now).json();
     expect(feeds.feeds[0].providers).toBe(3);
   });
 });

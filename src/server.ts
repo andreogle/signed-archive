@@ -1,16 +1,18 @@
 import index from '../web/index.html';
 import { handleApi } from './api.ts';
+import type { Catalog } from './catalog.ts';
 import { log } from './logger.ts';
 import { openReader } from './reader.ts';
 
 export interface ServerOptions {
   dbPath: string;
+  catalog: Catalog;
   host: string;
   port: number;
 }
 
 // Serves the explorer page and its JSON API. Bun bundles web/ (including the browser-side signature check) on start.
-export function startServer({ dbPath, host, port }: ServerOptions) {
+export function startServer({ dbPath, catalog, host, port }: ServerOptions) {
   const reader = openReader(dbPath);
   const server = Bun.serve({
     hostname: host,
@@ -22,7 +24,7 @@ export function startServer({ dbPath, host, port }: ServerOptions) {
     routes: {
       // Every other path is a page of the single-page app; the router in web/ picks what to show.
       '/*': index,
-      '/api/*': (request) => handleApi(reader, new URL(request.url)),
+      '/api/*': (request) => handleApi(reader, catalog, new URL(request.url)),
     },
   });
   log.info('server started', { url: server.url.href, db: dbPath });

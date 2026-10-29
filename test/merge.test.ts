@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { hexToBytes } from 'viem';
 import { mergeArchive } from '../src/merge.ts';
 import { openReader } from '../src/reader.ts';
-import { blocksize, coingecko, fixtureDb } from './fixtures.ts';
+import { blocksize, catalog, coingecko, fixtureDb } from './fixtures.ts';
 
 const source = fixtureDb();
 const dir = mkdtempSync(join(tmpdir(), 'signed-archive-merge-'));
@@ -43,7 +43,7 @@ afterAll(() => {
 
 describe('mergeArchive', () => {
   test('adds verified records and polls, and rejects anything that fails the checks', async () => {
-    const result = await mergeArchive({ sourcePath: source.path, dbPath: target });
+    const result = await mergeArchive({ sourcePath: source.path, dbPath: target, catalog });
     expect(result).toEqual({ read: 8, added: 5, rejected: 3, polls: 4, rejectedPolls: 1 });
 
     const reader = openReader(target);
@@ -56,10 +56,13 @@ describe('mergeArchive', () => {
   });
 
   test('adds nothing the second time, so merging is safe to repeat', async () => {
-    expect(await mergeArchive({ sourcePath: source.path, dbPath: target })).toMatchObject({ added: 0, rejected: 3 });
+    expect(await mergeArchive({ sourcePath: source.path, dbPath: target, catalog })).toMatchObject({
+      added: 0,
+      rejected: 3,
+    });
   });
 
   test('refuses to merge an archive into itself', async () => {
-    await expect(mergeArchive({ sourcePath: target, dbPath: target })).rejects.toThrow('same archive');
+    await expect(mergeArchive({ sourcePath: target, dbPath: target, catalog })).rejects.toThrow('same archive');
   });
 });

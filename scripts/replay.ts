@@ -2,7 +2,7 @@
 // after every record that the on-chain beacon set value equals the median src/price.ts computes. It shows two things:
 // the archived signatures are accepted on-chain exactly as published, and the archive's median matches Median.sol.
 //
-//   bun run replay -- --feed ETH/USD [--from <unix s>] [--to <unix s>] [--db data/archive.sqlite]
+//   bun run replay -- --feed ETH/USD [--from <unix s>] [--to <unix s>] [--db data/archive.sqlite] [--config <path>]
 //
 // The contract is deployed from @api3/contracts, whose bytecode is byte for byte what runs on Ethereum. No fork or RPC
 // is needed. Replaying into a fork, to test a protocol against real history, is the next step and needs an archive
@@ -21,11 +21,12 @@ import {
   walletActions,
 } from 'viem';
 import { foundry } from 'viem/chains';
+import { createCatalog } from '../src/catalog.ts';
 import { DEFAULT_DB_PATH } from '../src/config.ts';
-import { FEEDS } from '../src/feeds.ts';
 import { log } from '../src/logger.ts';
 import { decodeValue, median } from '../src/price.ts';
 import { openReader, type SignedPrice } from '../src/reader.ts';
+import { catalogInput, DEFAULT_CONFIG_PATH, parseSettings } from '../src/settings.ts';
 
 const { values: args } = parseArgs({
   options: {
@@ -34,10 +35,12 @@ const { values: args } = parseArgs({
     to: { type: 'string' },
     db: { type: 'string', default: DEFAULT_DB_PATH },
     port: { type: 'string', default: '8547' },
+    config: { type: 'string', default: process.env.CONFIG ?? DEFAULT_CONFIG_PATH },
   },
 });
 
-const sources = FEEDS.get(args.feed)?.public;
+const catalog = createCatalog(catalogInput(parseSettings(await Bun.file(args.config).text())));
+const sources = catalog.feeds.get(args.feed)?.public;
 if (!sources) throw new Error(`unknown feed ${args.feed}`);
 const reader = openReader(args.db);
 const to = args.to ? Number(args.to) : Math.floor(Date.now() / 1000);

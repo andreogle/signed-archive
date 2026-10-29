@@ -1,13 +1,13 @@
 import { Database } from 'bun:sqlite';
 import { existsSync, realpathSync } from 'node:fs';
-import { AIRNODES, isEndpoint, isSource } from './config.ts';
+import type { Catalog } from './catalog.ts';
+import { isEndpoint, isSource } from './config.ts';
 import { log } from './logger.ts';
 import { hasValidSignature, toSignedDatum } from './signed-data.ts';
 import { hasColumn, hasTable, openStore, type StoredPoll, type StoredRecord } from './store.ts';
 
 const BATCH_SIZE = 1000;
 const PROGRESS_EVERY = 100_000;
-const KNOWN_AIRNODES = new Set(AIRNODES.map(({ airnode }) => airnode.toLowerCase()));
 
 // The other archive is untrusted: every column is checked as if it came from the network.
 interface SourceRow {
@@ -36,7 +36,7 @@ const hex = (value: unknown) => (typeof value === 'string' ? `0x${value.toLowerC
 type Store = ReturnType<typeof openStore>;
 
 // A record, `'present'` when the target already has it, or null when it fails a check.
-async function toRecord(row: SourceRow, store: Store): Promise<StoredRecord | 'present' | null> {
+async function toRecord(row: SourceRow, store: Store, catalog: Catalog): Promise<StoredRecord | 'present' | null> {
   const datum = toSignedDatum({
     airnode: hex(row.airnode),
     templateId: hex(row.templateId),
@@ -44,7 +44,7 @@ async function toRecord(row: SourceRow, store: Store): Promise<StoredRecord | 'p
     encodedValue: hex(row.value),
     signature: hex(row.signature),
   });
-  if (!datum || !KNOWN_AIRNODES.has(datum.airnode) || !isEndpoint(row.endpoint) || !isCount(row.fetchedAt)) {
+  if (!datum || !catalog.knows(datum.airnode) || !isEndpoint(row.endpoint) || !isCount(row.fetchedAt)) {
     return null;
   }
   // Recovering a signer is the slow step, so records the target already holds are not checked again.
@@ -54,10 +54,10 @@ async function toRecord(row: SourceRow, store: Store): Promise<StoredRecord | 'p
 
 // Polls aren't signed: they are the other archiver's claim of when it was watching. They are merged
 // so its coverage fills our gaps, which is why only archives you run or trust should be merged.
-function toPoll(row: SourcePoll): StoredPoll | null {
+function toPoll(row: SourcePoll, catalog: Catalog): StoredPoll | null {
   const airnode = hex(row.airnode);
   const statusOk = row.status === null || isCount(row.status);
-  if (!airnode || !KNOWN_AIRNODES.has(airnode) || !isEndpoint(row.endpoint) || !isCount(row.fetchedAt) || !statusOk) {
+  if (!airnode || !catalog.knows(airnode) || !isEndpoint(row.endpoint) || !isCount(row.fetchedAt) || !statusOk) {
     return null;
   }
   if (!isCount(row.received) || !isCount(row.rejected) || !isCount(row.saved) || !isSource(row.source)) return null;
@@ -75,7 +75,15 @@ function toPoll(row: SourcePoll): StoredPoll | null {
 
 // Copies every record from another archive that passes the archiver's own checks into this one. Rows are only
 // added, never replaced, so a value that differs from ours for the same feed and time is kept beside it.
-export async function mergeArchive({ sourcePath, dbPath }: { sourcePath: string; dbPath: string }) {
+export async function mergeArchive({
+  sourcePath,
+  dbPath,
+  catalog,
+}: {
+  sourcePath: string;
+  dbPath: string;
+  catalog: Catalog;
+}) {
   if (existsSync(dbPath) && realpathSync(sourcePath) === realpathSync(dbPath)) {
     throw new Error('source and target are the same archive');
   }
@@ -93,7 +101,7 @@ export async function mergeArchive({ sourcePath, dbPath }: { sourcePath: string;
     );
     for (const row of rows.iterate()) {
       read += 1;
-      const record = await toRecord(row, store);
+      const record = await toRecord(row, store, catalog);
       if (record === null) rejected += 1;
       else if (record !== 'present') pending.push(record);
       if (pending.length >= BATCH_SIZE) {
@@ -117,7 +125,7 @@ export async function mergeArchive({ sourcePath, dbPath }: { sourcePath: string;
                 ${sourceColumn} FROM polls`
       );
       for (const row of pollRows.iterate()) {
-        const poll = toPoll(row);
+        const poll = toPoll(row, catalog);
         if (poll === null) {
           rejectedPolls += 1;
           continue;

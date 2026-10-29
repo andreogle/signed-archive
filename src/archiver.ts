@@ -1,7 +1,7 @@
 import { setTimeout as sleep } from 'node:timers/promises';
 import { type Address, isAddressEqual } from 'viem';
+import type { Catalog } from './catalog.ts';
 import {
-  AIRNODES,
   BASE_URL,
   ENDPOINTS,
   type Endpoint,
@@ -35,6 +35,7 @@ type Store = ReturnType<typeof openStore>;
 export interface ArchiverOptions {
   intervalSeconds: number;
   dbPath: string;
+  catalog: Catalog;
   heartbeatUrl?: URL | undefined;
   peers?: readonly URL[];
 }
@@ -126,9 +127,9 @@ async function poll(target: Target, store: Store, intervalMs: number, stop: Abor
   return { saved, rejected };
 }
 
-export async function runArchiver({ intervalSeconds, dbPath, heartbeatUrl, peers = [] }: ArchiverOptions) {
+export async function runArchiver({ intervalSeconds, dbPath, catalog, heartbeatUrl, peers = [] }: ArchiverOptions) {
   const intervalMs = intervalSeconds * 1000;
-  const targets: Target[] = AIRNODES.flatMap(({ alias, airnode, signedApiUrl }) => {
+  const targets: Target[] = catalog.airnodes.flatMap(({ alias, airnode, signedApiUrl }) => {
     return ENDPOINTS.flatMap((endpoint) => {
       return SOURCES.map((source) => {
         const baseUrl = source === 'api3' ? BASE_URL : signedApiUrl;
@@ -155,7 +156,7 @@ export async function runArchiver({ intervalSeconds, dbPath, heartbeatUrl, peers
   }
 
   log.info('archiver started', {
-    providers: AIRNODES.length,
+    providers: catalog.airnodes.length,
     targets: targets.length,
     intervalSeconds,
     db: dbPath,
@@ -215,7 +216,7 @@ export async function runArchiver({ intervalSeconds, dbPath, heartbeatUrl, peers
     if (peers.length > 0 && !stop.signal.aborted && Date.now() - lastRepair >= REPAIR_EVERY_MS) {
       lastRepair = Date.now();
       try {
-        const result = await repairGaps({ store, peers, intervalMs });
+        const result = await repairGaps({ store, catalog, peers, intervalMs });
         if (result.requests > 0) log.info('repair run', result);
       } catch (error) {
         log.warn('repair run failed', { error: errorMessage(error) });

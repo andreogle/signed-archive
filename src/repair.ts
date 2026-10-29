@@ -1,7 +1,7 @@
 import { isAddressEqual } from 'viem';
 import { PEER_WINDOW_SECONDS } from './api.ts';
-import { AIRNODES, type Endpoint, REQUEST_TIMEOUT_MS, USER_AGENT } from './config.ts';
-import { sourcesOfAirnode } from './feeds.ts';
+import type { Catalog } from './catalog.ts';
+import { type Endpoint, REQUEST_TIMEOUT_MS, USER_AGENT } from './config.ts';
 import { errorMessage, log } from './logger.ts';
 import { hasValidSignature, type SignedDatum, toSignedDatum } from './signed-data.ts';
 import type { openStore, Repair } from './store.ts';
@@ -25,6 +25,7 @@ type Gap = ReturnType<Store['closedGaps']>[number];
 
 export interface RepairOptions {
   store: Store;
+  catalog: Catalog;
   peers: readonly URL[];
   intervalMs: number;
   now?: number;
@@ -62,9 +63,9 @@ async function ask(peer: URL, gap: Gap, from: number, to: number): Promise<Answe
 
 // The checks a record from the Signed API gets, plus: it is for the gap's airnode, a known template on the gap's
 // endpoint, and signed inside the window asked for.
-async function verify(data: readonly unknown[], gap: Gap, from: number, to: number) {
+async function verify(catalog: Catalog, data: readonly unknown[], gap: Gap, from: number, to: number) {
   const templates = new Set(
-    sourcesOfAirnode(gap.airnode, gap.endpoint).map(({ templateId }) => templateId.toLowerCase())
+    catalog.sourcesOfAirnode(gap.airnode, gap.endpoint).map(({ templateId }) => templateId.toLowerCase())
   );
   const valid: SignedDatum[] = [];
   let rejected = 0;
@@ -100,14 +101,14 @@ function fresh(gap: Gap, peer: URL): Repair {
 
 // Works through closed gaps of the last week, at most REQUESTS_PER_RUN requests, and records progress so the next run
 // continues where this one stopped.
-export async function repairGaps({ store, peers, intervalMs, now = Date.now() }: RepairOptions) {
+export async function repairGaps({ store, catalog, peers, intervalMs, now = Date.now() }: RepairOptions) {
   let requests = 0;
   let added = 0;
   let rejected = 0;
   // A gap is missing more than a couple of polls, so ordinary jitter between requests never counts as one.
   for (const gap of store.closedGaps(now - LOOKBACK_MS, 3 * intervalMs)) {
     const gapEnd = Math.ceil(gap.to / 1000);
-    const provider = AIRNODES.find(({ airnode }) => isAddressEqual(airnode, gap.airnode))?.alias ?? gap.airnode;
+    const provider = catalog.aliasOf(gap.airnode) ?? gap.airnode;
     for (const peer of peers) {
       const repair =
         store.getRepair({ ...gap, endpoint: gap.endpoint as Endpoint, gapFrom: gap.from, peer: peer.href }) ??
@@ -135,7 +136,7 @@ export async function repairGaps({ store, peers, intervalMs, now = Date.now() }:
           log.warn('repair refused', { provider, endpoint: gap.endpoint, peer: peer.host, status: answer.status });
           break;
         }
-        const checked = await verify(answer.data, gap, repair.nextFrom, to);
+        const checked = await verify(catalog, answer.data, gap, repair.nextFrom, to);
         const saved = store.add(
           checked.valid.map((datum) => ({ datum, endpoint: gap.endpoint as Endpoint, fetchedAt: Date.now() })),
           []

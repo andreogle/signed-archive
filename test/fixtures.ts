@@ -1,8 +1,15 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { createCatalog } from '../src/catalog.ts';
+import { catalogInput, parseSettings } from '../src/settings.ts';
 import type { SignedDatum } from '../src/signed-data.ts';
 import { openStore } from '../src/store.ts';
+
+// The catalog from the committed config file, so tests check against the real airnode and feed lists.
+export const catalog = createCatalog(
+  catalogInput(parseSettings(await Bun.file(new URL('../signed-archive.yaml', import.meta.url)).text()))
+);
 
 // Real ETH/USD records from signed-api.api3.org, archived 2026-10-28.
 export const blocksize: SignedDatum[] = [

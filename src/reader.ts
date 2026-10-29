@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite';
 import { type Hex, hexToBytes } from 'viem';
-import type { FeedSource } from './feeds.ts';
+import type { FeedSource } from './catalog.ts';
 import { decodePrice } from './price.ts';
 import type { SignedDatum } from './signed-data.ts';
 import { hasTable } from './store.ts';
@@ -30,6 +30,21 @@ const POLL_RANGE = 'SELECT min(fetched_at) / 1000 AS first, max(fetched_at) / 10
 export interface Gap {
   from: number;
   to: number;
+}
+
+// Parts of each gap not covered by any of `covers`. Pieces of zero length are dropped.
+export function subtractCovered(gaps: readonly Gap[], covers: readonly Gap[]): Gap[] {
+  let pieces = [...gaps];
+  for (const cover of covers) {
+    pieces = pieces.flatMap((gap) => {
+      if (cover.to <= gap.from || cover.from >= gap.to) return [gap];
+      return [
+        { from: gap.from, to: cover.from },
+        { from: cover.to, to: gap.to },
+      ].filter((piece) => piece.to > piece.from);
+    });
+  }
+  return pieces;
 }
 
 export interface PricePoint {
@@ -167,7 +182,17 @@ export function openReader(path: string) {
     const found = db
       .query<Gap, { from: number; to: number; gap: number }>(GAPS)
       .all({ from: start * 1000, to: to * 1000, gap: GAP_SECONDS * 1000 });
-    return last < to - GAP_SECONDS ? [...found, { from: Math.max(last, start), to }] : found;
+    const all = last < to - GAP_SECONDS ? [...found, { from: Math.max(last, start), to }] : found;
+    // A stretch a peer filled is history like any other: its records were checked like the archiver's own.
+    const filled = hasTable(db, 'repairs')
+      ? db
+          .query<Gap, { from: number; to: number }>(
+            `SELECT gap_from / 1000 AS "from", gap_to / 1000 AS "to" FROM repairs
+             WHERE status = 'filled' AND gap_to >= $from AND gap_from <= $to`
+          )
+          .all({ from: start * 1000, to: to * 1000 })
+      : [];
+    return subtractCovered(all, filled);
   }
 
   return { at, records, history, earliest, gaps, lastPoll, watched, close: () => db.close() };

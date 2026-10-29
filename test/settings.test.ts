@@ -64,6 +64,42 @@ peers:
   });
 });
 
+describe('airnodes and feeds', () => {
+  const airnode = '0x9dB03a07bE313B3C08261B1d1606D511f3560D9e';
+  const template = '0xdeda2f7938bf877d2f011aa550852d3459794e16944ea0b7513465479752ba93';
+  const lists = (airnodes: string, feeds = '') => parseSettings(`airnodes:\n${airnodes}\nfeeds:\n${feeds}`);
+  const entry = (alias: string, address = `"${airnode}"`, url = 'https://signed-api.coingecko.com') =>
+    `  - alias: ${alias}\n    airnode: ${address}\n    signedApiUrl: ${url}`;
+
+  test('reads providers and feeds, and the committed config file parses', async () => {
+    const settings = lists(entry('coingecko'), `  ETH/USD:\n    coingecko: "${template}"`);
+    expect(settings.airnodes).toEqual([
+      { alias: 'coingecko', airnode, signedApiUrl: 'https://signed-api.coingecko.com' },
+    ]);
+    expect(settings.feeds).toEqual({ 'ETH/USD': { coingecko: template } });
+    const committed = parseSettings(await Bun.file(new URL('../signed-archive.yaml', import.meta.url)).text());
+    expect(committed.airnodes?.length).toBeGreaterThan(0);
+  });
+
+  test('rejects unquoted hex, missing fields, duplicate aliases and feeds naming unknown providers', () => {
+    // YAML reads a short unquoted 0x... as a number, which has lost the value's exact digits.
+    expect(() => lists(entry('coingecko', '0x12'))).toThrow('airnodes[0].airnode must be an address, quoted');
+    expect(() => lists('  - alias: coingecko')).toThrow('airnodes[0].airnode is required');
+    expect(() => lists(`${entry('coingecko')}\n${entry('coingecko')}`)).toThrow('has alias coingecko twice');
+    expect(() => lists(entry('coingecko', `"${airnode}"`, 'ftp://x'))).toThrow('signedApiUrl must be an http(s) URL');
+    expect(() => lists(entry('coingecko'), `  ETH/USD:\n    nobody: "${template}"`)).toThrow(
+      'feeds.ETH/USD.nobody is not an alias listed under airnodes'
+    );
+    expect(() => lists(entry('coingecko'), '  ETH/USD:\n    coingecko: 0x12')).toThrow('must be a 32-byte hex string');
+    expect(() => lists(entry('coingecko'), '  ETH/USD:\n    coingecko: "0x12"')).toThrow(
+      'must be a 32-byte hex string'
+    );
+    expect(() => lists(entry('coingecko'), '  ETH/USD: 5')).toThrow('feeds.ETH/USD must map provider aliases');
+    expect(() => parseSettings('airnodes: 5')).toThrow('airnodes must be a list');
+    expect(() => parseSettings('feeds: [1]')).toThrow('feeds must be a mapping');
+  });
+});
+
 describe('loadSettings', () => {
   const path = join(dir, 'archive.yaml');
   writeFileSync(path, 'archive:\n  interval: 90\n');
@@ -79,7 +115,14 @@ describe('loadSettings', () => {
   });
 
   test('a missing default file means no settings; a missing named file is an error', async () => {
-    expect(await loadSettings(['bun', 'cli.ts'], {})).toEqual({ path: null, settings: {} });
+    // The default file is looked up in the working directory, so look from one that has none.
+    const cwd = process.cwd();
+    process.chdir(dir);
+    try {
+      expect(await loadSettings(['bun', 'cli.ts'], {})).toEqual({ path: null, settings: {} });
+    } finally {
+      process.chdir(cwd);
+    }
     await expect(loadSettings(['bun', 'cli.ts', '--config', join(dir, 'nope.yaml')], {})).rejects.toThrow(
       'config file not found'
     );

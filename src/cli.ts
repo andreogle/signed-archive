@@ -1,10 +1,11 @@
 import { Command, InvalidArgumentError, Option } from 'commander';
 import pkg from '../package.json' with { type: 'json' };
 import { runArchiver } from './archiver.ts';
+import { createCatalog } from './catalog.ts';
 import { DEFAULT_DB_PATH, DEFAULT_HOST, DEFAULT_INTERVAL_SECONDS, DEFAULT_PORT } from './config.ts';
 import { parseHeartbeatUrl } from './heartbeat.ts';
 import { errorMessage, LOG_LEVELS, type LogLevel, log, setLogLevel } from './logger.ts';
-import { DEFAULT_CONFIG_PATH, loadSettings, parseInterval, parsePort, parseSeconds } from './settings.ts';
+import { catalogInput, DEFAULT_CONFIG_PATH, loadSettings, parseInterval, parsePort, parseSeconds } from './settings.ts';
 
 // Command-line parsers report problems through commander, so bad input fails before anything runs.
 const argParser = <T>(parse: (value: string) => T) => {
@@ -25,6 +26,15 @@ try {
   process.exit(1);
 }
 const { settings } = config;
+const catalog = createCatalog(catalogInput(settings));
+
+// Archiving, serving and merging need to know which airnodes and feeds exist; they come only from the config file.
+function requireCatalog() {
+  if (catalog.airnodes.length > 0) return catalog;
+  throw new Error(
+    `no airnodes configured: pass --config <path> (or CONFIG), or run from a directory with ${DEFAULT_CONFIG_PATH}`
+  );
+}
 
 const dbOption = () => {
   return new Option('--db <path>', 'SQLite database path').default(settings.db ?? DEFAULT_DB_PATH).env('DB_PATH');
@@ -48,7 +58,7 @@ interface ServeOptions {
 // Loaded on demand so a plain archiver never pulls in the web bundle.
 async function serve({ db, host, port }: ServeOptions) {
   const { startServer } = await import('./server.ts');
-  return startServer({ dbPath: db, host, port });
+  return startServer({ dbPath: db, catalog: requireCatalog(), host, port });
 }
 
 const program = new Command()
@@ -56,7 +66,10 @@ const program = new Command()
   .description("Record API3's public signed data so it has a verifiable history")
   .version(pkg.version)
   .addOption(
-    new Option('--config <path>', `YAML config file (default: ${DEFAULT_CONFIG_PATH} if it exists)`).env('CONFIG')
+    new Option(
+      '--config <path>',
+      `YAML config file with settings, airnodes and feeds (default: ./${DEFAULT_CONFIG_PATH})`
+    ).env('CONFIG')
   )
   .addOption(
     new Option('--log-level <level>', 'minimum log level')
@@ -97,6 +110,7 @@ program
     const archiving = runArchiver({
       intervalSeconds: options.interval,
       dbPath: options.db,
+      catalog: requireCatalog(),
       heartbeatUrl: options.heartbeatUrl,
       peers: settings.peers ?? [],
     });
@@ -124,7 +138,7 @@ program
   .addOption(dbOption())
   .action(async (source: string, { db }: { db: string }) => {
     const { mergeArchive } = await import('./merge.ts');
-    const result = await mergeArchive({ sourcePath: source, dbPath: db });
+    const result = await mergeArchive({ sourcePath: source, dbPath: db, catalog: requireCatalog() });
     const rejected = result.rejected + result.rejectedPolls;
     (rejected > 0 ? log.warn : log.info)('merge done', { source, ...result });
   });

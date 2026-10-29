@@ -6,12 +6,12 @@ import { handleApi } from '../src/api.ts';
 import { openReader } from '../src/reader.ts';
 import { repairGaps } from '../src/repair.ts';
 import { openStore } from '../src/store.ts';
-import { blocksize, coingecko, fixtureDb } from './fixtures.ts';
+import { blocksize, catalog, coingecko, fixtureDb } from './fixtures.ts';
 
 // The peer holds the real fixture records (ETH/USD, signed 1793206903-1793206951) and was polling at 1793207000.
 const peerDb = fixtureDb();
 const peerReader = openReader(peerDb.path);
-const peer = Bun.serve({ port: 0, fetch: (request) => handleApi(peerReader, new URL(request.url)) });
+const peer = Bun.serve({ port: 0, fetch: (request) => handleApi(peerReader, catalog, new URL(request.url)) });
 const peerUrl = new URL(peer.url);
 
 // Peers that misbehave: answer a fixed body or status, and count requests.
@@ -64,7 +64,7 @@ describe('repairGaps', () => {
     const stderr = quiet();
     // Down from 1793206800 to 1793207100: the peer's coingecko record at 1793206907 is inside.
     const store = archiveWithPolls(1_793_206_800, 1_793_207_100);
-    const first = await repairGaps({ store, peers: [peerUrl], intervalMs, now: 1_793_207_200_000 });
+    const first = await repairGaps({ store, catalog, peers: [peerUrl], intervalMs, now: 1_793_207_200_000 });
     expect(first).toEqual({ requests: 1, added: 1, rejected: 0 });
     expect(store.has(coingecko)).toBe(true);
     // Only the gap's airnode was asked for, so the peer's blocksize records stay where they are.
@@ -77,7 +77,7 @@ describe('repairGaps', () => {
     });
     expect(repair).toMatchObject({ status: 'filled', records: 1 });
 
-    expect(await repairGaps({ store, peers: [peerUrl], intervalMs, now: 1_793_207_300_000 })).toEqual({
+    expect(await repairGaps({ store, catalog, peers: [peerUrl], intervalMs, now: 1_793_207_300_000 })).toEqual({
       requests: 0,
       added: 0,
       rejected: 0,
@@ -89,7 +89,7 @@ describe('repairGaps', () => {
   test('marks a gap the peer missed too as none, and ignores gaps shorter than three intervals', async () => {
     const stderr = quiet();
     const store = archiveWithPolls(1_793_100_000, 1_793_100_120, 1_793_100_500);
-    const result = await repairGaps({ store, peers: [peerUrl], intervalMs, now: 1_793_200_000_000 });
+    const result = await repairGaps({ store, catalog, peers: [peerUrl], intervalMs, now: 1_793_200_000_000 });
     // 120 s is within three 60 s intervals; only the 380 s stretch is asked about, and the peer has nothing then.
     expect(result).toEqual({ requests: 1, added: 0, rejected: 0 });
     const repair = store.getRepair({
@@ -108,7 +108,7 @@ describe('repairGaps', () => {
     const fake = fakePeer(() => Response.json({ watched: false, records: [] }));
     // 2000 s, plus the minute before it, is three 900 s windows.
     const store = archiveWithPolls(1_793_000_000, 1_793_002_000);
-    expect(await repairGaps({ store, peers: [fake.url], intervalMs, now: 1_793_100_000_000 })).toMatchObject({
+    expect(await repairGaps({ store, catalog, peers: [fake.url], intervalMs, now: 1_793_100_000_000 })).toMatchObject({
       requests: 3,
     });
     expect(fake.requests()).toBe(3);
@@ -126,7 +126,7 @@ describe('repairGaps', () => {
       Response.json({ watched: true, records: [forged, otherAirnode, outsideWindow, 'junk', coingecko] })
     );
     const store = archiveWithPolls(1_793_206_800, 1_793_207_100);
-    expect(await repairGaps({ store, peers: [fake.url], intervalMs, now: 1_793_207_200_000 })).toEqual({
+    expect(await repairGaps({ store, catalog, peers: [fake.url], intervalMs, now: 1_793_207_200_000 })).toEqual({
       requests: 1,
       added: 1,
       rejected: 4,
@@ -149,18 +149,20 @@ describe('repairGaps', () => {
       gapFrom: 1_793_206_800_000,
       peer: down.href,
     };
-    expect((await repairGaps({ store, peers: [down], intervalMs, now })).requests).toBe(1);
+    expect((await repairGaps({ store, catalog, peers: [down], intervalMs, now })).requests).toBe(1);
     // Not due yet: the first retry waits 5 minutes.
-    expect((await repairGaps({ store, peers: [down], intervalMs, now: now + 60_000 })).requests).toBe(0);
-    expect((await repairGaps({ store, peers: [down], intervalMs, now: now + 6 * 60_000 })).requests).toBe(1);
-    expect((await repairGaps({ store, peers: [down], intervalMs, now: now + 60 * 60_000 })).requests).toBe(1);
+    expect((await repairGaps({ store, catalog, peers: [down], intervalMs, now: now + 60_000 })).requests).toBe(0);
+    expect((await repairGaps({ store, catalog, peers: [down], intervalMs, now: now + 6 * 60_000 })).requests).toBe(1);
+    expect((await repairGaps({ store, catalog, peers: [down], intervalMs, now: now + 60 * 60_000 })).requests).toBe(1);
     expect(store.getRepair(key)).toMatchObject({ status: 'failed', attempts: 3 });
-    expect((await repairGaps({ store, peers: [down], intervalMs, now: now + 24 * 60 * 60_000 })).requests).toBe(0);
+    expect(
+      (await repairGaps({ store, catalog, peers: [down], intervalMs, now: now + 24 * 60 * 60_000 })).requests
+    ).toBe(0);
 
     const busy = fakePeer(() => new Response('busy', { status: 503 }));
     const refusing = fakePeer(() => Response.json({ error: 'not found' }, { status: 404 }));
     const notJson = fakePeer(() => Response.json({ nope: true }));
-    await repairGaps({ store, peers: [busy.url, refusing.url, notJson.url], intervalMs, now });
+    await repairGaps({ store, catalog, peers: [busy.url, refusing.url, notJson.url], intervalMs, now });
     expect(store.getRepair({ ...key, peer: busy.url.href })).toMatchObject({ status: 'pending', attempts: 1 });
     expect(store.getRepair({ ...key, peer: refusing.url.href })).toMatchObject({ status: 'failed', attempts: 0 });
     expect(store.getRepair({ ...key, peer: notJson.url.href })).toMatchObject({ status: 'pending', attempts: 1 });
@@ -171,7 +173,8 @@ describe('repairGaps', () => {
 });
 
 describe('GET /api/records', () => {
-  const get = (query: string) => handleApi(peerReader, new URL(`http://x/api/records?${query}`), 1_793_300_000);
+  const get = (query: string) =>
+    handleApi(peerReader, catalog, new URL(`http://x/api/records?${query}`), 1_793_300_000);
 
   test('returns the signed records in the window and whether this archive was watching', async () => {
     const response = get(`airnode=${coingecko.airnode}&endpoint=public&from=1793206900&to=1793207000`);

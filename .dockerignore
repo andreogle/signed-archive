@@ -3,6 +3,7 @@
 !package.json
 !bun.lock
 !bunfig.toml
+!signed-archive.yaml
 !tsconfig.json
 !src/
 !web/

@@ -14,10 +14,11 @@ This file holds what is specific to this project and the invariants that must ne
 - Hex fields are stored as bytes. Read them with SQL `hex()` and write them with `hexToBytes`
 - Every request writes a `polls` row in the same transaction as its records, failures included, with the `source` that answered (`api3` or the provider's own Signed API). Without it a gap in the history is indistinguishable from a provider that stopped signing
 - Another archive is untrusted input: `merge` and peer repair (`src/repair.ts`) re-check shape, known airnode and signature for every record before adding it, exactly as the archiver does. Repair also requires the asked airnode, a known template on the asked endpoint and the asked window. Never add a fast path that copies rows unverified, and never import a peer's polls as our own coverage
+- A stretch a peer filled is shown as normal history: `gaps()` leaves out what `repairs` marks `filled`, since those records passed the same checks
 - Ask each peer about each gap once (`repairs` table). Retry only transient failures, with backoff and a cap; a finished answer is final, because a peer that missed a stretch can never gain it from the Signed API later
 
 **Be polite to the Signed API**
-- One request at a time, spread evenly across the poll interval. Never fetch in parallel or in bursts. Each provider is polled on two hosts (API3's Signed API and its own `signedApiUrl` from `src/airnodes.json`); a failing host backs off on its own without slowing the other
+- One request at a time, spread evenly across the poll interval. Never fetch in parallel or in bursts. Each provider is polled on two hosts (API3's Signed API and its own `signedApiUrl` from the config file); a failing host backs off on its own without slowing the other
 - Keep the `POLL_INTERVAL_SECONDS` floor (15 s). Feeds are re-signed every few seconds whether or not the price moved, so polling faster buys rows, not data
 - A failed target backs off exponentially (capped at 30 min) and honours `Retry-After`. Never retry in a tight loop
 - Every request has a timeout and our `User-Agent`
@@ -42,7 +43,7 @@ This file holds what is specific to this project and the invariants that must ne
 - Tools are pinned in `mise.toml`; run commands through it (`mise exec -- bun ...`) if the shell doesn't activate mise
 - Run `bun run check` (airnode list, Biome, `tsc`, tests with coverage) when done and read its **whole** output
 - The CLI is `src/cli.ts` (commander). Every option has a flag and an env var (`.env()`), and a key in the YAML config file (`src/settings.ts`), which supplies commander's defaults: flag beats env beats file beats default. Lists (peers) live only in the file. Validate with one parser shared by the flag and the file, so both accept exactly the same values, and reject unknown config keys
-- `bun run build` compiles a native binary to `dist/signed-archive`. JSON imported by the source (the airnode list, `package.json`) is bundled into it, so rebuild after `bun run airnodes`
+- `bun run build` compiles a native binary to `dist/signed-archive`. The airnode and feed lists are not bundled: they come from the config file at run time, and the Docker image ships `signed-archive.yaml` at `/app/signed-archive.yaml`
 - Biome runs strict, with every React rule on. Fix the code, don't disable the rule. The one exception is `noJsxPropsBind`, off on purpose: inline handlers are idiomatic React
 - `bun dev` runs the archiver and explorer under `--watch`, so every edit to `src/` restarts the archiver and leaves a gap. Use it for development only; the long-running archive runs `bun start` or the binary
 - **Never start, restart or kill a running archiver** (`bun start`, `bun dev`, or the `archiver` container). Ask the user. Stopping it leaves a gap in the history that can never be filled. Test Docker changes under another project name (`docker compose -p sa-test ...`, then `down -v`), never the real one
@@ -64,7 +65,7 @@ This file holds what is specific to this project and the invariants that must ne
 
 **Signed API**
 - `/public/<airnode>` serves base data delayed ~15 s; `/public-oev/<airnode>` serves fresher data already under the OEV template ID (`keccak256(templateId)`). Both verify with the same scheme
-- The API's `/airnodes` route is disabled. The airnode list (`src/airnodes.json`) and feed names (`src/feeds.json`) are generated from `@api3/api-integrations` by `bun run airnodes`. Never edit them by hand; `bun run check` fails if it's stale (e.g. after a Dependabot bump of that package)
+- The API's `/airnodes` route is disabled. The one config file, `signed-archive.yaml`, holds the settings and, below a marker line, the `airnodes` and `feeds` lists generated from `@api3/api-integrations` by `bun run airnodes`. Never edit below the marker by hand; `bun run check` fails if it's stale (e.g. after a Dependabot bump of that package). The lists reach code only through a `Catalog` (`src/catalog.ts`), passed in, never module-level state. Addresses and template IDs stay quoted: YAML may read an unquoted `0x...` as a number
 - Responses carry `Cache-Control: max-age=1`; a fresh fetch per cycle is expected
 
 **Bun and SQLite**
@@ -73,7 +74,7 @@ This file holds what is specific to this project and the invariants that must ne
 
 **Explorer (`web/`)**
 - `serve` (or `archive --serve`) opens the database read-only and serves `web/index.html` through Bun's HTML bundler; there is no separate frontend build. `src/reader.ts` is the only read path
-- Records shown in the explorer are checked in the browser: `isFeedRecord` (signer and template belong to the feed, from the bundled provider list) and `hasValidSignature`. A valid signature alone only proves who signed. Never replace either with a server-side "valid" flag: the page must not have to trust the server
+- Records shown in the explorer are checked in the browser: `catalog.isFeedRecord` (signer and template belong to the feed) and `hasValidSignature`. The page builds its catalog from `/api/catalog`, served by the same server as the page's code, so it is trusted exactly as far as the page is. A valid signature alone only proves who signed. Never replace either check with a server-side "valid" flag: the page must not have to trust the server's answers
 - The same goes for numbers: wherever the explorer presents a value as checked (the moment panel and the proof), it decodes prices from `encodedValue` and computes the median over verified records with `src/price.ts`, never the server's `price` or `median` strings. `src/price.ts` stays free of Bun and Node imports so it bundles for the browser. The chart and feed list are unverified overviews
 - The reader never hides a record: two values signed for the same feed and moment both come back from `at()`. Medians and provider counts take one value per provider
 - URL search params come from shared links: parse them through `parseFeedSearch` in `web/search.ts`

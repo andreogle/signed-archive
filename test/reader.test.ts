@@ -3,24 +3,23 @@ import { afterAll, describe, expect, test } from 'bun:test';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { FEEDS, isFeedRecord, PROVIDER_SLOTS } from '../src/feeds.ts';
 import { decodeValue, median } from '../src/price.ts';
 import { openReader } from '../src/reader.ts';
 import { hasValidSignature } from '../src/signed-data.ts';
 import { openStore } from '../src/store.ts';
-import { blocksize, coingecko, coingeckoOev, fixtureDb } from './fixtures.ts';
+import { blocksize, catalog, coingecko, coingeckoOev, fixtureDb } from './fixtures.ts';
 
 const db = fixtureDb();
 const reader = openReader(db.path);
-const eth = FEEDS.get('ETH/USD');
-if (!eth) throw new Error('ETH/USD missing from feeds.json');
+const eth = catalog.feeds.get('ETH/USD');
+if (!eth) throw new Error('ETH/USD missing from signed-archive.yaml');
 
 afterAll(() => {
   reader.close();
   db.remove();
 });
 
-describe('FEEDS', () => {
+describe('catalog.feeds', () => {
   test('maps a feed name to each provider base and OEV template ID', () => {
     const base = eth.public.find(({ provider }) => provider === 'coingecko');
     const oev = eth['public-oev'].find(({ provider }) => provider === 'coingecko');
@@ -31,24 +30,24 @@ describe('FEEDS', () => {
 
 describe('isFeedRecord', () => {
   test("accepts a provider's record for its own feed and endpoint", () => {
-    expect(isFeedRecord('ETH/USD', 'public', { provider: 'coingecko', ...coingecko })).toBe(true);
-    expect(isFeedRecord('ETH/USD', 'public-oev', { provider: 'coingecko', ...coingeckoOev })).toBe(true);
+    expect(catalog.isFeedRecord('ETH/USD', 'public', { provider: 'coingecko', ...coingecko })).toBe(true);
+    expect(catalog.isFeedRecord('ETH/USD', 'public-oev', { provider: 'coingecko', ...coingeckoOev })).toBe(true);
   });
 
   test('rejects a relabelled provider, a foreign signer, another feed or the other endpoint', () => {
-    expect(isFeedRecord('ETH/USD', 'public', { provider: 'blocksize', ...coingecko })).toBe(false);
+    expect(catalog.isFeedRecord('ETH/USD', 'public', { provider: 'blocksize', ...coingecko })).toBe(false);
     const forged = { provider: 'coingecko', ...coingecko, airnode: '0x0000000000000000000000000000000000000001' };
-    expect(isFeedRecord('ETH/USD', 'public', forged)).toBe(false);
-    expect(isFeedRecord('BTC/USD', 'public', { provider: 'coingecko', ...coingecko })).toBe(false);
-    expect(isFeedRecord('ETH/USD', 'public-oev', { provider: 'coingecko', ...coingecko })).toBe(false);
-    expect(isFeedRecord('NOPE/USD', 'public', { provider: 'coingecko', ...coingecko })).toBe(false);
+    expect(catalog.isFeedRecord('ETH/USD', 'public', forged)).toBe(false);
+    expect(catalog.isFeedRecord('BTC/USD', 'public', { provider: 'coingecko', ...coingecko })).toBe(false);
+    expect(catalog.isFeedRecord('ETH/USD', 'public-oev', { provider: 'coingecko', ...coingecko })).toBe(false);
+    expect(catalog.isFeedRecord('NOPE/USD', 'public', { provider: 'coingecko', ...coingecko })).toBe(false);
   });
 });
 
-describe('PROVIDER_SLOTS', () => {
+describe('catalog.slots', () => {
   test('gives providers that share a feed different colour slots, within the 8-colour palette', () => {
-    for (const [feed, { public: sources }] of FEEDS) {
-      const slots = sources.map(({ provider }) => PROVIDER_SLOTS.get(provider));
+    for (const [feed, { public: sources }] of catalog.feeds) {
+      const slots = sources.map(({ provider }) => catalog.slots.get(provider));
       expect({ feed, distinct: new Set(slots).size }).toEqual({ feed, distinct: sources.length });
       for (const slot of slots) expect(slot).toBeLessThan(8);
     }
@@ -172,6 +171,39 @@ describe('gaps', () => {
       { from: 1001, to: 1500 },
       { from: 1500, to: 2000 },
     ]);
+  });
+
+  test('hides the part of a gap a peer filled, since those records were checked like any other', () => {
+    const filled = join(dir, 'filled.sqlite');
+    const store = openStore(filled);
+    for (const seconds of [1000, 1001, 1500]) {
+      store.save([], {
+        airnode: coingecko.airnode,
+        endpoint: 'public',
+        source: 'api3',
+        fetchedAt: seconds * 1000,
+        status: 200,
+        received: 0,
+        rejected: 0,
+      });
+    }
+    // A peer filled 1001-1300; nothing covers 1300-1500.
+    store.putRepair({
+      airnode: coingecko.airnode,
+      endpoint: 'public',
+      gapFrom: 1_001_000,
+      gapTo: 1_300_000,
+      peer: 'https://peer.example/',
+      status: 'filled',
+      nextFrom: 1301,
+      attempts: 0,
+      retryAt: 0,
+      records: 3,
+    });
+    store.close();
+    const filledReader = openReader(filled);
+    expect(filledReader.gaps(0, 1600)).toEqual([{ from: 1300, to: 1500 }]);
+    filledReader.close();
   });
 
   test('lastPoll returns the newest request in unix milliseconds', () => {
