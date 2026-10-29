@@ -242,11 +242,10 @@ unclaimed ground. Cheapest first:
 
 1. **Symbolic tests of `Median.sol` with Halmos.** Run against the real Solidity: the overflow-safe average equals
    `(x + y) / 2` rounded toward zero, the sorting and quickselect paths give the same median, and the median lies
-   between the smallest and largest input. `src/price.ts` already follows the same rounding rule. _Status: tried, then
-   replaced. Halmos proved the average for every input and the median of up to 4 values, and timed out beyond that.
-   For this project the Foundry fuzz tests (`bun run proofs`, lengths 1 to 21, quickselect included) and the replay
-   against the deployed bytecode give the same assurance without a Python toolchain, so Halmos was dropped. Revisit it
-   in a separate repo if machine-checked proofs of API3's code become a goal of their own._
+   between the smallest and largest input. `src/price.ts` already follows the same rounding rule. _Status: tried here and
+   removed. Halmos proved the average for every input and the median of up to 4 values, then timed out; Foundry fuzz
+   tests covered lengths 1 to 21. For the archive, the replay against the deployed bytecode already shows its median
+   matches the contract, so these belong in a separate repo if proofs of API3's code become a goal of their own._
 2. **Majority rules for combined feeds (Lean 4).** Prove that if fewer than half of the providers behind a combined
    feed lie, the median stays between the lowest and highest honest prices. This is the security claim of API3's
    combined feeds, stated as a theorem. Lean's `BitVec 256` matches the EVM's integers exactly.
@@ -318,11 +317,10 @@ Public goods for the wider oracle ecosystem that the archive makes possible.
 3. Reliability, now: coverage log and `merge` _(done)_, then Docker with a heartbeat alert and nightly backups, then a
    second archiver and the providers' own Signed APIs. History only accrues from the day it is recorded, so this comes
    before new features.
-4. Tests of `Median.sol`. _Done: fuzz tests; Halmos tried and dropped._
-5. Daily files with Bitcoin timestamps. They double as the public backup and the open dataset.
-6. Replay tool _(prototype done)_ and settle-at-a-moment library. Both reuse the signature and feed checks the explorer already runs,
+4. Daily files with Bitcoin timestamps. They double as the public backup and the open dataset.
+5. Replay tool _(prototype done)_ and settle-at-a-moment library. Both reuse the signature and feed checks the explorer already runs,
    and one real event from the archive is enough to show them.
-7. Freshness labels, feed health checks and provider report cards.
-8. Agent plug-in (MCP server).
-9. The cherry-picking bound and the fraud-proof contract, once the archive holds enough history to measure.
-10. Liquidation checker, incident reports, price certificates and evidence packets.
+6. Freshness labels, feed health checks and provider report cards.
+7. Agent plug-in (MCP server).
+8. The cherry-picking bound and the fraud-proof contract, once the archive holds enough history to measure.
+9. Liquidation checker, incident reports, price certificates and evidence packets.

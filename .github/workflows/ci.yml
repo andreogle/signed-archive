@@ -34,7 +34,3 @@ jobs:
 
       - name: Check
         run: bun run check
-
-      # Fuzz tests of API3's Median.sol (Foundry comes from mise.toml).
-      - name: Proofs
-        run: bun run proofs
