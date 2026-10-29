@@ -32,19 +32,21 @@ export interface Gap {
   to: number;
 }
 
-// Parts of each gap not covered by any of `covers`. Pieces of zero length are dropped.
-export function subtractCovered(gaps: readonly Gap[], covers: readonly Gap[]): Gap[] {
-  let pieces = [...gaps];
+// Parts of each gap not covered by any of `covers`. A gap a cover cuts is split, and leftover pieces shorter than
+// `minPiece` are dropped: covers are signed times, a little earlier than the fetch times gaps are measured in, so a
+// filled gap would otherwise leave a sliver at its end. A gap no cover touches is kept whatever its length.
+export function subtractCovered(gaps: readonly Gap[], covers: readonly Gap[], minPiece = 0): Gap[] {
+  let pieces = gaps.map((gap) => ({ ...gap, cut: false }));
   for (const cover of covers) {
     pieces = pieces.flatMap((gap) => {
       if (cover.to <= gap.from || cover.from >= gap.to) return [gap];
       return [
-        { from: gap.from, to: cover.from },
-        { from: cover.to, to: gap.to },
+        { from: gap.from, to: cover.from, cut: true },
+        { from: cover.to, to: gap.to, cut: true },
       ].filter((piece) => piece.to > piece.from);
     });
   }
-  return pieces;
+  return pieces.filter(({ from, to, cut }) => !cut || to - from >= minPiece).map(({ from, to }) => ({ from, to }));
 }
 
 export interface PricePoint {
@@ -183,16 +185,16 @@ export function openReader(path: string) {
       .query<Gap, { from: number; to: number; gap: number }>(GAPS)
       .all({ from: start * 1000, to: to * 1000, gap: GAP_SECONDS * 1000 });
     const all = last < to - GAP_SECONDS ? [...found, { from: Math.max(last, start), to }] : found;
-    // A stretch a peer filled is history like any other: its records were checked like the archiver's own.
-    const filled = hasTable(db, 'repairs')
+    // A stretch a peer filled is history like any other: its records were checked like the archiver's own. Only the
+    // stretches the peer's records actually cover count, so a partly filled gap stays shaded where it is still empty.
+    const covered = hasTable(db, 'peer_coverage')
       ? db
           .query<Gap, { from: number; to: number }>(
-            `SELECT gap_from / 1000 AS "from", gap_to / 1000 AS "to" FROM repairs
-             WHERE status = 'filled' AND gap_to >= $from AND gap_from <= $to`
+            `SELECT "from", "to" FROM peer_coverage WHERE "to" >= $from AND "from" <= $to`
           )
-          .all({ from: start * 1000, to: to * 1000 })
+          .all({ from: start, to })
       : [];
-    return subtractCovered(all, filled);
+    return subtractCovered(all, covered, GAP_SECONDS);
   }
 
   return { at, records, history, earliest, gaps, lastPoll, watched, close: () => db.close() };

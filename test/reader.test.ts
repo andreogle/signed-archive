@@ -187,23 +187,23 @@ describe('gaps', () => {
         rejected: 0,
       });
     }
-    // A peer filled 1001-1300; nothing covers 1300-1500.
-    store.putRepair({
-      airnode: coingecko.airnode,
-      endpoint: 'public',
-      gapFrom: 1_001_000,
-      gapTo: 1_300_000,
-      peer: 'https://peer.example/',
-      status: 'filled',
-      nextFrom: 1301,
-      attempts: 0,
-      retryAt: 0,
-      records: 3,
-    });
+    // A peer's records cover 1001-1300; nothing covers 1300-1500.
+    store.addCoverage([{ airnode: coingecko.airnode, endpoint: 'public', from: 1001, to: 1300, peer: 'https://p/' }]);
     store.close();
     const filledReader = openReader(filled);
     expect(filledReader.gaps(0, 1600)).toEqual([{ from: 1300, to: 1500 }]);
     filledReader.close();
+
+    // Covered up to 1400 leaves 100 s, under the gap threshold: covers are signed times, a little before the fetch
+    // that ended the gap, so that is a sliver, not a gap.
+    const sliver = openStore(filled);
+    sliver.addCoverage([{ airnode: coingecko.airnode, endpoint: 'public', from: 1250, to: 1400, peer: 'https://p/' }]);
+    sliver.close();
+    const sliverReader = openReader(filled);
+    expect(sliverReader.gaps(0, 1600)).toEqual([]);
+    // A short stretch no cover touches is still reported, e.g. a gap clipped by the range asked for.
+    expect(sliverReader.gaps(1450, 1500)).toEqual([{ from: 1450, to: 1500 }]);
+    sliverReader.close();
   });
 
   test('lastPoll returns the newest request in unix milliseconds', () => {

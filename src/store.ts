@@ -44,7 +44,8 @@ const POLLS = `
 // a peer that missed it too never gains it later, because the Signed API only serves the latest value. `next_from`
 // (unix seconds) is where the next window starts; `attempts` counts failures on that window; `retry_at` is unix ms.
 // Status: `pending` (windows left, or a retry due), `filled` (records added), `none` (the peer had nothing) or
-// `failed` (gave up). These rows are bookkeeping, not signed data, so they are updated in place.
+// `failed` (gave up). `watched` is whether the peer said it was polling during any window; `rechecked` whether the
+// one second ask has happened. These rows are bookkeeping, not signed data, so they are updated in place.
 const REPAIRS = `
   CREATE TABLE IF NOT EXISTS repairs (
     airnode   BLOB    NOT NULL,
@@ -57,7 +58,22 @@ const REPAIRS = `
     attempts  INTEGER NOT NULL,
     retry_at  INTEGER NOT NULL,
     records   INTEGER NOT NULL,
+    watched   INTEGER NOT NULL DEFAULT 0,
+    rechecked INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (airnode, endpoint, gap_from, peer)
+  ) WITHOUT ROWID
+`;
+
+// Stretches (unix seconds, as signed) that a peer's records actually cover, so the explorer stops shading only what
+// was filled. Records further apart than the explorer's gap threshold count as separate stretches.
+const PEER_COVERAGE = `
+  CREATE TABLE IF NOT EXISTS peer_coverage (
+    airnode   BLOB    NOT NULL,
+    endpoint  TEXT    NOT NULL,
+    "from"    INTEGER NOT NULL,
+    "to"      INTEGER NOT NULL,
+    peer      TEXT    NOT NULL,
+    PRIMARY KEY (airnode, endpoint, "from", peer)
   ) WITHOUT ROWID
 `;
 
@@ -83,6 +99,16 @@ export interface Repair {
   attempts: number;
   retryAt: number;
   records: number;
+  watched: boolean;
+  rechecked: boolean;
+}
+
+export interface Coverage {
+  airnode: Address;
+  endpoint: Endpoint;
+  from: number;
+  to: number;
+  peer: string;
 }
 
 // Archives written before a table was added don't have it, and a read-only connection can't create it.
@@ -148,6 +174,12 @@ export function openStore(path: string) {
   db.run(DATAPOINTS);
   db.run(POLLS);
   db.run(REPAIRS);
+  db.run(PEER_COVERAGE);
+  // New columns only; repairs from before them read as not watched and not rechecked.
+  for (const column of ['watched', 'rechecked']) {
+    if (!hasColumn(db, 'repairs', column))
+      db.run(`ALTER TABLE repairs ADD COLUMN ${column} INTEGER NOT NULL DEFAULT 0`);
+  }
   // A new column only: existing polls keep their rows and read as API3's.
   if (!hasColumn(db, 'polls', 'source')) db.run("ALTER TABLE polls ADD COLUMN source TEXT NOT NULL DEFAULT 'api3'");
   db.run('CREATE INDEX IF NOT EXISTS polls_by_time ON polls (fetched_at)');
@@ -221,15 +253,21 @@ export function openStore(path: string) {
   };
 
   const repairQuery = db.prepare<
-    Omit<Repair, 'airnode' | 'endpoint' | 'gapFrom' | 'peer'>,
+    Omit<Repair, 'airnode' | 'endpoint' | 'gapFrom' | 'peer' | 'watched' | 'rechecked'> & {
+      watched: number;
+      rechecked: number;
+    },
     { airnode: Uint8Array; endpoint: string; gapFrom: number; peer: string }
   >(
-    `SELECT gap_to AS gapTo, status, next_from AS nextFrom, attempts, retry_at AS retryAt, records FROM repairs
+    `SELECT gap_to AS gapTo, status, next_from AS nextFrom, attempts, retry_at AS retryAt, records, watched, rechecked
+     FROM repairs
      WHERE airnode = $airnode AND endpoint = $endpoint AND gap_from = $gapFrom AND peer = $peer`
   );
   const repairUpsert = db.prepare(
-    `INSERT OR REPLACE INTO repairs (airnode, endpoint, gap_from, gap_to, peer, status, next_from, attempts, retry_at, records)
-     VALUES ($airnode, $endpoint, $gapFrom, $gapTo, $peer, $status, $nextFrom, $attempts, $retryAt, $records)`
+    `INSERT OR REPLACE INTO repairs
+       (airnode, endpoint, gap_from, gap_to, peer, status, next_from, attempts, retry_at, records, watched, rechecked)
+     VALUES ($airnode, $endpoint, $gapFrom, $gapTo, $peer, $status, $nextFrom, $attempts, $retryAt, $records,
+             $watched, $rechecked)`
   );
   const getRepair = ({
     airnode,
@@ -238,9 +276,34 @@ export function openStore(path: string) {
     peer,
   }: Pick<Repair, 'airnode' | 'endpoint' | 'gapFrom' | 'peer'>) => {
     const row = repairQuery.get({ airnode: hexToBytes(airnode), endpoint, gapFrom, peer });
-    return row ? ({ airnode, endpoint, gapFrom, peer, ...row } satisfies Repair) : null;
+    if (!row) return null;
+    const { watched, rechecked, ...rest } = row;
+    return {
+      airnode,
+      endpoint,
+      gapFrom,
+      peer,
+      ...rest,
+      watched: watched === 1,
+      rechecked: rechecked === 1,
+    } satisfies Repair;
   };
-  const putRepair = (repair: Repair) => repairUpsert.run({ ...repair, airnode: hexToBytes(repair.airnode) });
+  const putRepair = (repair: Repair) => {
+    return repairUpsert.run({
+      ...repair,
+      airnode: hexToBytes(repair.airnode),
+      watched: repair.watched ? 1 : 0,
+      rechecked: repair.rechecked ? 1 : 0,
+    });
+  };
 
-  return { save, add, has, closedGaps, getRepair, putRepair, close: () => db.close() };
+  const coverageInsert = db.prepare(
+    `INSERT OR IGNORE INTO peer_coverage (airnode, endpoint, "from", "to", peer)
+     VALUES ($airnode, $endpoint, $from, $to, $peer)`
+  );
+  const addCoverage = db.transaction((rows: readonly Coverage[]) => {
+    for (const row of rows) coverageInsert.run({ ...row, airnode: hexToBytes(row.airnode) });
+  });
+
+  return { save, add, has, closedGaps, getRepair, putRepair, addCoverage, close: () => db.close() };
 }

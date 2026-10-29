@@ -14,8 +14,8 @@ This file holds what is specific to this project and the invariants that must ne
 - Hex fields are stored as bytes. Read them with SQL `hex()` and write them with `hexToBytes`
 - Every request writes a `polls` row in the same transaction as its records, failures included, with the `source` that answered (`api3` or the provider's own Signed API). Without it a gap in the history is indistinguishable from a provider that stopped signing
 - Another archive is untrusted input: `merge` and peer repair (`src/repair.ts`) re-check shape, known airnode and signature for every record before adding it, exactly as the archiver does. Repair also requires the asked airnode, a known template on the asked endpoint and the asked window. Never add a fast path that copies rows unverified, and never import a peer's polls as our own coverage
-- A stretch a peer filled is shown as normal history: `gaps()` leaves out what `repairs` marks `filled`, since those records passed the same checks
-- Ask each peer about each gap once (`repairs` table). Retry only transient failures, with backoff and a cap; a finished answer is final, because a peer that missed a stretch can never gain it from the Signed API later
+- A stretch a peer filled is shown as normal history: `gaps()` leaves out the stretches in `peer_coverage`, which are what the peer's records actually span (records more than the gap threshold apart are separate stretches), never a whole gap just because some of it was filled
+- Ask each peer about each gap once (`repairs` table). The one exception: a peer that had nothing and wasn't polling either is asked once more an hour later, since it may fill the stretch from its own peers. Retry only transient failures, with backoff and a cap. Records under templates this archive doesn't know are counted apart from rejected ones, not treated as suspicious
 
 **Be polite to the Signed API**
 - One request at a time, spread evenly across the poll interval. Never fetch in parallel or in bursts. Each provider is polled on two hosts (API3's Signed API and its own `signedApiUrl` from the config file); a failing host backs off on its own without slowing the other

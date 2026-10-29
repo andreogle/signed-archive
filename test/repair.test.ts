@@ -65,7 +65,7 @@ describe('repairGaps', () => {
     // Down from 1793206800 to 1793207100: the peer's coingecko record at 1793206907 is inside.
     const store = archiveWithPolls(1_793_206_800, 1_793_207_100);
     const first = await repairGaps({ store, catalog, peers: [peerUrl], intervalMs, now: 1_793_207_200_000 });
-    expect(first).toEqual({ requests: 1, added: 1, rejected: 0 });
+    expect(first).toEqual({ requests: 1, added: 1, rejected: 0, unknown: 0 });
     expect(store.has(coingecko)).toBe(true);
     // Only the gap's airnode was asked for, so the peer's blocksize records stay where they are.
     expect(store.has(blocksize[0] ?? coingecko)).toBe(false);
@@ -81,26 +81,92 @@ describe('repairGaps', () => {
       requests: 0,
       added: 0,
       rejected: 0,
+      unknown: 0,
     });
     stderr.mockRestore();
     store.close();
   });
 
-  test('marks a gap the peer missed too as none, and ignores gaps shorter than three intervals', async () => {
+  test('asks a peer that missed the gap too once more, an hour later, then never again', async () => {
     const stderr = quiet();
     const store = archiveWithPolls(1_793_100_000, 1_793_100_120, 1_793_100_500);
-    const result = await repairGaps({ store, catalog, peers: [peerUrl], intervalMs, now: 1_793_200_000_000 });
-    // 120 s is within three 60 s intervals; only the 380 s stretch is asked about, and the peer has nothing then.
-    expect(result).toEqual({ requests: 1, added: 0, rejected: 0 });
-    const repair = store.getRepair({
+    const now = 1_793_200_000_000;
+    const key = {
       airnode: coingecko.airnode.toLowerCase() as typeof coingecko.airnode,
-      endpoint: 'public',
+      endpoint: 'public' as const,
       gapFrom: 1_793_100_120_000,
       peer: peerUrl.href,
+    };
+    // 120 s is within three 60 s intervals; only the 380 s stretch is asked about. The peer wasn't polling then.
+    expect(await repairGaps({ store, catalog, peers: [peerUrl], intervalMs, now })).toEqual({
+      requests: 1,
+      added: 0,
+      rejected: 0,
+      unknown: 0,
     });
-    expect(repair?.status).toBe('none');
+    expect(store.getRepair(key)).toMatchObject({ status: 'pending', rechecked: true, watched: false });
+    expect((await repairGaps({ store, catalog, peers: [peerUrl], intervalMs, now: now + 30 * 60_000 })).requests).toBe(
+      0
+    );
+    expect((await repairGaps({ store, catalog, peers: [peerUrl], intervalMs, now: now + 61 * 60_000 })).requests).toBe(
+      1
+    );
+    expect(store.getRepair(key)?.status).toBe('none');
+    expect(
+      (await repairGaps({ store, catalog, peers: [peerUrl], intervalMs, now: now + 24 * 3600_000 })).requests
+    ).toBe(0);
     stderr.mockRestore();
     store.close();
+  });
+
+  test('takes a peer that was watching and has nothing at its word', async () => {
+    const stderr = quiet();
+    const fake = fakePeer(() => Response.json({ watched: true, records: [] }));
+    const store = archiveWithPolls(1_793_100_000, 1_793_100_500);
+    await repairGaps({ store, catalog, peers: [fake.url], intervalMs, now: 1_793_200_000_000 });
+    const key = {
+      airnode: coingecko.airnode.toLowerCase() as typeof coingecko.airnode,
+      endpoint: 'public' as const,
+      gapFrom: 1_793_100_000_000,
+      peer: fake.url.href,
+    };
+    expect(store.getRepair(key)).toMatchObject({ status: 'none', rechecked: false, watched: true });
+    void fake.stop();
+    stderr.mockRestore();
+    store.close();
+  });
+
+  test('records only the stretch the records cover, so the rest of a partly filled gap stays a gap', async () => {
+    const stderr = quiet();
+    // blocksize, down for 1400 s; the peer holds two of its records, 48 s apart.
+    const [first, second] = blocksize;
+    if (!first || !second) throw new Error('fixtures need two blocksize records');
+    const fake = fakePeer(() => Response.json({ watched: true, records: [first, second] }));
+    archives += 1;
+    const path = join(dir, `archive-${archives}.sqlite`);
+    const store = openStore(path);
+    for (const at of [1_793_206_000, 1_793_207_400]) {
+      store.save([], {
+        airnode: first.airnode,
+        endpoint: 'public',
+        source: 'api3',
+        fetchedAt: at * 1000,
+        status: 200,
+        received: 0,
+        rejected: 0,
+      });
+    }
+    await repairGaps({ store, catalog, peers: [fake.url], intervalMs, now: 1_793_208_000_000 });
+    store.close();
+    const reader = openReader(path);
+    // 48 s of 1400 s are covered; the stretches either side are longer than the gap threshold, so both stay shaded.
+    expect(reader.gaps(1_793_206_000, 1_793_207_400)).toEqual([
+      { from: 1_793_206_000, to: 1_793_206_903 },
+      { from: 1_793_206_951, to: 1_793_207_400 },
+    ]);
+    reader.close();
+    void fake.stop();
+    stderr.mockRestore();
   });
 
   test('splits a long gap into windows the peer accepts', async () => {
@@ -122,15 +188,22 @@ describe('repairGaps', () => {
     const forged: typeof coingecko = { ...coingecko, encodedValue: `0x${'00'.repeat(31)}01` };
     const otherAirnode = blocksize[0];
     const outsideWindow = { ...coingecko, timestamp: '1700000000' };
+    // A template this archive doesn't know isn't suspicious, just out of scope, so it isn't counted as rejected.
+    const unknownTemplate: typeof coingecko = { ...coingecko, templateId: `0x${'ab'.repeat(32)}` };
     const fake = fakePeer(() =>
-      Response.json({ watched: true, records: [forged, otherAirnode, outsideWindow, 'junk', coingecko] })
+      Response.json({
+        watched: true,
+        records: [forged, otherAirnode, outsideWindow, 'junk', unknownTemplate, coingecko],
+      })
     );
     const store = archiveWithPolls(1_793_206_800, 1_793_207_100);
     expect(await repairGaps({ store, catalog, peers: [fake.url], intervalMs, now: 1_793_207_200_000 })).toEqual({
       requests: 1,
       added: 1,
       rejected: 4,
+      unknown: 1,
     });
+    expect(store.has(unknownTemplate)).toBe(false);
     expect(store.has(coingecko)).toBe(true);
     expect(store.has(forged)).toBe(false);
     void fake.stop();

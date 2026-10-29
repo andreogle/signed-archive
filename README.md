@@ -150,10 +150,17 @@ first cycle, and then every 10 minutes, the archiver:
 3. checks every record it gets back like any other input (shape, the asked airnode, a known template on the asked
    endpoint, inside the window, valid signature) and adds the ones that pass.
 
-A peer that answers is never asked about that stretch again: one that missed it too can never gain it later. Only
-failures are retried (network errors, 429 and 5xx), three times with backoff from 5 minutes. Progress is kept in the
-`repairs` table, so restarts don't repeat requests. Peers' polls are not imported, because coverage claims aren't
-signed: the stretch stays a gap in `polls`, and `repairs` records what was filled and from whom.
+A peer that was polling and has nothing is never asked about that stretch again: it can never gain it later. A peer
+that wasn't polling either is asked once more an hour later, because it may have filled the stretch from its own
+peers in the meantime. Only failures are retried (network errors, 429 and 5xx), three times with backoff from 5
+minutes. Progress is kept in the `repairs` table, so restarts don't repeat requests. Peers' polls are not imported,
+because coverage claims aren't signed: the stretch stays a gap in `polls`, and `peer_coverage` records the stretches
+the peer's records actually span. The explorer stops shading exactly those, so a partly filled gap stays shaded where
+it is still empty.
+
+Nodes may poll at different intervals, run different versions or list different feeds. Records prove themselves, so
+none of that matters to what is exchanged: a peer returns whatever it holds in the window, and records under templates
+this archive doesn't know are skipped (and counted) rather than treated as suspicious.
 
 To be someone's peer, expose your explorer (only `/api/records` is needed) where they can reach it, for example
 through a reverse proxy in front of the `explorer` container.
