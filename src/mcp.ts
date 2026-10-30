@@ -304,10 +304,17 @@ export async function handleMcp(
   }
   const isNotification = request.id === undefined;
   const params = typeof request.params === 'object' && request.params !== null ? request.params : {};
+  log.debug('mcp request', { method: request.method });
 
   switch (request.method) {
     case 'initialize': {
       const asked = typeof params.protocolVersion === 'string' ? params.protocolVersion : '';
+      const client = (typeof params.clientInfo === 'object' && params.clientInfo) || {};
+      log.info('mcp client connected', {
+        client: 'name' in client ? String(client.name) : undefined,
+        version: 'version' in client ? String(client.version) : undefined,
+        protocolVersion: asked,
+      });
       return reply(request.id, {
         protocolVersion: PROTOCOL_VERSIONS.includes(asked) ? asked : PROTOCOL_VERSIONS[0],
         capabilities: { tools: { listChanged: false } },
@@ -324,15 +331,22 @@ export async function handleMcp(
       return reply(request.id, { tools: TOOLS });
     case 'tools/call': {
       const name = typeof params.name === 'string' ? params.name : '';
-      const args = typeof params.arguments === 'object' && params.arguments !== null ? params.arguments : {};
+      const args = (
+        typeof params.arguments === 'object' && params.arguments !== null ? params.arguments : {}
+      ) as ToolArguments;
+      const startedAt = Date.now();
+      const fields = { tool: name, feed: typeof args.feed === 'string' ? args.feed : undefined };
       try {
-        const result = await callTool(reader, catalog, name, args as ToolArguments, now);
+        const result = await callTool(reader, catalog, name, args, now);
+        log.info('mcp tool called', { ...fields, durationMs: Date.now() - startedAt });
         return reply(request.id, {
           content: [{ type: 'text', text: JSON.stringify(result) }],
           structuredContent: result,
         });
       } catch (error) {
-        if (!(error instanceof ArgumentError)) log.warn('mcp tool failed', { tool: name, error: errorMessage(error) });
+        const failed = { ...fields, durationMs: Date.now() - startedAt, error: errorMessage(error) };
+        if (error instanceof ArgumentError) log.info('mcp tool refused', failed);
+        else log.warn('mcp tool failed', failed);
         return reply(request.id, { content: [{ type: 'text', text: errorMessage(error) }], isError: true });
       }
     }

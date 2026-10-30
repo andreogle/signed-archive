@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, test } from 'bun:test';
+import { afterAll, describe, expect, spyOn, test } from 'bun:test';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -62,6 +62,24 @@ describe('protocol', () => {
       error: { code: -32600 },
     });
     expect(await handleMcp(reader, catalog, { id: 1, method: 'ping' })).toMatchObject({ error: { code: -32600 } });
+  });
+});
+
+describe('logs', () => {
+  test('logs who connected and every tool call, with refused arguments apart from failures', async () => {
+    const stderr = spyOn(process.stderr, 'write').mockImplementation(() => true);
+    await rpc('initialize', { protocolVersion: '2025-06-18', clientInfo: { name: 'claude-code', version: '2.1.0' } });
+    await call('get_price_at', { feed: 'ETH/USD', time: now });
+    await call('get_price_at', { feed: 'NOPE/USD', time: now });
+    const lines = stderr.mock.calls.map(([line]) => String(line));
+    stderr.mockRestore();
+    expect(lines[0]).toContain(
+      '[info] mcp client connected client=claude-code version=2.1.0 protocolVersion=2025-06-18'
+    );
+    expect(lines[1]).toMatch(/\[info\] mcp tool called tool=get_price_at feed=ETH\/USD durationMs=\d+$/m);
+    expect(lines[2]).toMatch(
+      /\[info\] mcp tool refused tool=get_price_at feed=NOPE\/USD durationMs=\d+ error="unknown feed/
+    );
   });
 });
 
