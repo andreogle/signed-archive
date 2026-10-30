@@ -71,23 +71,3 @@ test('merging a legacy archive keeps its polls as API3, and polls from an unknow
     rejectedPolls: 1,
   });
 });
-
-test('opening an archive with an older repairs table adds watched and rechecked, reading as false', () => {
-  const path = join(dir, 'old-repairs.sqlite');
-  const db = new Database(path, { create: true });
-  db.run(`CREATE TABLE repairs (airnode BLOB NOT NULL, endpoint TEXT NOT NULL, gap_from INTEGER NOT NULL,
-    gap_to INTEGER NOT NULL, peer TEXT NOT NULL, status TEXT NOT NULL, next_from INTEGER NOT NULL,
-    attempts INTEGER NOT NULL, retry_at INTEGER NOT NULL, records INTEGER NOT NULL,
-    PRIMARY KEY (airnode, endpoint, gap_from, peer)) WITHOUT ROWID`);
-  db.run(`INSERT INTO repairs VALUES (${airnode}, 'public', 1000, 2000, 'https://p/', 'filled', 2001, 0, 0, 5)`);
-  db.close();
-  const store = openStore(path);
-  const key = { airnode: coingecko.airnode.toLowerCase() as typeof coingecko.airnode, endpoint: 'public' as const };
-  expect(store.getRepair({ ...key, gapFrom: 1000, peer: 'https://p/' })).toMatchObject({
-    status: 'filled',
-    records: 5,
-    watched: false,
-    rechecked: false,
-  });
-  store.close();
-});

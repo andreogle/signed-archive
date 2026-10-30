@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { decodeValue, median } from '../src/price.ts';
-import { openReader } from '../src/reader.ts';
+import { GAP_SECONDS, openReader } from '../src/reader.ts';
 import { hasValidSignature } from '../src/signed-data.ts';
 import { openStore } from '../src/store.ts';
 import { blocksize, catalog, coingecko, coingeckoOev, fixtureDb } from './fixtures.ts';
@@ -132,24 +132,48 @@ describe('decodeValue', () => {
   });
 });
 
-describe('gaps', () => {
+describe('gaps and uncovered', () => {
   const dir = mkdtempSync(join(tmpdir(), 'signed-archive-gaps-'));
-  const path = join(dir, 'archive.sqlite');
-  const store = openStore(path);
-  // Polls at 1000 s and 1001 s, nothing for 499 s, then 1500 s; the archiver was down 1001-1500.
-  for (const seconds of [1000, 1001, 1500]) {
-    store.save([], {
-      airnode: coingecko.airnode,
-      endpoint: 'public',
-      source: 'api3',
-      fetchedAt: seconds * 1000,
-      status: 200,
-      received: 0,
-      rejected: 0,
-    });
+  const source = (provider: string) => {
+    const found = eth.public.find((entry) => entry.provider === provider);
+    if (!found) throw new Error(`${provider} missing from ETH/USD`);
+    return found;
+  };
+  const coingeckoSource = source('coingecko');
+  const blocksizeSource = source('blocksize');
+  let archives = 0;
+
+  // An archive where each listed airnode was polled on `public` at the given seconds (status 200 unless negative).
+  function archive(polls: Record<string, readonly number[]>, coverage: readonly [string, number, number][] = []) {
+    archives += 1;
+    const path = join(dir, `archive-${archives}.sqlite`);
+    const store = openStore(path);
+    for (const [airnode, seconds] of Object.entries(polls)) {
+      for (const at of seconds) {
+        store.save([], {
+          airnode: airnode as typeof coingecko.airnode,
+          endpoint: 'public',
+          source: 'api3',
+          fetchedAt: Math.abs(at) * 1000,
+          status: at < 0 ? 503 : 200,
+          received: 0,
+          rejected: 0,
+        });
+      }
+    }
+    store.addCoverage(
+      coverage.map(([airnode, from, to]) => {
+        return { airnode: airnode as typeof coingecko.airnode, endpoint: 'public', from, to, peer: 'https://p/' };
+      }),
+      GAP_SECONDS
+    );
+    store.close();
+    return openReader(path);
   }
-  store.close();
-  const gapReader = openReader(path);
+
+  // coingecko polled at 1000, 1001 and 1500: down 1001-1500.
+  const gapReader = archive({ [coingecko.airnode]: [1000, 1001, 1500] });
+  const feed = [coingeckoSource];
 
   afterAll(() => {
     gapReader.close();
@@ -157,53 +181,64 @@ describe('gaps', () => {
   });
 
   test('reports stretches with no polls, but not time before the first poll', () => {
-    expect(gapReader.gaps(0, 1600)).toEqual([{ from: 1001, to: 1500 }]);
+    expect(gapReader.gaps(feed, 'public', 0, 1600)).toEqual([{ from: 1001, to: 1500 }]);
   });
 
   test('reports the part of a gap inside the range when the gap starts before it or ends after it', () => {
-    expect(gapReader.gaps(1200, 1600)).toEqual([{ from: 1200, to: 1500 }]);
-    expect(gapReader.gaps(1100, 1300)).toEqual([{ from: 1100, to: 1300 }]);
-    expect(gapReader.gaps(1002, 1003)).toEqual([{ from: 1002, to: 1003 }]);
+    expect(gapReader.gaps(feed, 'public', 1200, 1600)).toEqual([{ from: 1200, to: 1500 }]);
+    expect(gapReader.gaps(feed, 'public', 1100, 1300)).toEqual([{ from: 1100, to: 1300 }]);
+    expect(gapReader.gaps(feed, 'public', 1002, 1003)).toEqual([{ from: 1002, to: 1003 }]);
   });
 
   test('reports a trailing gap when polling stopped before the end of the range', () => {
-    expect(gapReader.gaps(0, 2000)).toEqual([
-      { from: 1001, to: 1500 },
-      { from: 1500, to: 2000 },
-    ]);
+    // The outage and the stop after it touch at 1500, so they read as one stretch.
+    expect(gapReader.gaps(feed, 'public', 0, 2000)).toEqual([{ from: 1001, to: 2000 }]);
   });
 
-  test('hides the part of a gap a peer filled, since those records were checked like any other', () => {
-    const filled = join(dir, 'filled.sqlite');
-    const store = openStore(filled);
-    for (const seconds of [1000, 1001, 1500]) {
-      store.save([], {
-        airnode: coingecko.airnode,
-        endpoint: 'public',
-        source: 'api3',
-        fetchedAt: seconds * 1000,
-        status: 200,
-        received: 0,
-        rejected: 0,
-      });
-    }
-    // A peer's records cover 1001-1300; nothing covers 1300-1500.
-    store.addCoverage([{ airnode: coingecko.airnode, endpoint: 'public', from: 1001, to: 1300, peer: 'https://p/' }]);
-    store.close();
-    const filledReader = openReader(filled);
-    expect(filledReader.gaps(0, 1600)).toEqual([{ from: 1300, to: 1500 }]);
-    filledReader.close();
+  test('counts a failed request as the archiver watching, since the provider was down, not the archiver', () => {
+    // Failed requests every 100 s between successful ones at 1000 and 1400.
+    const failing = archive({ [coingecko.airnode]: [1000, -1100, -1200, -1300, 1400] });
+    expect(failing.gaps(feed, 'public', 1000, 1400)).toEqual([]);
+    // A peer, though, is told it lacks the stretch: it got no data then.
+    expect(failing.uncovered(coingecko.airnode, 'public', 1000, 1400)).toEqual([{ from: 1000, to: 1400 }]);
+    failing.close();
+  });
 
-    // Covered up to 1400 leaves 100 s, under the gap threshold: covers are signed times, a little before the fetch
-    // that ended the gap, so that is a sliver, not a gap.
-    const sliver = openStore(filled);
-    sliver.addCoverage([{ airnode: coingecko.airnode, endpoint: 'public', from: 1250, to: 1400, peer: 'https://p/' }]);
-    sliver.close();
-    const sliverReader = openReader(filled);
-    expect(sliverReader.gaps(0, 1600)).toEqual([]);
+  test('hides only what a peer filled, and slivers under the gap threshold', () => {
+    const filled = archive({ [coingecko.airnode]: [1000, 1001, 1500] }, [[coingecko.airnode, 1001, 1300]]);
+    expect(filled.gaps(feed, 'public', 0, 1600)).toEqual([{ from: 1300, to: 1500 }]);
+    filled.close();
+    // Covered to 1400 leaves 100 s: covers are signed times, a little before the fetch that ended the gap.
+    const sliver = archive({ [coingecko.airnode]: [1000, 1001, 1500] }, [[coingecko.airnode, 1001, 1400]]);
+    expect(sliver.gaps(feed, 'public', 0, 1600)).toEqual([]);
     // A short stretch no cover touches is still reported, e.g. a gap clipped by the range asked for.
-    expect(sliverReader.gaps(1450, 1500)).toEqual([{ from: 1450, to: 1500 }]);
-    sliverReader.close();
+    expect(sliver.gaps(feed, 'public', 1450, 1500)).toEqual([{ from: 1450, to: 1500 }]);
+    sliver.close();
+  });
+
+  test("one provider's coverage never hides another provider's gap", () => {
+    // Both were down 1001-1500; a peer filled blocksize only.
+    const both = archive(
+      { [coingecko.airnode]: [1000, 1001, 1500], [blocksize[0]?.airnode ?? '']: [1000, 1001, 1500] },
+      [[blocksize[0]?.airnode ?? '', 1001, 1500]]
+    );
+    expect(both.gaps([blocksizeSource], 'public', 0, 1600)).toEqual([]);
+    expect(both.gaps([coingeckoSource], 'public', 0, 1600)).toEqual([{ from: 1001, to: 1500 }]);
+    // A feed with both providers stays shaded until every provider is covered.
+    expect(both.gaps([coingeckoSource, blocksizeSource], 'public', 0, 1600)).toEqual([{ from: 1001, to: 1500 }]);
+    // Coverage on one endpoint says nothing about the other.
+    expect(both.gaps([blocksizeSource], 'public-oev', 0, 1600)).toEqual([]);
+    both.close();
+  });
+
+  test("uncovered counts time before this archive's first poll, so a peer knows to ask again later", () => {
+    expect(gapReader.uncovered(coingecko.airnode, 'public', 500, 1600)).toEqual([
+      { from: 500, to: 1000 },
+      { from: 1001, to: 1500 },
+    ]);
+    expect(gapReader.uncovered(blocksize[0]?.airnode ?? coingecko.airnode, 'public', 500, 600)).toEqual([
+      { from: 500, to: 600 },
+    ]);
   });
 
   test('lastPoll returns the newest request in unix milliseconds', () => {
@@ -211,7 +246,7 @@ describe('gaps', () => {
   });
 
   test('reports nothing before the first poll, or for an archive made before polls were recorded', () => {
-    expect(reader.gaps(0, 10)).toEqual([]);
+    expect(reader.gaps(feed, 'public', 0, 10)).toEqual([]);
     const oldPath = join(dir, 'old.sqlite');
     const old = new Database(oldPath, { create: true });
     old.run(
@@ -219,7 +254,8 @@ describe('gaps', () => {
     );
     old.close();
     const oldReader = openReader(oldPath);
-    expect(oldReader.gaps(0, 2000)).toEqual([]);
+    expect(oldReader.gaps(feed, 'public', 0, 2000)).toEqual([]);
+    expect(oldReader.uncovered(coingecko.airnode, 'public', 0, 2000)).toEqual([{ from: 0, to: 2000 }]);
     expect(oldReader.lastPoll()).toBeNull();
     oldReader.close();
   });

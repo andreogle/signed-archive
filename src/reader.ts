@@ -1,5 +1,5 @@
 import { Database } from 'bun:sqlite';
-import { type Hex, hexToBytes } from 'viem';
+import { type Address, type Hex, hexToBytes } from 'viem';
 import type { FeedSource } from './catalog.ts';
 import { decodePrice } from './price.ts';
 import type { SignedDatum } from './signed-data.ts';
@@ -17,15 +17,32 @@ export interface SignedPrice extends SignedDatum {
   price: string;
 }
 
-// Polls are stored in unix milliseconds; everything the reader returns is in unix seconds. The window includes the
-// last poll before the range and the first after it, so a gap that crosses either edge is found, then clipped.
-const GAPS = `
+// Polls are stored in unix milliseconds; everything the reader returns is in unix seconds. Gaps are per airnode and
+// endpoint. The window includes the last poll before the range and the first after it, so a gap that crosses either
+// edge is found, then clipped. `$ok` limits it to successful polls (1) or counts any poll (0).
+const POLL_GAPS = `
   SELECT max(previous, $from) / 1000 AS "from", min(fetched_at, $to) / 1000 AS "to" FROM (
     SELECT fetched_at, lag(fetched_at) OVER (ORDER BY fetched_at) AS previous FROM polls
-    WHERE fetched_at BETWEEN coalesce((SELECT max(fetched_at) FROM polls WHERE fetched_at < $from), $from)
-                         AND coalesce((SELECT min(fetched_at) FROM polls WHERE fetched_at > $to), $to)
+    WHERE airnode = $airnode AND endpoint = $endpoint AND (status = 200 OR $ok = 0)
+      AND fetched_at BETWEEN coalesce((SELECT max(fetched_at) FROM polls WHERE airnode = $airnode
+                                         AND endpoint = $endpoint AND (status = 200 OR $ok = 0) AND fetched_at < $from), $from)
+                         AND coalesce((SELECT min(fetched_at) FROM polls WHERE airnode = $airnode
+                                         AND endpoint = $endpoint AND (status = 200 OR $ok = 0) AND fetched_at > $to), $to)
   ) WHERE fetched_at - previous > $gap AND previous < $to AND fetched_at > $from`;
-const POLL_RANGE = 'SELECT min(fetched_at) / 1000 AS first, max(fetched_at) / 1000 AS last FROM polls';
+const POLL_RANGE = `
+  SELECT min(fetched_at) / 1000 AS first, max(fetched_at) / 1000 AS last FROM polls
+  WHERE airnode = $airnode AND endpoint = $endpoint AND (status = 200 OR $ok = 0)`;
+
+// Overlapping or touching stretches merged into one, in order.
+export function union(gaps: readonly Gap[]): Gap[] {
+  const merged: Gap[] = [];
+  for (const gap of [...gaps].sort((a, b) => a.from - b.from)) {
+    const last = merged.at(-1);
+    if (last && gap.from <= last.to) last.to = Math.max(last.to, gap.to);
+    else merged.push({ ...gap });
+  }
+  return merged;
+}
 
 export interface Gap {
   from: number;
@@ -154,21 +171,6 @@ export function openReader(path: string) {
     return times.length > 0 ? Math.min(...times) : null;
   }
 
-  // Stretches inside [from, to] when the archiver was not polling, in unix seconds. Coverage is only
-  // known since the first recorded poll, so earlier time is never reported as a gap.
-  // Whether this archive had a successful request for the airnode and endpoint in [from, to] (unix seconds), so a peer
-  // asking for records can tell "nothing was signed" from "this archive wasn't watching either".
-  function watched(airnode: Hex, endpoint: string, from: number, to: number) {
-    if (!hasTable(db, 'polls')) return false;
-    const found = db
-      .query<{ found: 1 }, { airnode: Uint8Array; endpoint: string; from: number; to: number }>(
-        `SELECT 1 AS found FROM polls WHERE airnode = $airnode AND endpoint = $endpoint AND status = 200
-         AND fetched_at BETWEEN $from AND $to LIMIT 1`
-      )
-      .get({ airnode: hexToBytes(airnode), endpoint, from: from * 1000, to: to * 1000 });
-    return found !== null;
-  }
-
   // Every record of every (airnode, template, timestamp) that has more than one signed value in [from, to] (unix
   // seconds), with the Signed API that served it: matched through the poll that saved it. Records merged or repaired
   // from another archive have no matching poll, so their source is null.
@@ -228,27 +230,50 @@ export function openReader(path: string) {
     return db.query<{ last: number | null }, []>('SELECT max(fetched_at) AS last FROM polls').get()?.last ?? null;
   }
 
-  function gaps(from: number, to: number): Gap[] {
-    if (!hasTable(db, 'polls')) return [];
-    const range = db.query<{ first: number | null; last: number | null }, []>(POLL_RANGE).get();
-    if (!range || range.first === null || range.last === null) return [];
+  // Where this archive has nothing for one airnode and endpoint in [from, to] (unix seconds): stretches longer than
+  // GAP_SECONDS without a poll, minus what peers filled. `ok` counts only successful polls. `beforeFirst` decides
+  // whether time before the first poll counts as missing (true when telling a peer what this archive lacks) or as
+  // unknown and left out (false for the explorer, which can't call the time before an archive existed a gap).
+  function missing(airnode: Address, endpoint: string, from: number, to: number, ok: boolean, beforeFirst: boolean) {
+    if (!hasTable(db, 'polls')) return beforeFirst ? [{ from, to }] : [];
+    const key = { airnode: hexToBytes(airnode), endpoint, ok: ok ? 1 : 0 };
+    const range = db.query<{ first: number | null; last: number | null }, typeof key>(POLL_RANGE).get(key);
+    if (!range || range.first === null || range.last === null) return beforeFirst ? [{ from, to }] : [];
     const { first, last } = range;
     const start = Math.max(from, first);
-    const found = db
-      .query<Gap, { from: number; to: number; gap: number }>(GAPS)
-      .all({ from: start * 1000, to: to * 1000, gap: GAP_SECONDS * 1000 });
-    const all = last < to - GAP_SECONDS ? [...found, { from: Math.max(last, start), to }] : found;
-    // A stretch a peer filled is history like any other: its records were checked like the archiver's own. Only the
-    // stretches the peer's records actually cover count, so a partly filled gap stays shaded where it is still empty.
+    const found =
+      start > to
+        ? []
+        : db
+            .query<Gap, typeof key & { from: number; to: number; gap: number }>(POLL_GAPS)
+            .all({ ...key, from: start * 1000, to: to * 1000, gap: GAP_SECONDS * 1000 });
+    const head = beforeFirst && first > from ? [{ from, to: Math.min(first, to) }] : [];
+    const tail = last < to - GAP_SECONDS ? [{ from: Math.max(last, start), to }] : [];
+    // A stretch a peer filled is history like any other: its records were checked like the archiver's own.
     const covered = hasTable(db, 'peer_coverage')
       ? db
-          .query<Gap, { from: number; to: number }>(
-            `SELECT "from", "to" FROM peer_coverage WHERE "to" >= $from AND "from" <= $to`
+          .query<Gap, { airnode: Uint8Array; endpoint: string; from: number; to: number }>(
+            `SELECT "from", "to" FROM peer_coverage
+             WHERE airnode = $airnode AND endpoint = $endpoint AND "to" >= $from AND "from" <= $to`
           )
-          .all({ from: start, to })
+          .all({ airnode: key.airnode, endpoint, from, to })
       : [];
-    return subtractCovered(all, covered, GAP_SECONDS);
+    return subtractCovered(union([...head, ...found, ...tail]), covered, GAP_SECONDS);
   }
+
+  // Stretches inside [from, to] when this archive has no data for some provider of a feed (`sources`, all on one
+  // endpoint), in unix seconds, for the explorer to shade. A stretch stays shaded until every provider is covered,
+  // by this archive's own polls or by what peers filled. Time before an airnode's first poll is unknown, not a gap.
+  function gaps(sources: readonly FeedSource[], endpoint: string, from: number, to: number): Gap[] {
+    const airnodes = [...new Set(sources.map(({ airnode }) => airnode.toLowerCase() as Address))];
+    return union(airnodes.flatMap((airnode) => missing(airnode, endpoint, from, to, false, false)));
+  }
+
+  // What this archive lacks for one airnode and endpoint in [from, to], told to a peer asking for records so it can
+  // tell "nothing was signed" from "this archive wasn't watching either". Only successful polls count as watching.
+  const uncovered = (airnode: Address, endpoint: string, from: number, to: number) => {
+    return missing(airnode, endpoint, from, to, true, true);
+  };
 
   return {
     at,
@@ -256,8 +281,8 @@ export function openReader(path: string) {
     history,
     earliest,
     gaps,
+    uncovered,
     lastPoll,
-    watched,
     conflictRecords,
     momentCounts,
     close: () => db.close(),

@@ -13,7 +13,7 @@ import {
 } from './config.ts';
 import { sendHeartbeat } from './heartbeat.ts';
 import { errorMessage, log } from './logger.ts';
-import { repairGaps } from './repair.ts';
+import { runRepairs } from './repair.ts';
 import { hasValidSignature, type SignedDatum, toSignedDatum } from './signed-data.ts';
 import { openStore } from './store.ts';
 
@@ -39,9 +39,6 @@ export interface ArchiverOptions {
   heartbeatUrl?: URL | undefined;
   peers?: readonly URL[];
 }
-
-// Repair runs after the first cycle, which closes the gap a restart left, then at most this often.
-const REPAIR_EVERY_MS = 10 * 60 * 1000;
 
 function backOff(target: Target, intervalMs: number, retryAfter: string | null) {
   target.failures += 1;
@@ -163,7 +160,9 @@ export async function runArchiver({ intervalSeconds, dbPath, catalog, heartbeatU
     heartbeat: heartbeatUrl?.host,
     peers: peers.length,
   });
-  let lastRepair = 0;
+  // Peer repair runs beside polling, never inside it, so a slow or unreachable peer can't hold up archiving. It stops
+  // with the archiver and is waited for before the database closes.
+  const repairing = peers.length > 0 ? runRepairs({ store, catalog, peers, intervalMs, signal: stop.signal }) : null;
   while (!stop.signal.aborted) {
     const cycleStartedAt = Date.now();
     let saved = 0;
@@ -213,16 +212,8 @@ export async function runArchiver({ intervalSeconds, dbPath, catalog, heartbeatU
     });
     // Only a cycle that reached the API counts as alive, so the monitor also alerts when every request fails.
     if (heartbeatUrl && succeeded > 0 && !stop.signal.aborted) await sendHeartbeat(heartbeatUrl);
-    if (peers.length > 0 && !stop.signal.aborted && Date.now() - lastRepair >= REPAIR_EVERY_MS) {
-      lastRepair = Date.now();
-      try {
-        const result = await repairGaps({ store, catalog, peers, intervalMs });
-        if (result.requests > 0) log.info('repair run', result);
-      } catch (error) {
-        log.warn('repair run failed', { error: errorMessage(error) });
-      }
-    }
   }
+  await repairing;
   store.close();
   log.info('archiver stopped');
 }

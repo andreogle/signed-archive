@@ -152,27 +152,36 @@ to be serving a record from the same second.
 ## Peer repair
 
 A moment the archiver misses can never be fetched from the Signed API again, but another archive that was polling
-then may have it. List other archives under `peers` in the config file (the base URL of their explorer). After the
-first cycle, and then every 10 minutes, the archiver:
+then may have it. List other archives under `peers` in the config file (the base URL of their explorer). Repair runs
+beside polling, never inside it, so a slow or unreachable peer can't hold up archiving:
 
-1. finds stretches of the last 7 days with no successful request for an airnode and endpoint, longer than three
-   intervals, that have since ended;
-2. asks each peer once per stretch, through `GET /api/records?airnode=&endpoint=&from=&to=` (windows of at most 15
-   minutes, at most 10 requests per run);
-3. checks every record it gets back like any other input (shape, the asked airnode, a known template on the asked
-   endpoint, inside the window, valid signature) and adds the ones that pass.
+1. After the first polling cycle, then every 10 minutes, it finds gaps that have closed: stretches with no successful
+   request for an airnode and endpoint longer than three polling intervals, and never shorter than 3 minutes. A gap
+   that ended in the last week is found whole, however long ago it started.
+2. Each gap is split once into windows of at most 15 minutes, with 2 minutes of margin on both sides for signing
+   delays and clock drift, and each window is recorded for each peer in `repair_windows`.
+3. Due windows are asked one every 5 seconds, newest first, through
+   `GET /api/records?airnode=&endpoint=&from=&to=`. A window another peer already covered is skipped.
+4. Every record that comes back is checked like any other input (shape, the asked airnode and window, a known
+   template, valid signature) and added if it passes. Responses over 16 MB or 50,000 records, and redirects, are
+   refused; duplicates are dropped before the signature check.
 
-A peer that was polling and has nothing is never asked about that stretch again: it can never gain it later. A peer
-that wasn't polling either is asked once more an hour later, because it may have filled the stretch from its own
-peers in the meantime. Only failures are retried (network errors, 429 and 5xx), three times with backoff from 5
-minutes. Progress is kept in the `repairs` table, so restarts don't repeat requests. Peers' polls are not imported,
-because coverage claims aren't signed: the stretch stays a gap in `polls`, and `peer_coverage` records the stretches
-the peer's records actually span. The explorer stops shading exactly those, so a partly filled gap stays shaded where
-it is still empty.
+A peer also says where in the window it has nothing itself (`uncovered`). A peer that watched the whole window and
+has nothing is final: it can never gain the data later. A window the peer missed part of is asked once more an hour
+later, since the peer may have filled it from its own peers. Network errors, 429 and other non-400 errors are retried
+up to three times with backoff, honouring `Retry-After`; a peer that keeps failing is paused as a whole (from 5
+minutes up to 6 hours), so its outage doesn't use up the attempts of every window waiting on it. Peers' polls are
+never imported, because coverage claims aren't signed: the stretch stays a gap in `polls`, and `peer_coverage` records
+the stretches the peer's records actually span. The explorer shades a stretch until every provider of the feed is
+covered.
 
 Nodes may poll at different intervals, run different versions or list different feeds. Records prove themselves, so
 none of that matters to what is exchanged: a peer returns whatever it holds in the window, and records under templates
-this archive doesn't know are skipped (and counted) rather than treated as suspicious.
+this archive doesn't know are skipped (and counted) rather than treated as suspicious. An archive that doesn't send
+`uncovered` is read through its `watched` flag.
+
+Known cost: merging polls into an old gap changes where the gap starts, so its pieces are asked about again (windows
+already covered are skipped).
 
 To be someone's peer, expose your explorer (only `/api/records` is needed) where they can reach it, for example
 through a reverse proxy in front of the `explorer` container.

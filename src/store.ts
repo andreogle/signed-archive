@@ -40,32 +40,32 @@ const POLLS = `
   ) WITHOUT ROWID
 `;
 
-// Asking peers for records this archive missed. One row per gap and peer, so each peer is asked about a gap once:
-// a peer that missed it too never gains it later, because the Signed API only serves the latest value. `next_from`
-// (unix seconds) is where the next window starts; `attempts` counts failures on that window; `retry_at` is unix ms.
-// Status: `pending` (windows left, or a retry due), `filled` (records added), `none` (the peer had nothing) or
-// `failed` (gave up). `watched` is whether the peer said it was polling during any window; `rechecked` whether the
-// one second ask has happened. These rows are bookkeeping, not signed data, so they are updated in place.
-const REPAIRS = `
-  CREATE TABLE IF NOT EXISTS repairs (
+// Asking peers for records this archive missed, one row per window of a gap and peer. A gap is split into windows
+// once, when it is first found; each window is then asked about independently, so a slow or failing window never
+// holds back the others. `from` and `to` are unix seconds (as signed), inclusive, at most 900 apart. Status: `pending`
+// (not asked yet, a retry due, or a second ask due), `done`, `skipped` (another peer already covered it, or the
+// airnode is no longer configured) or `failed` (gave up). `attempts` counts failures; `retry_at` is unix ms;
+// `rechecked` is whether the one second ask, for a peer that had missed part of the window too, has been scheduled;
+// `records` counts new records it added. These rows are bookkeeping, not signed data, so they are updated in place.
+const REPAIR_WINDOWS = `
+  CREATE TABLE IF NOT EXISTS repair_windows (
     airnode   BLOB    NOT NULL,
     endpoint  TEXT    NOT NULL,
-    gap_from  INTEGER NOT NULL,
-    gap_to    INTEGER NOT NULL,
+    "from"    INTEGER NOT NULL,
+    "to"      INTEGER NOT NULL,
     peer      TEXT    NOT NULL,
     status    TEXT    NOT NULL,
-    next_from INTEGER NOT NULL,
     attempts  INTEGER NOT NULL,
     retry_at  INTEGER NOT NULL,
+    rechecked INTEGER NOT NULL,
     records   INTEGER NOT NULL,
-    watched   INTEGER NOT NULL DEFAULT 0,
-    rechecked INTEGER NOT NULL DEFAULT 0,
-    PRIMARY KEY (airnode, endpoint, gap_from, peer)
+    PRIMARY KEY (airnode, endpoint, "from", peer)
   ) WITHOUT ROWID
 `;
 
-// Stretches (unix seconds, as signed) that a peer's records actually cover, so the explorer stops shading only what
-// was filled. Records further apart than the explorer's gap threshold count as separate stretches.
+// Stretches (unix seconds, as signed) that peers' records actually cover, so the explorer stops shading only what was
+// filled. Overlapping or nearly touching stretches for one airnode and endpoint are merged into one row, so stretches
+// from consecutive windows join up. `peer` is the peer whose answer last extended the stretch.
 const PEER_COVERAGE = `
   CREATE TABLE IF NOT EXISTS peer_coverage (
     airnode   BLOB    NOT NULL,
@@ -78,29 +78,34 @@ const PEER_COVERAGE = `
 `;
 
 // Stretches with no successful request for an airnode and endpoint (from either source) longer than `threshold`,
-// that have since closed, in unix milliseconds. A gap still open has nothing to ask about yet.
+// that have since closed, in unix milliseconds. A gap still open has nothing to ask about yet. Only gaps that end
+// after `since` are listed, but a gap may start before it: the first poll after `since` looks back for its
+// predecessor, so an outage longer than the lookback is still found whole.
 const CLOSED_GAPS = `
   SELECT hex(airnode) AS airnode, endpoint, previous AS "from", fetched_at AS "to" FROM (
     SELECT airnode, endpoint, fetched_at,
-           lag(fetched_at) OVER (PARTITION BY airnode, endpoint ORDER BY fetched_at) AS previous
-    FROM polls WHERE status = 200 AND fetched_at >= $since
-  ) WHERE fetched_at - previous > $threshold
+           CASE WHEN lag(fetched_at) OVER w IS NULL THEN (
+             SELECT max(p.fetched_at) FROM polls p
+             WHERE p.airnode = recent.airnode AND p.endpoint = recent.endpoint AND p.status = 200
+               AND p.fetched_at < $since
+           ) ELSE lag(fetched_at) OVER w END AS previous
+    FROM polls recent WHERE status = 200 AND fetched_at >= $since
+    WINDOW w AS (PARTITION BY airnode, endpoint ORDER BY fetched_at)
+  ) WHERE previous IS NOT NULL AND fetched_at - previous > $threshold
   ORDER BY "from"`;
 
-export type RepairStatus = 'pending' | 'filled' | 'none' | 'failed';
-export interface Repair {
+export type WindowStatus = 'pending' | 'done' | 'skipped' | 'failed';
+export interface RepairWindow {
   airnode: Address;
   endpoint: Endpoint;
-  gapFrom: number;
-  gapTo: number;
+  from: number;
+  to: number;
   peer: string;
-  status: RepairStatus;
-  nextFrom: number;
+  status: WindowStatus;
   attempts: number;
   retryAt: number;
-  records: number;
-  watched: boolean;
   rechecked: boolean;
+  records: number;
 }
 
 export interface Coverage {
@@ -173,13 +178,9 @@ export function openStore(path: string) {
   db.run('PRAGMA busy_timeout = 10000');
   db.run(DATAPOINTS);
   db.run(POLLS);
-  db.run(REPAIRS);
+  db.run(REPAIR_WINDOWS);
+  db.run('CREATE INDEX IF NOT EXISTS repair_windows_due ON repair_windows (status, retry_at)');
   db.run(PEER_COVERAGE);
-  // New columns only; repairs from before them read as not watched and not rechecked.
-  for (const column of ['watched', 'rechecked']) {
-    if (!hasColumn(db, 'repairs', column))
-      db.run(`ALTER TABLE repairs ADD COLUMN ${column} INTEGER NOT NULL DEFAULT 0`);
-  }
   // A new column only: existing polls keep their rows and read as API3's.
   if (!hasColumn(db, 'polls', 'source')) db.run("ALTER TABLE polls ADD COLUMN source TEXT NOT NULL DEFAULT 'api3'");
   db.run('CREATE INDEX IF NOT EXISTS polls_by_time ON polls (fetched_at)');
@@ -252,58 +253,120 @@ export function openStore(path: string) {
       .map((gap) => ({ ...gap, airnode: `0x${gap.airnode.toLowerCase()}` as Address }));
   };
 
-  const repairQuery = db.prepare<
-    Omit<Repair, 'airnode' | 'endpoint' | 'gapFrom' | 'peer' | 'watched' | 'rechecked'> & {
-      watched: number;
-      rechecked: number;
-    },
-    { airnode: Uint8Array; endpoint: string; gapFrom: number; peer: string }
-  >(
-    `SELECT gap_to AS gapTo, status, next_from AS nextFrom, attempts, retry_at AS retryAt, records, watched, rechecked
-     FROM repairs
-     WHERE airnode = $airnode AND endpoint = $endpoint AND gap_from = $gapFrom AND peer = $peer`
+  // Windows are inserted once; finding the same gap again changes nothing.
+  const windowInsert = db.prepare(
+    `INSERT OR IGNORE INTO repair_windows (airnode, endpoint, "from", "to", peer, status, attempts, retry_at, rechecked, records)
+     VALUES ($airnode, $endpoint, $from, $to, $peer, 'pending', 0, 0, 0, 0)`
   );
-  const repairUpsert = db.prepare(
-    `INSERT OR REPLACE INTO repairs
-       (airnode, endpoint, gap_from, gap_to, peer, status, next_from, attempts, retry_at, records, watched, rechecked)
-     VALUES ($airnode, $endpoint, $gapFrom, $gapTo, $peer, $status, $nextFrom, $attempts, $retryAt, $records,
-             $watched, $rechecked)`
+  const addWindows = db.transaction(
+    (rows: readonly Pick<RepairWindow, 'airnode' | 'endpoint' | 'from' | 'to' | 'peer'>[]) => {
+      let added = 0;
+      for (const row of rows) added += windowInsert.run({ ...row, airnode: hexToBytes(row.airnode) }).changes;
+      return added;
+    }
   );
-  const getRepair = ({
+
+  type WindowRow = Omit<RepairWindow, 'airnode' | 'rechecked'> & { airnode: string; rechecked: number };
+  const toWindow = ({ airnode, rechecked, ...row }: WindowRow): RepairWindow => {
+    return { ...row, airnode: `0x${airnode.toLowerCase()}` as Address, rechecked: rechecked === 1 };
+  };
+  const windowColumns = `hex(airnode) AS airnode, endpoint, "from", "to", peer, status, attempts, retry_at AS retryAt,
+    rechecked, records`;
+  // Newest first: recent stretches are what people look at, and every window is reached in time either way.
+  const dueQuery = db.prepare<WindowRow, { now: number; limit: number }>(
+    `SELECT ${windowColumns} FROM repair_windows WHERE status = 'pending' AND retry_at <= $now
+     ORDER BY "from" DESC LIMIT $limit`
+  );
+  const dueWindows = (now: number, limit: number) => dueQuery.all({ now, limit }).map(toWindow);
+  const windowQuery = db.prepare<WindowRow, { airnode: Uint8Array; endpoint: string; from: number; peer: string }>(
+    `SELECT ${windowColumns} FROM repair_windows
+     WHERE airnode = $airnode AND endpoint = $endpoint AND "from" = $from AND peer = $peer`
+  );
+  const getWindow = ({
     airnode,
     endpoint,
-    gapFrom,
+    from,
     peer,
-  }: Pick<Repair, 'airnode' | 'endpoint' | 'gapFrom' | 'peer'>) => {
-    const row = repairQuery.get({ airnode: hexToBytes(airnode), endpoint, gapFrom, peer });
-    if (!row) return null;
-    const { watched, rechecked, ...rest } = row;
-    return {
-      airnode,
-      endpoint,
-      gapFrom,
-      peer,
-      ...rest,
-      watched: watched === 1,
-      rechecked: rechecked === 1,
-    } satisfies Repair;
+  }: Pick<RepairWindow, 'airnode' | 'endpoint' | 'from' | 'peer'>) => {
+    const row = windowQuery.get({ airnode: hexToBytes(airnode), endpoint, from, peer });
+    return row ? toWindow(row) : null;
   };
-  const putRepair = (repair: Repair) => {
-    return repairUpsert.run({
-      ...repair,
-      airnode: hexToBytes(repair.airnode),
-      watched: repair.watched ? 1 : 0,
-      rechecked: repair.rechecked ? 1 : 0,
+  const windowUpdate = db.prepare(
+    `UPDATE repair_windows SET status = $status, attempts = $attempts, retry_at = $retryAt, rechecked = $rechecked,
+       records = $records
+     WHERE airnode = $airnode AND endpoint = $endpoint AND "from" = $from AND peer = $peer`
+  );
+  const putWindow = (window: RepairWindow) => {
+    windowUpdate.run({
+      airnode: hexToBytes(window.airnode),
+      endpoint: window.endpoint,
+      from: window.from,
+      peer: window.peer,
+      status: window.status,
+      attempts: window.attempts,
+      retryAt: window.retryAt,
+      rechecked: window.rechecked ? 1 : 0,
+      records: window.records,
     });
   };
+  const windowCounts = () => {
+    return Object.fromEntries(
+      db
+        .query<{ status: WindowStatus; n: number }, []>(
+          'SELECT status, count(*) AS n FROM repair_windows GROUP BY status'
+        )
+        .all()
+        .map(({ status, n }) => [status, n])
+    ) as Partial<Record<WindowStatus, number>>;
+  };
 
-  const coverageInsert = db.prepare(
-    `INSERT OR IGNORE INTO peer_coverage (airnode, endpoint, "from", "to", peer)
-     VALUES ($airnode, $endpoint, $from, $to, $peer)`
+  // Adds stretches, merging each with any stored stretch of the same airnode and endpoint that overlaps it or comes
+  // within `joinWithin` seconds, so stretches from consecutive windows become one.
+  const touching = db.prepare<
+    { from: number; to: number },
+    { airnode: Uint8Array; endpoint: string; from: number; to: number }
+  >(
+    `SELECT "from", "to" FROM peer_coverage
+     WHERE airnode = $airnode AND endpoint = $endpoint AND "from" <= $to AND "to" >= $from`
   );
-  const addCoverage = db.transaction((rows: readonly Coverage[]) => {
-    for (const row of rows) coverageInsert.run({ ...row, airnode: hexToBytes(row.airnode) });
+  const removeStretch = db.prepare(
+    `DELETE FROM peer_coverage WHERE airnode = $airnode AND endpoint = $endpoint AND "from" = $from`
+  );
+  const insertStretch = db.prepare(
+    `INSERT OR REPLACE INTO peer_coverage (airnode, endpoint, "from", "to", peer) VALUES ($airnode, $endpoint, $from, $to, $peer)`
+  );
+  const addCoverage = db.transaction((rows: readonly Coverage[], joinWithin: number) => {
+    for (const row of rows) {
+      const airnode = hexToBytes(row.airnode);
+      const key = { airnode, endpoint: row.endpoint };
+      const neighbours = touching.all({ ...key, from: row.from - joinWithin, to: row.to + joinWithin });
+      const from = Math.min(row.from, ...neighbours.map((stretch) => stretch.from));
+      const to = Math.max(row.to, ...neighbours.map((stretch) => stretch.to));
+      for (const stretch of neighbours) removeStretch.run({ ...key, from: stretch.from });
+      insertStretch.run({ ...key, from, to, peer: row.peer });
+    }
   });
+  // Whether stored stretches for the airnode and endpoint already span [from, to], give or take `slack` seconds.
+  const coveredQuery = db.prepare<{ found: 1 }, { airnode: Uint8Array; endpoint: string; from: number; to: number }>(
+    `SELECT 1 AS found FROM peer_coverage
+     WHERE airnode = $airnode AND endpoint = $endpoint AND "from" <= $from AND "to" >= $to LIMIT 1`
+  );
+  const isCovered = (airnode: Address, endpoint: Endpoint, from: number, to: number, slack: number) => {
+    return coveredQuery.get({ airnode: hexToBytes(airnode), endpoint, from: from + slack, to: to - slack }) !== null;
+  };
 
-  return { save, add, has, closedGaps, getRepair, putRepair, addCoverage, close: () => db.close() };
+  return {
+    save,
+    add,
+    has,
+    closedGaps,
+    addWindows,
+    dueWindows,
+    getWindow,
+    putWindow,
+    windowCounts,
+    addCoverage,
+    isCovered,
+    close: () => db.close(),
+  };
 }

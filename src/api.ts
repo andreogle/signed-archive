@@ -44,7 +44,10 @@ export interface RecordsResponse {
   endpoint: Endpoint;
   from: number;
   to: number;
-  // Whether this archive was polling then. No records and `watched: false` means it missed the stretch too.
+  // Where this archive itself has nothing in the window (no successful poll for longer than the gap threshold, and
+  // nothing filled from its own peers), so the asker can tell "nothing was signed" from "this archive missed it too".
+  uncovered: Gap[];
+  // True when `uncovered` is empty. Kept for archives that only read this field.
   watched: boolean;
   records: SignedDatum[];
 }
@@ -101,8 +104,16 @@ export function handleApi(reader: Reader, catalog: Catalog, url: URL, now = Math
       .map(({ airnode, templateId, timestamp, encodedValue, signature }) => {
         return { airnode, templateId, timestamp, encodedValue, signature };
       });
-    const watched = reader.watched(airnode, endpoint, from, to);
-    return json({ airnode, endpoint, from, to, watched, records } satisfies RecordsResponse);
+    const uncovered = reader.uncovered(airnode, endpoint, from, to);
+    return json({
+      airnode,
+      endpoint,
+      from,
+      to,
+      uncovered,
+      watched: uncovered.length === 0,
+      records,
+    } satisfies RecordsResponse);
   }
 
   if (url.pathname === '/api/conflicts') {
@@ -135,7 +146,7 @@ export function handleApi(reader: Reader, catalog: Catalog, url: URL, now = Math
       to,
       earliest,
       providers,
-      gaps: reader.gaps(from, to),
+      gaps: reader.gaps(sources, endpoint, from, to),
     } satisfies HistoryResponse);
   }
 
