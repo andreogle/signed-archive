@@ -2,6 +2,7 @@ import index from '../web/index.html';
 import { handleApi } from './api.ts';
 import type { Catalog } from './catalog.ts';
 import { log } from './logger.ts';
+import { handleMcpHttp } from './mcp.ts';
 import { openReader } from './reader.ts';
 
 export interface ServerOptions {
@@ -25,6 +26,8 @@ export function startServer({ dbPath, catalog, host, port }: ServerOptions) {
       // Every other path is a page of the single-page app; the router in web/ picks what to show.
       '/*': index,
       '/api/*': (request) => handleApi(reader, catalog, new URL(request.url)),
+      // The archive as an MCP server for AI agents (see src/mcp.ts).
+      '/mcp': (request) => handleMcpHttp(reader, catalog, request),
     },
   });
   log.info('server started', { url: server.url.href, db: dbPath });

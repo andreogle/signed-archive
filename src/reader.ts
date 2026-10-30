@@ -155,12 +155,15 @@ export function openReader(path: string) {
     return rows.sort((a, b) => Number(a.timestamp) - Number(b.timestamp));
   }
 
-  function history(sources: readonly FeedSource[], from: number, to: number) {
-    const bucket = Math.max(1, Math.ceil((to - from) / MAX_POINTS));
+  // At most `maxPoints` per provider: longer ranges keep the last record of each bucket.
+  function history(sources: readonly FeedSource[], from: number, to: number, maxPoints = MAX_POINTS) {
+    const bucket = Math.max(1, Math.ceil((to - from) / maxPoints));
     return sources.flatMap((source) => {
       const points = historyQuery
         .all({ ...keyOf(source), from, to, bucket })
-        .map(({ timestamp, value }) => ({ timestamp, price: decodePrice(toHex(value)) }));
+        .map(({ timestamp, value }) => ({ timestamp, price: decodePrice(toHex(value)) }))
+        // Buckets are aligned to multiples of their size, so a range can touch one more than maxPoints; keep the newest.
+        .slice(-maxPoints);
       return points.length > 0 ? [{ provider: source.provider, points }] : [];
     });
   }

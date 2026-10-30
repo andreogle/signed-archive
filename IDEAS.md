@@ -206,7 +206,9 @@ Products that only past signed prices make possible. API3 itself only exposes th
 
 AI agents can make up numbers and often cannot show where a fact came from. Signed history answers both.
 
-- **Agent plug-in (MCP server).** One plug-in with four abilities:
+- **Agent plug-in (MCP server).** _Status: built (`signed-archive mcp`, and `POST /mcp` on the explorer), with past
+  prices with proof, a safety check, history and conflicts; source report cards are still to do._ One plug-in with four
+  abilities:
   - **Past price with proof**: "what was ETH at 2pm last Tuesday?", answered with the providers' signatures.
   - **"Is this price safe to use?"**: is it fresh, do the sources agree, is the time stamp not in the future? For
     live AirnodeHub answers, the community Trust-Aware Agent and Asset Price Monitor already do this; the plug-in only

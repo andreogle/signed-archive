@@ -144,6 +144,17 @@ program
   });
 
 program
+  .command('mcp')
+  .description('serve the archive to AI agents over MCP on stdin and stdout (read-only)')
+  .addOption(dbOption())
+  .action(async ({ db }: { db: string }) => {
+    const [{ openReader }, { runMcpStdio }] = await Promise.all([import('./reader.ts'), import('./mcp.ts')]);
+    const reader = openReader(db);
+    await runMcpStdio(reader, requireCatalog());
+    reader.close();
+  });
+
+program
   .command('health')
   .description('exit 0 if the archiver recorded a request recently, 1 otherwise (for container health checks)')
   .addOption(dbOption())

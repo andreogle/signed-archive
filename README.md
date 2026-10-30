@@ -137,6 +137,31 @@ The Signed API only serves the latest value, so a moment the archiver misses is 
   overwritten. Records the target already has are skipped, so merging again is fast. Polls are merged too; they are
   the other archiver's unsigned claim of when it was watching, so only merge archives you run or trust.
 
+## For AI agents (MCP)
+
+The archive is also an MCP server, so an agent can ask for signed prices at past moments and get the proof with the
+answer. It is read-only and has five tools:
+
+- `list_feeds`: feeds with their current median, filterable by name.
+- `get_price_at`: every provider's latest signed price at or before a moment, its age, the median, and the raw signed
+  fields so the answer can be verified independently.
+- `check_price`: is the latest price safe to use? Freshness, agreement between providers, conflicting signatures, and
+  a verdict with the issues found.
+- `get_price_history`: downsampled points per provider over a range, and the stretches with no data.
+- `get_conflicts`: values signed twice for the same second, per provider.
+
+Locally, over stdin and stdout (for Claude Code, for example):
+
+```sh
+claude mcp add signed-archive -- /path/to/signed-archive mcp --config /path/to/signed-archive.yaml
+```
+
+Remotely, the explorer serves the same tools at `POST /mcp` (MCP's Streamable HTTP transport, stateless JSON):
+
+```sh
+claude mcp add --transport http signed-archive http://127.0.0.1:3000/mcp
+```
+
 ## Conflicting values
 
 The explorer's **Conflicts** page (`/conflicts`, or `/api/conflicts?from=&to=` as JSON) lists, per provider and

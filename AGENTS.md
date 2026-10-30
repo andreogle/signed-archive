@@ -81,6 +81,12 @@ This file holds what is specific to this project and the invariants that must ne
 - URL search params come from shared links: parse them through `parseFeedSearch` in `web/search.ts`
 - Route components that call `getRouteApi` declare their return type (`JSX.Element`), or the router's registered types collapse to `any` through the import cycle
 
+**MCP (`src/mcp.ts`)**
+- One handler, two transports: `signed-archive mcp` (stdio, one JSON-RPC message per line) and `POST /mcp` on the explorer (stateless Streamable HTTP, JSON answers, 202 for notifications). No MCP SDK dependency; the protocol surface is `initialize`, `ping`, `tools/list` and `tools/call`
+- Under stdio, stdout carries protocol messages only. Logs already go to stderr; never write anything else to stdout
+- Tools are read-only and go through the reader and catalog like the API. A bad argument is a tool result with `isError: true` and a message the agent can act on, never a JSON-RPC error; unexpected failures are logged
+- Answers that present a price as verified carry the raw signed fields, so an agent or its owner can re-check them without trusting the server
+
 **Dependencies**
 - Runtime dependencies are `viem` (signature recovery, hashing, hex helpers) and `commander` (CLI), plus React, TanStack Router and TanStack Query for the explorer in `web/`. Reach for Bun's built-ins and the standard library before adding another
 - `bunfig.toml` refuses package versions published less than 3 days ago (`minimumReleaseAge`). Don't bypass it to grab a fresh release
