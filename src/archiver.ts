@@ -16,6 +16,7 @@ import {
 import { sendHeartbeat } from './heartbeat.ts';
 import { readCapped, retryAfterMs } from './http.ts';
 import { errorMessage, log } from './logger.ts';
+import { DEFAULT_AFTER_DAYS, runMoves } from './parquet.ts';
 import { runRepairs } from './repair.ts';
 import { hasValidSignature, type SignedDatum, toSignedDatum } from './signed-data.ts';
 import { openStore } from './store.ts';
@@ -43,6 +44,10 @@ export interface ArchiverOptions {
   catalog: Catalog;
   heartbeatUrl?: URL | undefined;
   peers?: readonly URL[];
+  // Where closed days' Parquet files go, and how many days after a day ends it moves there. Without a directory,
+  // records stay in SQLite.
+  parquetDir?: string | undefined;
+  afterDays?: number;
   // API3's Signed API; tests point it at a local server.
   api3Url?: string;
   // Stops the archiver like SIGINT or SIGTERM do.
@@ -167,6 +172,8 @@ export async function runArchiver({
   catalog,
   heartbeatUrl,
   peers = [],
+  parquetDir,
+  afterDays = DEFAULT_AFTER_DAYS,
   api3Url = BASE_URL,
   signal,
 }: ArchiverOptions) {
@@ -209,10 +216,14 @@ export async function runArchiver({
     db: dbPath,
     heartbeat: heartbeatUrl?.host,
     peers: peers.length,
+    parquetDir,
+    afterDays: parquetDir ? afterDays : undefined,
   });
   // Peer repair runs beside polling, never inside it, so a slow or unreachable peer can't hold up archiving. It stops
   // with the archiver and is waited for before the database closes.
   const repairing = peers.length > 0 ? runRepairs({ store, catalog, peers, intervalMs, signal: stop.signal }) : null;
+  // Moving closed days to Parquet runs beside polling too, on its own connection, in small transactions.
+  const moving = parquetDir ? runMoves({ dbPath, dir: parquetDir, afterDays, signal: stop.signal }) : null;
   while (!stop.signal.aborted) {
     const cycleStartedAt = Date.now();
     let saved = 0;
@@ -258,6 +269,7 @@ export async function runArchiver({
     if (heartbeatUrl && succeeded > 0 && !stop.signal.aborted) await sendHeartbeat(heartbeatUrl);
   }
   await repairing;
+  await moving;
   store.close();
   signal?.removeEventListener('abort', onAbort);
   for (const { name, handler } of handlers) process.off(name, handler);

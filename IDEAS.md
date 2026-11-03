@@ -15,8 +15,9 @@ check them; builders supply the application, extra data, and rules for interpret
 - Conflicting values preserved together, with summaries of when providers contradicted themselves.
 - Polling history and peer repair to help explain gaps in what the archive observed.
 
-See [README.md](README.md) for the interfaces and how to run an archive. Daily bulk exports and a portable
-bundle checker could make larger downstream projects easier; they are not available yet.
+See [README.md](README.md) for the interfaces and how to run an archive. Moved days are published as Parquet
+files under `/data/`; a portable bundle checker and timestamping those files (for example with OpenTimestamps) could
+make larger downstream projects easier, and are not available yet.
 
 ## For API3
 

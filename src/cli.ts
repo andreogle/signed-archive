@@ -1,3 +1,4 @@
+import { dirname, join } from 'node:path';
 import { Command, InvalidArgumentError, Option } from 'commander';
 import pkg from '../package.json' with { type: 'json' };
 import { runArchiver } from './archiver.ts';
@@ -5,7 +6,16 @@ import { createCatalog } from './catalog.ts';
 import { DEFAULT_DB_PATH, DEFAULT_HOST, DEFAULT_INTERVAL_SECONDS, DEFAULT_PORT } from './config.ts';
 import { parseHeartbeatUrl } from './heartbeat.ts';
 import { errorMessage, LOG_LEVELS, type LogLevel, log, setLogLevel } from './logger.ts';
-import { DEFAULT_CONFIG_PATH, loadSettings, parseInterval, parsePort, parseSeconds, parseSwitch } from './settings.ts';
+import { DEFAULT_AFTER_DAYS } from './parquet.ts';
+import {
+  DEFAULT_CONFIG_PATH,
+  loadSettings,
+  parseDays,
+  parseInterval,
+  parsePort,
+  parseSeconds,
+  parseSwitch,
+} from './settings.ts';
 
 // Command-line parsers report problems through commander, so bad input fails before anything runs.
 const argParser = <T>(parse: (value: string) => T) => {
@@ -49,16 +59,29 @@ const portOption = () => {
     .env('PORT');
 };
 
+// Moved days' files. Without a setting they sit in parquet/ next to the database, so a copied data directory (or the
+// Docker volume) keeps them together.
+const parquetDirOption = () => {
+  return new Option('--parquet-dir <path>', 'directory of moved days as Parquet files (default: parquet/ beside --db)')
+    .default(settings.parquet?.dir)
+    .env('PARQUET_DIR');
+};
+const parquetDirOf = ({ db, parquetDir }: { db: string; parquetDir?: string | undefined }) => {
+  return parquetDir ?? join(dirname(db), 'parquet');
+};
+
 interface ServeOptions {
   db: string;
+  parquetDir?: string;
   host: string;
   port: number;
 }
 
 // Loaded on demand so a plain archiver never pulls in the web bundle.
-async function serve({ db, host, port }: ServeOptions) {
+async function serve(options: ServeOptions) {
   const { startServer } = await import('./server.ts');
-  return startServer({ dbPath: db, catalog: requireCatalog(), host, port });
+  const { db, host, port } = options;
+  return startServer({ dbPath: db, parquetDir: parquetDirOf(options), catalog: requireCatalog(), host, port });
 }
 
 const program = new Command()
@@ -106,28 +129,42 @@ program
       .default(settings.archive?.serve ?? false)
       .env('SERVE')
   )
+  .addOption(parquetDirOption())
+  .addOption(
+    new Option('--parquet-after-days <days>', 'move a closed day to Parquet once it ended this many days ago')
+      .argParser(argParser(parseDays))
+      .default(settings.parquet?.afterDays ?? DEFAULT_AFTER_DAYS)
+      .env('PARQUET_AFTER_DAYS')
+  )
   .addOption(hostOption())
   .addOption(portOption())
-  .action(async (options: ServeOptions & { interval: number; serve?: boolean; heartbeatUrl?: URL }) => {
-    // runArchiver creates the database before its first await, so the read-only server can open it.
-    const archiving = runArchiver({
-      intervalSeconds: options.interval,
-      dbPath: options.db,
-      catalog: requireCatalog(),
-      heartbeatUrl: options.heartbeatUrl,
-      peers: settings.peers ?? [],
-    });
-    const server = options.serve ? await serve(options) : null;
-    await archiving;
-    // An open server keeps the process alive, so close it, and any open connections, once archiving stops.
-    await server?.stop(true);
-    if (server) log.info('server stopped');
-  });
+  .action(
+    async (
+      options: ServeOptions & { interval: number; serve?: boolean; heartbeatUrl?: URL; parquetAfterDays: number }
+    ) => {
+      // runArchiver creates the database before its first await, so the read-only server can open it.
+      const archiving = runArchiver({
+        intervalSeconds: options.interval,
+        dbPath: options.db,
+        catalog: requireCatalog(),
+        heartbeatUrl: options.heartbeatUrl,
+        peers: settings.peers ?? [],
+        parquetDir: parquetDirOf(options),
+        afterDays: options.parquetAfterDays,
+      });
+      const server = options.serve ? await serve(options) : null;
+      await archiving;
+      // An open server keeps the process alive, so close it, and any open connections, once archiving stops.
+      await server?.stop(true);
+      if (server) log.info('server stopped');
+    }
+  );
 
 program
   .command('serve')
   .description('serve the explorer and its JSON API, reading the archive without writing to it')
   .addOption(dbOption())
+  .addOption(parquetDirOption())
   .addOption(hostOption())
   .addOption(portOption())
   .action(async (options: ServeOptions) => {
@@ -150,9 +187,10 @@ program
   .command('mcp')
   .description('serve the archive to AI agents over MCP on stdin and stdout (read-only)')
   .addOption(dbOption())
-  .action(async ({ db }: { db: string }) => {
+  .addOption(parquetDirOption())
+  .action(async (options: { db: string; parquetDir?: string }) => {
     const [{ openReader }, { runMcpStdio }] = await Promise.all([import('./reader.ts'), import('./mcp.ts')]);
-    const reader = openReader(db);
+    const reader = openReader(options.db, { parquetDir: parquetDirOf(options) });
     await runMcpStdio(reader, requireCatalog());
     reader.close();
   });
@@ -183,14 +221,15 @@ program
 
 program
   .command('backup')
-  .description('write a consistent, timestamped copy of the archive into a directory (safe while archiving)')
+  .description('write a consistent, timestamped copy of the archive, and any Parquet files it lacks, into a directory')
   .argument('<dir>', 'directory to write the copy into')
   .addOption(dbOption())
-  .action(async (dir: string, { db }: { db: string }) => {
+  .addOption(parquetDirOption())
+  .action(async (dir: string, options: { db: string; parquetDir?: string }) => {
     const { backupArchive } = await import('./store.ts');
     const startedAt = Date.now();
-    const path = backupArchive(db, dir);
-    log.info('backup done', { path, durationMs: Date.now() - startedAt });
+    const { path, parquetCopied } = await backupArchive(options.db, dir, { parquetDir: parquetDirOf(options) });
+    log.info('backup done', { path, parquetCopied, durationMs: Date.now() - startedAt });
   });
 
 try {

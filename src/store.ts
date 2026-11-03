@@ -1,5 +1,5 @@
 import { Database } from 'bun:sqlite';
-import { mkdirSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, rmSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { type Address, hexToBytes } from 'viem';
 import type { Endpoint, Source } from './config.ts';
@@ -159,7 +159,14 @@ export interface StoredRecord {
 
 // Writes a consistent copy of the archive into `dir` and returns its path. In WAL mode a plain file copy of a live
 // archive can miss committed data, so this uses VACUUM INTO, which also runs while the archiver keeps writing.
-export function backupArchive(dbPath: string, dir: string, now = new Date()) {
+// Moved days live in Parquet files, so every file the copy registers is copied into `dir`/parquet too, after the
+// SQLite copy: a file registered later is not needed, because the copy still holds those records. Files never change,
+// so one already in the backup is skipped; each new copy is checked against its registered SHA-256.
+export async function backupArchive(
+  dbPath: string,
+  dir: string,
+  { parquetDir, now = new Date() }: { parquetDir?: string | undefined; now?: Date } = {}
+) {
   mkdirSync(dir, { recursive: true });
   const path = join(dir, `archive-${now.toISOString().replace(/[:.]/g, '-')}.sqlite`);
   const db = new Database(dbPath, { readonly: true, strict: true });
@@ -168,7 +175,33 @@ export function backupArchive(dbPath: string, dir: string, now = new Date()) {
   } finally {
     db.close();
   }
-  return path;
+  let parquetCopied = 0;
+  const copy = new Database(path, { readonly: true, strict: true });
+  try {
+    const files = hasTable(copy, 'parquet_files')
+      ? copy
+          .query<{ name: string; bytes: number; sha256: string }, []>('SELECT name, bytes, sha256 FROM parquet_files')
+          .all()
+      : [];
+    if (files.length > 0 && !parquetDir)
+      throw new Error('the archive has Parquet files but no parquet directory was given');
+    const target = join(dir, 'parquet');
+    if (files.length > 0) mkdirSync(target, { recursive: true });
+    for (const { name, bytes, sha256 } of files) {
+      const to = join(target, name);
+      if (existsSync(to) && statSync(to).size === bytes) continue;
+      copyFileSync(join(parquetDir ?? '.', name), to);
+      const copied = new Bun.CryptoHasher('sha256').update(await Bun.file(to).arrayBuffer()).digest('hex');
+      if (copied !== sha256) {
+        rmSync(to, { force: true });
+        throw new Error(`${name} does not match its registered SHA-256`);
+      }
+      parquetCopied += 1;
+    }
+  } finally {
+    copy.close();
+  }
+  return { path, parquetCopied };
 }
 
 export function openStore(path: string) {

@@ -25,6 +25,9 @@ serve:
   port: 8080
 health:
   maxAge: 600
+parquet:
+  dir: /data/parquet
+  afterDays: 3
 peers:
   - https://archive.example.org
   - https://archive.example.org
@@ -36,6 +39,7 @@ peers:
       archive: { interval: 120, serve: true },
       serve: { host: '0.0.0.0', port: 8080 },
       health: { maxAge: 600 },
+      parquet: { dir: '/data/parquet', afterDays: 3 },
     });
     expect(settings.archive?.heartbeatUrl?.host).toBe('hc-ping.com');
     // Duplicates collapse, so a peer is never asked twice.
@@ -65,6 +69,12 @@ peers:
     expect(() => parseSettings('archive:\n  serve: yes please')).toThrow('config: archive.serve must be true or false');
     expect(() => parseSettings('db: ""')).toThrow('config: db must be a non-empty string');
     expect(() => parseSettings('serve: 3000')).toThrow('config: serve must be a mapping');
+    expect(() => parseSettings('parquet:\n  afterDays: 0')).toThrow(
+      'config: parquet.afterDays must be a whole number of days'
+    );
+    expect(() => parseSettings('parquet:\n  afterDays: 1.5')).toThrow(
+      'config: parquet.afterDays must be a whole number'
+    );
   });
 });
 
@@ -120,7 +130,7 @@ describe('loadSettings', () => {
   const path = join(dir, 'archive.yaml');
   writeFileSync(
     path,
-    'db: data/archive.sqlite\narchive:\n  interval: 90\ncatalog:\n  airnodes: lists/a.yaml\n  feeds: lists/f.yaml\n'
+    'db: data/archive.sqlite\narchive:\n  interval: 90\nparquet:\n  dir: cold\ncatalog:\n  airnodes: lists/a.yaml\n  feeds: lists/f.yaml\n'
   );
   mkdirSync(join(dir, 'lists'), { recursive: true });
   writeFileSync(
@@ -134,6 +144,7 @@ describe('loadSettings', () => {
     settings: {
       db: join(dir, 'data/archive.sqlite'),
       archive: { interval: 90 },
+      parquet: { dir: join(dir, 'cold') },
       catalog: { airnodes: 'lists/a.yaml', feeds: 'lists/f.yaml' },
     },
     catalog: {

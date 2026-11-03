@@ -21,13 +21,18 @@ export interface ConflictSummary {
   widest: { feed: string; timestamp: number; values: string[]; spreadBps: number | null };
 }
 
-type ConflictRecord = ReturnType<Reader['conflictRecords']>[number];
+type ConflictRecord = Awaited<ReturnType<Reader['conflictRecords']>>[number];
 
 const percentile = (sorted: readonly (number | null)[], p: number) => {
   return sorted[Math.min(sorted.length - 1, Math.floor(p * sorted.length))] ?? null;
 };
 
-export function summarizeConflicts(reader: Reader, catalog: Catalog, from: number, to: number): ConflictSummary[] {
+export async function summarizeConflicts(
+  reader: Reader,
+  catalog: Catalog,
+  from: number,
+  to: number
+): Promise<ConflictSummary[]> {
   const feedOf = new Map<string, string>();
   const sources = [...catalog.feeds].flatMap(([name, feed]) => {
     const all = [...feed.public, ...feed['public-oev']];
@@ -37,7 +42,7 @@ export function summarizeConflicts(reader: Reader, catalog: Catalog, from: numbe
 
   // One group per conflicting moment.
   const moments = new Map<string, ConflictRecord[]>();
-  for (const record of reader.conflictRecords(sources, from, to)) {
+  for (const record of await reader.conflictRecords(sources, from, to)) {
     const key = `${record.airnode}:${record.templateId}:${record.timestamp}`;
     moments.set(key, [...(moments.get(key) ?? []), record]);
   }
@@ -68,8 +73,7 @@ export function summarizeConflicts(reader: Reader, catalog: Catalog, from: numbe
     byTarget.set(key, target);
   }
 
-  return reader
-    .momentCounts(sources, from, to)
+  return (await reader.momentCounts(sources, from, to))
     .flatMap(({ airnode, endpoint, moments: total }): ConflictSummary[] => {
       const target = byTarget.get(`${airnode}:${endpoint}`);
       if (!target?.widest) return [];

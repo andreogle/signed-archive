@@ -451,15 +451,17 @@ describe('coverage', () => {
 });
 
 describe('GET /api/records', () => {
-  const get = (query: string) =>
-    handleApi(peerReader, catalog, new URL(`http://x/api/records?${query}`), 1_793_300_000);
+  const response = (query: string) => {
+    return handleApi(peerReader, catalog, new URL(`http://x/api/records?${query}`), 1_793_300_000);
+  };
+  const get = async (query: string) => (await response(query)).json();
 
   test('returns the signed records in the window and what this archive itself lacks there', async () => {
-    const body = await get(`airnode=${coingecko.airnode}&endpoint=public&from=1793206900&to=1793207000`).json();
+    const body = await get(`airnode=${coingecko.airnode}&endpoint=public&from=1793206900&to=1793207000`);
     expect(body.records).toEqual([coingecko]);
     // The peer's only poll was at 1793207000, so it lacks everything before it.
     expect(body).toMatchObject({ uncovered: [{ from: 1_793_206_900, to: 1_793_207_000 }], watched: false });
-    const before = await get(`airnode=${coingecko.airnode}&endpoint=public&from=1793100000&to=1793100100`).json();
+    const before = await get(`airnode=${coingecko.airnode}&endpoint=public&from=1793100000&to=1793100100`);
     expect(before).toMatchObject({
       records: [],
       uncovered: [{ from: 1_793_100_000, to: 1_793_100_100 }],
@@ -467,11 +469,11 @@ describe('GET /api/records', () => {
     });
   });
 
-  test('refuses unknown airnodes and windows that are missing, reversed or too long', () => {
+  test('refuses unknown airnodes and windows that are missing, reversed or too long', async () => {
     // 400, which the asker treats as final: a peer that doesn't know an airnode won't learn it by being asked again.
-    expect(get('airnode=0x0000000000000000000000000000000000000001&from=1&to=2').status).toBe(400);
-    expect(get(`airnode=${coingecko.airnode}&to=2`).status).toBe(400);
-    expect(get(`airnode=${coingecko.airnode}&from=5&to=2`).status).toBe(400);
-    expect(get(`airnode=${coingecko.airnode}&from=0&to=901`).status).toBe(400);
+    expect((await response('airnode=0x0000000000000000000000000000000000000001&from=1&to=2')).status).toBe(400);
+    expect((await response(`airnode=${coingecko.airnode}&to=2`)).status).toBe(400);
+    expect((await response(`airnode=${coingecko.airnode}&from=5&to=2`)).status).toBe(400);
+    expect((await response(`airnode=${coingecko.airnode}&from=0&to=901`)).status).toBe(400);
   });
 });

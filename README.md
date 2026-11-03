@@ -57,6 +57,9 @@ last updated.
 - **API**: `/api/feeds`, `/api/history?feed=ETH/USD&from=&to=` and `/api/at?feed=ETH/USD&time=` (unix seconds; add
   `endpoint=public-oev` for OEV data).
 
+- **Data**: `/data/manifest.json` lists the moved days' Parquet files with their SHA-256, and `/data/<name>` serves each
+  one (see [Parquet files](#parquet-files)).
+
 Feed names come from `config/feeds.yaml`. The page fetches the airnode and feed lists from
 `/api/catalog` and checks every record against them in the browser.
 
@@ -99,7 +102,9 @@ live file. Run it nightly from the host's cron and move the copies off the machi
 docker run --rm -v signed-archive_backups:/backups -v "$PWD":/out busybox cp -r /backups/. /out/
 ```
 
-Each copy is a full archive (hundreds of MB per day of history), so prune old copies once they are stored elsewhere.
+Each copy holds what is still in SQLite (about the last week), plus a `parquet/` folder beside it with every moved
+day. Parquet files never change, so they are copied once and checked against their registered SHA-256; prune old
+SQLite copies once they are stored elsewhere, but keep `parquet/`.
 
 `bun run dev` stays the development loop. Don't point it at the Docker volume: under `--watch` every edit restarts the
 archiver and leaves a gap.
@@ -220,6 +225,51 @@ already covered are skipped).
 
 To be someone's peer, expose your explorer (only `/api/records` is needed) where they can reach it, for example
 through a reverse proxy in front of the `explorer` container.
+
+## Parquet files
+
+Closed days move out of SQLite into Parquet files once they ended 7 days ago (`parquet.afterDays` in the config,
+`--parquet-after-days`, `PARQUET_AFTER_DAYS`). The files go to `parquet/` next to the database (`parquet.dir`,
+`--parquet-dir`, `PARQUET_DIR`), so the Docker volume holds both. The archiver checks hourly, beside polling.
+
+A day is moved only after its file has been written, flushed to disk, read back and matched against SQLite row for row,
+and registered with its SHA-256; only then are those rows deleted from SQLite, in small batches. Files are never changed.
+A record that arrives later for a moved day (from a peer, a merge, or a feed still serving an old value) goes to SQLite,
+and the next move writes it to another part of that day, or drops it if a file already holds it.
+
+Each day is one or more files named `YYYY-MM-DD.NNN.parquet`, about 73 bytes per record (the 65-byte signature doesn't
+compress), roughly a third of SQLite. Every column is kept exactly as signed, as bytes:
+
+| Column        | Type           | Notes                                                  |
+| ------------- | -------------- | ------------------------------------------------------ |
+| `airnode`     | 20 bytes       |                                                        |
+| `template_id` | 32 bytes       | OEV records carry the OEV template ID                  |
+| `timestamp`   | int64          | unix seconds, as signed                                |
+| `value`       | 32 bytes       | int256, 18 decimals                                    |
+| `signature`   | 65 bytes       |                                                        |
+| `endpoint`    | string         | `public` or `public-oev`                               |
+| `fetched_at`  | int64          | unix milliseconds, when this archive fetched it        |
+| `source`      | string or null | `api3` or `provider`; null for merged or repaired ones |
+
+The explorer, API and MCP read SQLite and the files together, so nothing changes for them. To query the files yourself,
+download them from `/data/` or query one in place with DuckDB, which reads only the parts it needs over HTTP (a URL
+can't be a glob; take the names from the manifest):
+
+```sql
+SELECT '0x' || lower(hex(airnode)) AS airnode, count(*) AS records
+FROM read_parquet('https://archive.example.org/data/2026-11-02.000.parquet')
+GROUP BY ALL;
+-- Recent days are still in SQLite: read both together. DuckDB can't scan `datapoints` directly (it has no rowid),
+-- so pass the query through to SQLite, and compare keys as hex.
+ATTACH 'data/archive.sqlite' AS live (TYPE sqlite, READ_ONLY);
+SELECT count(*) FROM (
+  SELECT hex(airnode), hex(template_id), timestamp, hex(value) FROM read_parquet('data/parquet/*.parquet')
+  UNION
+  SELECT * FROM sqlite_query('live', 'SELECT hex(airnode), hex(template_id), timestamp, hex(value) FROM datapoints')
+);
+```
+
+`merge` reads only the other archive's SQLite, so records it has already moved to Parquet are not merged.
 
 ## Querying
 

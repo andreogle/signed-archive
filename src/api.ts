@@ -73,7 +73,12 @@ function parseSeconds(value: string | null, fallback: number) {
 const providerCount = (records: readonly SignedPrice[]) => new Set(records.map(({ provider }) => provider)).size;
 
 // GET /api/feeds, /api/history and /api/at. Times are unix seconds, like the signed timestamps.
-export function handleApi(reader: Reader, catalog: Catalog, url: URL, now = Math.floor(Date.now() / 1000)): Response {
+export async function handleApi(
+  reader: Reader,
+  catalog: Catalog,
+  url: URL,
+  now = Math.floor(Date.now() / 1000)
+): Promise<Response> {
   // The airnodes and feeds this archive keeps, so the web app checks records against the same lists.
   if (url.pathname === '/api/catalog') return json(catalog.input);
 
@@ -82,12 +87,15 @@ export function handleApi(reader: Reader, catalog: Catalog, url: URL, now = Math
   if (!isEndpoint(endpoint)) return fail(400, `endpoint must be one of ${ENDPOINTS.join(', ')}`);
 
   if (url.pathname === '/api/feeds') {
-    const feeds = [...catalog.feeds].flatMap(([feed, sources]): FeedSummary[] => {
-      const records = reader.at(sources[endpoint], now);
-      if (records.length === 0) return [];
-      const latest = Math.max(...records.map(({ timestamp }) => Number(timestamp)));
-      return [{ feed, providers: providerCount(records), latest, median: medianPrice(records) }];
-    });
+    const summaries = await Promise.all(
+      [...catalog.feeds].map(async ([feed, sources]): Promise<FeedSummary[]> => {
+        const records = await reader.at(sources[endpoint], now);
+        if (records.length === 0) return [];
+        const latest = Math.max(...records.map(({ timestamp }) => Number(timestamp)));
+        return [{ feed, providers: providerCount(records), latest, median: medianPrice(records) }];
+      })
+    );
+    const feeds = summaries.flat();
     return json({ endpoint, feeds } satisfies FeedsResponse);
   }
 
@@ -101,11 +109,11 @@ export function handleApi(reader: Reader, catalog: Catalog, url: URL, now = Math
     if (from === null || to === null || from < 0 || to < from || to - from > PEER_WINDOW_SECONDS) {
       return fail(400, `from and to must be unix seconds, from <= to, at most ${PEER_WINDOW_SECONDS} s apart`);
     }
-    const records = reader
-      .records(catalog.sourcesOfAirnode(airnode, endpoint), from, to)
-      .map(({ airnode, templateId, timestamp, encodedValue, signature }) => {
+    const records = (await reader.records(catalog.sourcesOfAirnode(airnode, endpoint), from, to)).map(
+      ({ airnode, templateId, timestamp, encodedValue, signature }) => {
         return { airnode, templateId, timestamp, encodedValue, signature };
-      });
+      }
+    );
     const uncovered = reader.uncovered(airnode, endpoint, from, to);
     return json({
       airnode,
@@ -124,7 +132,11 @@ export function handleApi(reader: Reader, catalog: Catalog, url: URL, now = Math
     if (from === null || to === null || from > to || to - from > MAX_CONFLICT_SECONDS) {
       return fail(400, `from and to must be unix seconds, from <= to, at most ${MAX_CONFLICT_SECONDS} s apart`);
     }
-    return json({ from, to, summaries: summarizeConflicts(reader, catalog, from, to) } satisfies ConflictsResponse);
+    return json({
+      from,
+      to,
+      summaries: await summarizeConflicts(reader, catalog, from, to),
+    } satisfies ConflictsResponse);
   }
 
   const feed = params.get('feed') ?? '';
@@ -140,9 +152,9 @@ export function handleApi(reader: Reader, catalog: Catalog, url: URL, now = Math
     // Start at the first record, so a range like "all" (from=0) spends its points on data, not empty decades.
     const earliest = reader.earliest(sources);
     const from = Math.min(to, Math.max(requested, earliest ?? requested));
-    const providers = reader
-      .history(sources, from, to)
-      .map((series) => ({ ...series, slot: catalog.slots.get(series.provider) ?? 0 }));
+    const providers = (await reader.history(sources, from, to)).map((series) => {
+      return { ...series, slot: catalog.slots.get(series.provider) ?? 0 };
+    });
     return json({
       feed,
       endpoint,
@@ -157,7 +169,7 @@ export function handleApi(reader: Reader, catalog: Catalog, url: URL, now = Math
   if (url.pathname === '/api/at') {
     const time = parseSeconds(params.get('time'), now);
     if (time === null) return fail(400, 'time must be unix seconds');
-    const records = reader.at(sources, time);
+    const records = await reader.at(sources, time);
     return json({ feed, endpoint, time, median: medianPrice(records), records } satisfies MomentResponse);
   }
 

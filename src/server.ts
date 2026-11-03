@@ -7,14 +7,15 @@ import { openReader } from './reader.ts';
 
 export interface ServerOptions {
   dbPath: string;
+  parquetDir?: string | undefined;
   catalog: Catalog;
   host: string;
   port: number;
 }
 
 // Serves the explorer page and its JSON API. Bun bundles web/ (including the browser-side signature check) on start.
-export function startServer({ dbPath, catalog, host, port }: ServerOptions) {
-  const reader = openReader(dbPath);
+export function startServer({ dbPath, parquetDir, catalog, host, port }: ServerOptions) {
+  const reader = openReader(dbPath, { parquetDir });
   const server = Bun.serve({
     hostname: host,
     port,
@@ -33,6 +34,22 @@ export function startServer({ dbPath, catalog, host, port }: ServerOptions) {
           return new Response('method not allowed', { status: 405, headers: { allow: 'GET, HEAD' } });
         }
         return handleApi(reader, catalog, new URL(request.url));
+      },
+      // Moved days as Parquet files, for bulk download or querying in place (DuckDB reads them over HTTP ranges, which
+      // Bun.file responses answer). The manifest lists each file with its SHA-256.
+      '/data/manifest.json': () => {
+        const files = reader.parquetFiles().map((file) => ({ ...file, url: `/data/${file.name}` }));
+        return Response.json({ files });
+      },
+      '/data/:name': (request) => {
+        const path = reader.parquetPath(request.params.name);
+        if (!path) return new Response('not found', { status: 404 });
+        return new Response(Bun.file(path), {
+          headers: {
+            'content-type': 'application/vnd.apache.parquet',
+            'cache-control': 'public, max-age=31536000, immutable',
+          },
+        });
       },
       // The archive as an MCP server for AI agents (see src/mcp.ts).
       '/mcp': (request) => handleMcpHttp(reader, catalog, request),

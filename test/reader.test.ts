@@ -56,7 +56,7 @@ describe('catalog.slots', () => {
 
 describe('at', () => {
   test('returns each provider latest record at or before the time, still verifiable', async () => {
-    const records = reader.at(eth.public, 1_793_206_910);
+    const records = await reader.at(eth.public, 1_793_206_910);
     expect(records.map(({ provider, timestamp }) => [provider, timestamp])).toEqual([
       ['blocksize', '1793206903'],
       ['coingecko', '1793206907'],
@@ -66,19 +66,19 @@ describe('at', () => {
     expect(records[1]).toMatchObject({ ...coingecko, price: '2333.11' });
   });
 
-  test('picks the newest record when several are older than the time', () => {
-    const [latest] = reader.at(eth.public, 1_793_207_000);
+  test('picks the newest record when several are older than the time', async () => {
+    const [latest] = await reader.at(eth.public, 1_793_207_000);
     expect(latest?.encodedValue).toBe(blocksize[1]?.encodedValue);
   });
 
-  test('reads OEV records under the OEV template ID', () => {
-    expect(reader.at(eth['public-oev'], 1_793_207_000).map(({ provider }) => provider)).toEqual(['coingecko']);
+  test('reads OEV records under the OEV template ID', async () => {
+    expect((await reader.at(eth['public-oev'], 1_793_207_000)).map(({ provider }) => provider)).toEqual(['coingecko']);
   });
 });
 
 describe('records', () => {
   test('returns every record in range, oldest first, still verifiable', async () => {
-    const records = reader.records(eth.public, 1_793_206_900, 1_793_206_960);
+    const records = await reader.records(eth.public, 1_793_206_900, 1_793_206_960);
     expect(records.map(({ provider, timestamp }) => [provider, timestamp])).toEqual([
       ['blocksize', '1793206903'],
       ['coingecko', '1793206907'],
@@ -86,15 +86,15 @@ describe('records', () => {
       ['blocksize', '1793206951'],
     ]);
     for (const record of records) expect(await hasValidSignature(record)).toBe(true);
-    expect(reader.records(eth.public, 1_793_206_904, 1_793_206_910).map(({ provider }) => provider)).toEqual([
+    expect((await reader.records(eth.public, 1_793_206_904, 1_793_206_910)).map(({ provider }) => provider)).toEqual([
       'coingecko',
     ]);
   });
 });
 
 describe('history', () => {
-  test('returns ordered points per provider in range', () => {
-    const providers = reader.history(eth.public, 1_793_206_900, 1_793_206_960);
+  test('returns ordered points per provider in range', async () => {
+    const providers = await reader.history(eth.public, 1_793_206_900, 1_793_206_960);
     expect(providers.map(({ provider, points }) => [provider, points.map(({ timestamp }) => timestamp)])).toEqual([
       ['blocksize', [1_793_206_903, 1_793_206_951]],
       ['coingecko', [1_793_206_907]],
@@ -102,8 +102,8 @@ describe('history', () => {
     ]);
   });
 
-  test('keeps the last record of each bucket on long ranges', () => {
-    const [first] = reader.history(eth.public, 0, 1_793_207_000);
+  test('keeps the last record of each bucket on long ranges', async () => {
+    const [first] = await reader.history(eth.public, 0, 1_793_207_000);
     expect(first?.points).toEqual([{ timestamp: 1_793_206_951, price: '2332.2122749432156' }]);
   });
 });

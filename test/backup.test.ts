@@ -16,7 +16,7 @@ afterAll(() => {
 });
 
 test('writes a timestamped copy with every record and poll, still verifiable', async () => {
-  const path = backupArchive(source.path, join(dir, 'nested'), new Date('2026-10-28T12:34:56.789Z'));
+  const { path } = await backupArchive(source.path, join(dir, 'nested'), { now: new Date('2026-10-28T12:34:56.789Z') });
   expect(path).toBe(join(dir, 'nested', 'archive-2026-10-28T12-34-56-789Z.sqlite'));
 
   const count = (file: string, table: string) => {
@@ -42,8 +42,8 @@ test('writes a timestamped copy with every record and poll, still verifiable', a
   expect(await hasValidSignature(restored as typeof coingecko)).toBe(true);
 });
 
-test('refuses to overwrite an existing backup', () => {
-  const at = new Date('2026-10-28T00:00:00.000Z');
-  backupArchive(source.path, dir, at);
-  expect(() => backupArchive(source.path, dir, at)).toThrow();
+test('refuses to overwrite an existing backup', async () => {
+  const now = new Date('2026-10-28T00:00:00.000Z');
+  await backupArchive(source.path, dir, { now });
+  await expect(backupArchive(source.path, dir, { now })).rejects.toThrow();
 });

@@ -52,7 +52,7 @@ describe('mergeArchive', () => {
     expect(result).toEqual({ read: 8, added: 5, rejected: 3, polls: 5, rejectedPolls: 2 });
 
     const reader = openReader(target);
-    const [latest] = reader.at(
+    const [latest] = await reader.at(
       [{ provider: 'blocksize', airnode: blocksize[0]?.airnode ?? '0x', templateId: blocksize[0]?.templateId ?? '0x' }],
       1_793_207_000
     );

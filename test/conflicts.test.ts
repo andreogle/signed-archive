@@ -49,8 +49,8 @@ describe('summarizeConflicts', () => {
     for (const datum of zecConflict) expect(await hasValidSignature(datum)).toBe(true);
   });
 
-  test('counts the conflict per provider and endpoint, with its spread and the two Signed APIs that served it', () => {
-    const all = summarizeConflicts(reader, catalog, 1, 1_800_000_000);
+  test('counts the conflict per provider and endpoint, with its spread and the two Signed APIs that served it', async () => {
+    const all = await summarizeConflicts(reader, catalog, 1, 1_800_000_000);
     const summary = all.find(({ provider }) => provider === 'blocksize');
     // Three distinct moments archived for blocksize: two ETH/USD, one ZEC/USD (with two values).
     expect(summary).toMatchObject({
@@ -67,18 +67,18 @@ describe('summarizeConflicts', () => {
     expect(summary?.widest.values).toHaveLength(2);
   });
 
-  test('marks records with no matching poll as from an unknown source, and lists providers alphabetically on a tie', () => {
-    const all = summarizeConflicts(reader, catalog, 1, 1_800_000_000);
+  test('marks records with no matching poll as from an unknown source, and lists providers alphabetically on a tie', async () => {
+    const all = await summarizeConflicts(reader, catalog, 1, 1_800_000_000);
     expect(all.map(({ provider }) => provider)).toEqual(['blocksize', 'coingecko']);
     // Doubling the value is a 6667 bps spread around the mean of the two.
     expect(all[1]).toMatchObject({ conflicts: 1, sources: { unknown: 1 }, spreadBps: { max: 6666.66 } });
   });
 
-  test('finds nothing outside the range asked for', () => {
-    expect(summarizeConflicts(reader, catalog, 1_793_219_957, 1_800_000_000)).toEqual([]);
+  test('finds nothing outside the range asked for', async () => {
+    expect(await summarizeConflicts(reader, catalog, 1_793_219_957, 1_800_000_000)).toEqual([]);
   });
 
-  test('reports a zero-median conflict as undefined spread, never zero disagreement', () => {
+  test('reports a zero-median conflict as undefined spread, never zero disagreement', async () => {
     const path = join(dir, 'zero-median.sqlite');
     const store = openStore(path);
     // Synthetic stored rows exercise arithmetic only; signature verification has its own real fixtures.
@@ -88,7 +88,7 @@ describe('summarizeConflicts', () => {
     store.close();
     const zeroReader = openReader(path);
     try {
-      expect(summarizeConflicts(zeroReader, catalog, 1, 1_800_000_000)).toMatchObject([
+      expect(await summarizeConflicts(zeroReader, catalog, 1, 1_800_000_000)).toMatchObject([
         { conflicts: 1, spreadBps: { median: null, p90: null, max: null }, widest: { spreadBps: null } },
       ]);
     } finally {
@@ -98,18 +98,20 @@ describe('summarizeConflicts', () => {
 });
 
 describe('GET /api/conflicts', () => {
-  const get = (query: string) => handleApi(reader, catalog, new URL(`http://x/api/conflicts?${query}`), 1_793_400_000);
+  const response = (query: string) =>
+    handleApi(reader, catalog, new URL(`http://x/api/conflicts?${query}`), 1_793_400_000);
+  const get = async (query: string) => (await response(query)).json();
 
   test('returns the summaries for the range, the last day by default', async () => {
-    const all = await get('from=1793200000&to=1793400000').json();
+    const all = await get('from=1793200000&to=1793400000');
     expect(all.summaries.map(({ provider }: { provider: string }) => provider)).toEqual(['blocksize', 'coingecko']);
     // The fixtures were signed more than a day before `now`, so the default range has none.
-    expect(await get('').json()).toEqual({ from: 1_793_313_600, to: 1_793_400_000, summaries: [] });
+    expect(await get('')).toEqual({ from: 1_793_313_600, to: 1_793_400_000, summaries: [] });
   });
 
-  test('refuses a reversed or malformed range, or one longer than a week, which would read too many records', () => {
-    expect(get('from=5&to=2').status).toBe(400);
-    expect(get('from=soon').status).toBe(400);
-    expect(get('from=0&to=1800000000').status).toBe(400);
+  test('refuses a reversed or malformed range, or one longer than a week, which would read too many records', async () => {
+    expect((await response('from=5&to=2')).status).toBe(400);
+    expect((await response('from=soon')).status).toBe(400);
+    expect((await response('from=0&to=1800000000')).status).toBe(400);
   });
 });

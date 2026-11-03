@@ -82,7 +82,7 @@ describe('poll', () => {
     expect(await poll(target(coingecko.airnode), store, 60_000, stop)).toEqual({ saved: 1, rejected: 3 });
     store.close();
     const reader = openReader(dbPath);
-    expect(reader.records([{ provider: 'coingecko', ...coingecko }], 0, 2e9)).toHaveLength(1);
+    expect(await reader.records([{ provider: 'coingecko', ...coingecko }], 0, 2e9)).toHaveLength(1);
     reader.close();
   });
 
@@ -155,7 +155,7 @@ describe('runArchiver', () => {
     expect(requests).toContain(path);
     expect(requests).toContain(`/public-oev/${coingecko.airnode}`);
     const reader = openReader(dbPath);
-    expect(reader.records([{ provider: 'coingecko', ...coingecko }], 0, 2e9)).toHaveLength(1);
+    expect(await reader.records([{ provider: 'coingecko', ...coingecko }], 0, 2e9)).toHaveLength(1);
     reader.close();
     expect(['SIGINT', 'SIGTERM'].map((name) => process.listenerCount(name))).toEqual(listeners);
   });

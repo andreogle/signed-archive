@@ -204,22 +204,24 @@ async function callTool(reader: Reader, catalog: Catalog, name: string, args: To
     case 'list_feeds': {
       const endpoint = readEndpoint(args.endpoint);
       const needle = typeof args.search === 'string' ? args.search.toUpperCase() : '';
-      const feeds = [...catalog.feeds]
-        .filter(([feed]) => feed.toUpperCase().includes(needle))
-        .flatMap(([feed, sources]) => {
-          const records = reader.at(sources[endpoint], now);
+      const matching = [...catalog.feeds].filter(([feed]) => feed.toUpperCase().includes(needle));
+      const listed = await Promise.all(
+        matching.map(async ([feed, sources]) => {
+          const records = await reader.at(sources[endpoint], now);
           if (records.length === 0) return [];
           const latest = Math.max(...records.map(({ timestamp }) => Number(timestamp)));
           const providers = new Set(records.map(({ provider }) => provider)).size;
           return [{ feed, median: medianPrice(records), providers, latestSignedAt: iso(latest) }];
-        });
+        })
+      );
+      const feeds = listed.flat();
       return { endpoint, count: feeds.length, feeds };
     }
     case 'get_price_at': {
       const endpoint = readEndpoint(args.endpoint);
       const sources = sourcesOf(catalog, args.feed, endpoint);
       const time = parseTime(args.time, 'time');
-      const records = reader.at(sources, time);
+      const records = await reader.at(sources, time);
       const described = await describeRecords(catalog, String(args.feed), endpoint, records, time);
       const verified = records.filter((_, index) => described[index]?.verified);
       return {
@@ -240,7 +242,7 @@ async function callTool(reader: Reader, catalog: Catalog, name: string, args: To
       const sources = sourcesOf(catalog, args.feed, endpoint);
       const maxAge = readNumber(args.maxAgeSeconds, 'maxAgeSeconds', 300);
       const maxSpread = readNumber(args.maxSpreadBps, 'maxSpreadBps', 100);
-      const records = reader.at(sources, now);
+      const records = await reader.at(sources, now);
       const described = await describeRecords(catalog, String(args.feed), endpoint, records, now);
       const verified = records.filter((_, index) => described[index]?.verified);
       const issues: string[] = [];
@@ -281,7 +283,7 @@ async function callTool(reader: Reader, catalog: Catalog, name: string, args: To
       const to = parseTime(args.to, 'to');
       if (from > to) throw new ArgumentError('from must not be after to');
       const points = readCount(args.points, 'points', DEFAULT_HISTORY_POINTS, MAX_HISTORY_POINTS);
-      const providers = reader.history(sources, from, to, points).map(({ provider, points: series }) => {
+      const providers = (await reader.history(sources, from, to, points)).map(({ provider, points: series }) => {
         return { provider, points: series.map(({ timestamp, price }) => ({ signedAt: iso(timestamp), price })) };
       });
       const gaps = reader.gaps(sources, endpoint, from, to).map((gap) => ({ from: iso(gap.from), to: iso(gap.to) }));
@@ -292,7 +294,7 @@ async function callTool(reader: Reader, catalog: Catalog, name: string, args: To
       const from = args.from === undefined ? to - 24 * 60 * 60 : parseTime(args.from, 'from');
       if (from > to) throw new ArgumentError('from must not be after to');
       if (to - from > MAX_CONFLICT_SECONDS) throw new ArgumentError('the range must be at most 7 days');
-      const summaries = summarizeConflicts(reader, catalog, from, to).map((summary) => {
+      const summaries = (await summarizeConflicts(reader, catalog, from, to)).map((summary) => {
         const { feed, timestamp } = summary.widest;
         const endpoint = summary.endpoint === 'public' ? {} : { endpoint: summary.endpoint };
         const recheck = { tool: 'get_price_at', arguments: { feed, time: timestamp, ...endpoint } };

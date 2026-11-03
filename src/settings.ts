@@ -21,6 +21,8 @@ export interface Settings {
   archive?: { interval?: number; heartbeatUrl?: URL; serve?: boolean };
   serve?: { host?: string; port?: number };
   health?: { maxAge?: number };
+  // Moved days' Parquet files (default: parquet/ next to the database), and how many days a closed day waits first.
+  parquet?: { dir?: string; afterDays?: number };
   // Other archives to ask for records this one missed. See src/repair.ts.
   peers?: URL[];
   // The airnode and feed list files, relative to the settings file.
@@ -44,6 +46,12 @@ export function parseSeconds(value: string) {
   const seconds = Number(value);
   if (!Number.isInteger(seconds) || seconds < 1) throw new Error('must be a whole number of seconds');
   return seconds;
+}
+
+export function parseDays(value: string) {
+  const days = Number(value);
+  if (!Number.isInteger(days) || days < 1) throw new Error('must be a whole number of days, at least 1');
+  return days;
 }
 
 // For a switch given a value, as an env var always is: SERVE=false must turn it off, not on.
@@ -155,6 +163,7 @@ const SETTINGS = section({
   archive: section({ interval: scalar(parseInterval), heartbeatUrl: scalar(parseHeartbeatUrl), serve: flag }),
   serve: section({ host: text, port: scalar(parsePort) }),
   health: section({ maxAge: scalar(parseSeconds) }),
+  parquet: section({ dir: text, afterDays: scalar(parseDays) }),
   peers,
   catalog: section({ airnodes: text, feeds: text }),
 });
@@ -197,6 +206,7 @@ export async function loadConfig(path: string) {
   const settings = parseSettings(await Bun.file(path).text());
   const base = dirname(path);
   if (settings.db) settings.db = resolve(base, settings.db);
+  if (settings.parquet?.dir) settings.parquet.dir = resolve(base, settings.parquet.dir);
   const airnodesPath = resolve(base, settings.catalog?.airnodes ?? DEFAULT_AIRNODES_PATH);
   const feedsPath = resolve(base, settings.catalog?.feeds ?? DEFAULT_FEEDS_PATH);
   const airnodeList = parseAirnodes(await readListFile(airnodesPath));

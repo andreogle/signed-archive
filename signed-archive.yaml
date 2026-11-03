@@ -26,6 +26,13 @@ health:
   # `health` fails when the newest request is older than this many seconds (HEALTH_MAX_AGE_SECONDS).
   maxAge: 300
 
+# Closed days move from SQLite to Parquet files once they ended this many days ago (PARQUET_AFTER_DAYS). Each file is
+# read back and matched against SQLite, and registered with its SHA-256, before its records leave SQLite.
+parquet:
+  # Directory for the files (PARQUET_DIR); defaults to parquet/ next to the database.
+  # dir: data/parquet
+  afterDays: 7
+
 # Other archives to ask for records this one missed, by the base URL of their explorer. Each peer is asked about each
 # window once, with one recheck after an hour if the peer also missed part of it. Records are re-checked like any other input,
 # so a peer needs no trust. Peers must expose their explorer (only /api/records is used) where this archive can reach it.

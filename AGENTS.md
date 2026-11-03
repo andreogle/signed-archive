@@ -10,7 +10,7 @@ This file holds what is specific to this project and the invariants that must ne
 - Store records exactly as signed: `airnode`, `templateId`, `timestamp`, `encodedValue`, `signature`. Never normalise, round or re-encode a signed field, or the signature stops verifying
 - Only store a record whose signature recovers to the airnode it was fetched for (`hasValidSignature` in `src/signed-data.ts`, the same EIP-191 check `Api3ServerV1` does, including OpenZeppelin's refusal of high `s` and `v` other than 27/28, which viem alone would accept). Count and log anything else as rejected
 - The primary key includes the value, so two different values signed for the same feed and timestamp both survive. That pair is the equivocation evidence the archive exists to catch: never "fix" it with an upsert or a key without the value
-- Never delete or rewrite stored rows. A schema change adds a table or column; it never migrates signed data in place
+- Never delete or rewrite stored rows, with one exception: the move to Parquet (`src/parquet.ts`). A closed day's rows leave SQLite only after its file is written, flushed, read back and matched row for row (SHA-256 over every field), renamed into place and registered (`parquet_files`, `parquet_keys`), and only the rows that file holds are deleted. Parquet files are never changed or deleted; records that arrive later for a moved day go to a new part file. A schema change adds a table or column; it never migrates signed data in place
 - Hex fields are stored as bytes. Read them with SQL `hex()` and write them with `hexToBytes`
 - Every request writes a `polls` row in the same transaction as its records, failures included, with the `source` that answered (`api3` or the provider's own Signed API). Without it a gap in the history is indistinguishable from a provider that stopped signing
 - Another archive is untrusted input: `merge` and peer repair (`src/repair.ts`) re-check shape, known airnode and signature for every record before adding it, exactly as the archiver does. Repair also requires the asked airnode, a known template on the asked endpoint and the asked window. Never add a fast path that copies rows unverified, and never import a peer's polls as our own coverage
@@ -71,13 +71,14 @@ This file holds what is specific to this project and the invariants that must ne
 
 **Bun and SQLite**
 - `bun:sqlite` is opened with `strict: true`: SQL uses `$name` placeholders, bound objects use plain `name` keys
-- WAL mode is on. Copy the database with SQLite's backup (`VACUUM INTO`), never by copying the file while the archiver runs
+- WAL mode is on. Copy the database with SQLite's backup (`VACUUM INTO`), never by copying the file while the archiver runs. The archive is the SQLite file and its Parquet directory together: `backup` copies both, checking each file against its registered hash
 
 **Explorer (`web/`)**
-- `serve` (or `archive --serve`) opens the database read-only and serves `web/index.html` through Bun's HTML bundler; there is no separate frontend build. `src/reader.ts` is the only read path
+- `serve` (or `archive --serve`) opens the database read-only and serves `web/index.html` through Bun's HTML bundler; there is no separate frontend build. `src/reader.ts` is the only read path, and it reads SQLite and the Parquet files together, each record once. Every reader query that touches records is async (hyparquet is), so its callers await it
 - Records shown in the explorer are checked in the browser: `catalog.isFeedRecord` (signer and template belong to the feed) and `hasValidSignature`. The page builds its catalog from `/api/catalog`, served by the same server as the page's code, so it is trusted exactly as far as the page is. A valid signature alone only proves who signed. Never replace either check with a server-side "valid" flag: the page must not have to trust the server's answers
 - The same goes for numbers: wherever the explorer presents a value as checked (the moment panel and the proof), it decodes prices from `encodedValue` and computes the median over verified records with `src/price.ts`, never the server's `price` or `median` strings. `src/price.ts` stays free of Bun and Node imports so it bundles for the browser. The chart and feed list are unverified overviews
-- The reader never hides a record: two values signed for the same feed and moment both come back from `at()`. Medians and provider counts take one value per provider
+- The reader never hides a record: two values signed for the same feed and moment both come back from `at()`, even when one is in a Parquet file and the other in SQLite. Medians and provider counts take one value per provider
+- `/data/*` serves only files named in `parquet_files` (moved ones), never a path built from the request
 - URL search params come from shared links: parse them through `parseFeedSearch` in `web/search.ts`
 - Route components that call `getRouteApi` declare their return type (`JSX.Element`), or the router's registered types collapse to `any` through the import cycle
 
