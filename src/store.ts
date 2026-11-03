@@ -80,7 +80,8 @@ const PEER_COVERAGE = `
 // Stretches with no successful request for an airnode and endpoint (from either source) longer than `threshold`,
 // that have since closed, in unix milliseconds. A gap still open has nothing to ask about yet. Only gaps that end
 // after `since` are listed, but a gap may start before it: the first poll after `since` looks back for its
-// predecessor, so an outage longer than the lookback is still found whole.
+// predecessor, so an outage longer than the lookback is still found whole. Polls dated after `now` (a clock that
+// jumped ahead, or a merged archive's) are ignored, or one would open a gap reaching into the future.
 const CLOSED_GAPS = `
   SELECT hex(airnode) AS airnode, endpoint, previous AS "from", fetched_at AS "to" FROM (
     SELECT airnode, endpoint, fetched_at,
@@ -89,7 +90,7 @@ const CLOSED_GAPS = `
              WHERE p.airnode = recent.airnode AND p.endpoint = recent.endpoint AND p.status = 200
                AND p.fetched_at < $since
            ) ELSE lag(fetched_at) OVER w END AS previous
-    FROM polls recent WHERE status = 200 AND fetched_at >= $since
+    FROM polls recent WHERE status = 200 AND fetched_at >= $since AND fetched_at <= $now
     WINDOW w AS (PARTITION BY airnode, endpoint ORDER BY fetched_at)
   ) WHERE previous IS NOT NULL AND fetched_at - previous > $threshold
   ORDER BY "from"`;
@@ -173,9 +174,10 @@ export function backupArchive(dbPath: string, dir: string, now = new Date()) {
 export function openStore(path: string) {
   mkdirSync(dirname(path), { recursive: true });
   const db = new Database(path, { create: true, strict: true });
-  db.run('PRAGMA journal_mode = WAL');
-  // `merge` can write while the archiver does; wait for the other writer instead of failing.
+  // `merge` can write while the archiver does; wait for the other writer instead of failing. Set first, so switching
+  // to WAL waits too.
   db.run('PRAGMA busy_timeout = 10000');
+  db.run('PRAGMA journal_mode = WAL');
   db.run(DATAPOINTS);
   db.run(POLLS);
   db.run(REPAIR_WINDOWS);
@@ -214,12 +216,19 @@ export function openStore(path: string) {
     }).changes;
   };
   const insertPollRow = (poll: StoredPoll) => insertPoll.run({ ...poll, airnode: hexToBytes(poll.airnode) });
+  const pollTaken = db.prepare<{ found: 1 }, { airnode: Uint8Array; endpoint: string; fetchedAt: number }>(
+    'SELECT 1 AS found FROM polls WHERE airnode = $airnode AND endpoint = $endpoint AND fetched_at = $fetchedAt'
+  );
 
-  // Stores the verified records from one request together with its poll row, in one transaction.
+  // Stores the verified records from one request together with its poll row, in one transaction. Polls are keyed by
+  // airnode, endpoint and time, not source, so when another poll already holds that millisecond (both sources in one
+  // millisecond, or a clock that stepped back) this one moves to the next free millisecond instead of being dropped.
   const save = db.transaction((data: readonly SignedDatum[], poll: Poll) => {
+    const key = { airnode: hexToBytes(poll.airnode), endpoint: poll.endpoint, fetchedAt: poll.fetchedAt };
+    while (pollTaken.get(key)) key.fetchedAt += 1;
     let saved = 0;
-    for (const datum of data) saved += insertRecord({ datum, endpoint: poll.endpoint, fetchedAt: poll.fetchedAt });
-    insertPollRow({ ...poll, saved });
+    for (const datum of data) saved += insertRecord({ datum, endpoint: poll.endpoint, fetchedAt: key.fetchedAt });
+    insertPollRow({ ...poll, fetchedAt: key.fetchedAt, saved });
     return saved;
   });
 
@@ -245,11 +254,11 @@ export function openStore(path: string) {
 
   const gapsQuery = db.prepare<
     { airnode: string; endpoint: Endpoint; from: number; to: number },
-    { since: number; threshold: number }
+    { since: number; threshold: number; now: number }
   >(CLOSED_GAPS);
-  const closedGaps = (since: number, threshold: number) => {
+  const closedGaps = (since: number, threshold: number, now = Date.now()) => {
     return gapsQuery
-      .all({ since, threshold })
+      .all({ since, threshold, now })
       .map((gap) => ({ ...gap, airnode: `0x${gap.airnode.toLowerCase()}` as Address }));
   };
 
@@ -272,12 +281,16 @@ export function openStore(path: string) {
   };
   const windowColumns = `hex(airnode) AS airnode, endpoint, "from", "to", peer, status, attempts, retry_at AS retryAt,
     rechecked, records`;
-  // Newest first: recent stretches are what people look at, and every window is reached in time either way.
-  const dueQuery = db.prepare<WindowRow, { now: number; limit: number }>(
-    `SELECT ${windowColumns} FROM repair_windows WHERE status = 'pending' AND retry_at <= $now
+  // Newest first: recent stretches are what people look at, and every window is reached in time either way. Only
+  // windows of `peers` are listed, so windows waiting on a removed or paused peer can't crowd out the others.
+  const dueQuery = db.prepare<WindowRow, { now: number; limit: number; peers: string }>(
+    `SELECT ${windowColumns} FROM repair_windows
+     WHERE status = 'pending' AND retry_at <= $now AND peer IN (SELECT value FROM json_each($peers))
      ORDER BY "from" DESC LIMIT $limit`
   );
-  const dueWindows = (now: number, limit: number) => dueQuery.all({ now, limit }).map(toWindow);
+  const dueWindows = (now: number, limit: number, peers: readonly string[]) => {
+    return dueQuery.all({ now, limit, peers: JSON.stringify(peers) }).map(toWindow);
+  };
   const windowQuery = db.prepare<WindowRow, { airnode: Uint8Array; endpoint: string; from: number; peer: string }>(
     `SELECT ${windowColumns} FROM repair_windows
      WHERE airnode = $airnode AND endpoint = $endpoint AND "from" = $from AND peer = $peer`
@@ -346,13 +359,28 @@ export function openStore(path: string) {
       insertStretch.run({ ...key, from, to, peer: row.peer });
     }
   });
-  // Whether stored stretches for the airnode and endpoint already span [from, to], give or take `slack` seconds.
+  // Whether stored stretches for the window's airnode and endpoint already span it. Its outer edges get `slack`
+  // seconds, since a gap's first and last records are signed a little inside its windows. A seam with the next window
+  // of the same gap gets none: a hole there would otherwise pass as covered from both sides.
   const coveredQuery = db.prepare<{ found: 1 }, { airnode: Uint8Array; endpoint: string; from: number; to: number }>(
     `SELECT 1 AS found FROM peer_coverage
      WHERE airnode = $airnode AND endpoint = $endpoint AND "from" <= $from AND "to" >= $to LIMIT 1`
   );
-  const isCovered = (airnode: Address, endpoint: Endpoint, from: number, to: number, slack: number) => {
-    return coveredQuery.get({ airnode: hexToBytes(airnode), endpoint, from: from + slack, to: to - slack }) !== null;
+  const seamQuery = db.prepare<
+    { before: number; after: number },
+    { airnode: Uint8Array; endpoint: string; from: number; to: number }
+  >(
+    `SELECT EXISTS (SELECT 1 FROM repair_windows WHERE airnode = $airnode AND endpoint = $endpoint
+                      AND "to" = $from - 1) AS before,
+            EXISTS (SELECT 1 FROM repair_windows WHERE airnode = $airnode AND endpoint = $endpoint
+                      AND "from" = $to + 1) AS after`
+  );
+  const isCovered = (window: Pick<RepairWindow, 'airnode' | 'endpoint' | 'from' | 'to'>, slack: number) => {
+    const key = { airnode: hexToBytes(window.airnode), endpoint: window.endpoint, from: window.from, to: window.to };
+    const seams = seamQuery.get(key);
+    const from = window.from + (seams?.before ? 0 : slack);
+    const to = window.to - (seams?.after ? 0 : slack);
+    return coveredQuery.get({ ...key, from, to }) !== null;
   };
 
   return {

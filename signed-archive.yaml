@@ -27,7 +27,7 @@ health:
   maxAge: 300
 
 # Other archives to ask for records this one missed, by the base URL of their explorer. Each peer is asked about each
-# gap once; a peer that missed the stretch too can never gain it later. Records are re-checked like any other input,
+# window once, with one recheck after an hour if the peer also missed part of it. Records are re-checked like any other input,
 # so a peer needs no trust. Peers must expose their explorer (only /api/records is used) where this archive can reach it.
 peers: []
 #  - https://archive.example.org

@@ -17,11 +17,18 @@ describe('parseFeedSearch', () => {
     expect(parseFeedSearch({ feed: '', range: 'toString', endpoint: 'private', time: 1.5 })).toEqual(defaults);
     expect(parseFeedSearch({ feed: 42, range: 7, time: '1793206910' })).toEqual(defaults);
     expect(parseFeedSearch({ time: -5 })).toEqual(defaults);
+    expect(parseFeedSearch({ time: 99_999_999_999_999 })).toEqual(defaults);
+    expect(parseFeedSearch({ time: 1e12 })).toEqual(defaults);
+  });
+
+  test('keeps the largest time the server accepts, 12 digits', () => {
+    expect(parseFeedSearch({ time: 999_999_999_999 }).time).toBe(999_999_999_999);
   });
 });
 
 test('parseConflictsSearch keeps a known range and falls back to the last day', () => {
   expect(parseConflictsSearch({ range: '7d' })).toEqual({ range: '7d' });
   expect(parseConflictsSearch({ range: 'forever' })).toEqual({ range: '24h' });
+  expect(parseConflictsSearch({ range: 'all' })).toEqual({ range: '24h' });
   expect(parseConflictsSearch({})).toEqual({ range: '24h' });
 });

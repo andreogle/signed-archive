@@ -6,6 +6,12 @@ x-image: &image
   build: .
   image: signed-archive:local
   init: true
+  # Nothing in the image is written at run time; only the mounted volumes and /tmp are writable.
+  read_only: true
+  tmpfs:
+    - /tmp
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
 
 services:
   archiver:

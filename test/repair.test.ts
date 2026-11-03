@@ -1,3 +1,4 @@
+import { Database } from 'bun:sqlite';
 import { afterAll, beforeAll, describe, expect, spyOn, test } from 'bun:test';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -97,6 +98,42 @@ describe('windowsOf', () => {
 });
 
 describe('repair', () => {
+  test('a bad signature cannot hide a genuine record later in the response', async () => {
+    const bad = { ...coingecko, signature: `0x${'00'.repeat(65)}` };
+    const fake = answering({ uncovered: [], records: [bad, coingecko, bad, coingecko] });
+    const { store } = archiveWithPolls([1_793_206_800, 1_793_207_100]);
+    try {
+      const [result] = await drain(store, [fake.url], 1_793_207_200_000);
+      expect(result).toMatchObject({ added: 1, rejected: 1 });
+      expect(store.has(coingecko)).toBe(true);
+    } finally {
+      void fake.stop();
+      store.close();
+    }
+  });
+
+  test('keeps a peer-reported hole when storing coverage between genuine records', async () => {
+    const provider = blocksize[0]?.airnode;
+    if (!provider) throw new Error('missing blocksize fixture');
+    const fake = answering({ uncovered: [{ from: 1_793_206_920, to: 1_793_206_930 }], records: blocksize });
+    const { store, path } = archiveWithPolls([1_793_206_800, 1_793_207_100], provider);
+    try {
+      await drain(store, [fake.url], 1_793_207_200_000);
+      const db = new Database(path, { readonly: true });
+      try {
+        expect(db.query('SELECT "from", "to" FROM peer_coverage ORDER BY "from"').all()).toEqual([
+          { from: 1_793_206_903, to: 1_793_206_920 },
+          { from: 1_793_206_930, to: 1_793_206_951 },
+        ]);
+      } finally {
+        db.close();
+      }
+    } finally {
+      void fake.stop();
+      store.close();
+    }
+  });
+
   test('fills a gap from a peer, and asks again only because the peer missed part of the window too', async () => {
     // Down from 1793206800 to 1793207100; the peer's coingecko record at 1793206907 is inside. The peer itself only
     // polled once, at 1793207000, so it reports most of the window as missing on its side too.
@@ -174,6 +211,56 @@ describe('repair', () => {
     ]);
     expect(fake.asked.map((url) => url.searchParams.get('from'))).toEqual(['1793001682']);
     void fake.stop();
+    store.close();
+  });
+
+  test('asks another peer about a window whose coverage has a hole at its seam with the next window', async () => {
+    const fake = answering({ uncovered: [], watched: true, records: [] });
+    const { store } = archiveWithPolls([1_793_000_000, 1_793_002_000]);
+    scheduleRepairs({ store, catalog, peers: [fake.url], intervalMs, now: 1_793_100_000_000 });
+    // Another peer covered everything except 1793001500-1793001861, which straddles the seam at 1793001681/82.
+    store.addCoverage(
+      [
+        { airnode, endpoint: 'public', from: 1_792_999_000, to: 1_793_001_500, peer: 'x' },
+        { airnode, endpoint: 'public', from: 1_793_001_861, to: 1_793_003_000, peer: 'x' },
+      ],
+      GAP_SECONDS
+    );
+    const outcomes = [];
+    for (;;) {
+      const result = await repairNext({ store, catalog, peers: [fake.url], now: 1_793_100_000_000 });
+      if (!result) break;
+      outcomes.push([result.window.from, result.outcome]);
+    }
+    expect(outcomes).toEqual([
+      [1_793_001_682, 'done'],
+      [1_793_000_781, 'done'],
+      [1_792_999_880, 'skipped'],
+    ]);
+    void fake.stop();
+    store.close();
+  });
+
+  test('ignores polls dated in the future, which would open a gap reaching into it', () => {
+    const now = 1_793_100_000_000;
+    const { store } = archiveWithPolls([1_793_000_000, 1_793_000_060, 4_102_444_800]);
+    expect(scheduleRepairs({ store, catalog, peers: [peerUrl], intervalMs, now })).toEqual({ gaps: 0, windows: 0 });
+    store.close();
+  });
+
+  test('windows waiting on a removed or paused peer never crowd out a ready peer', async () => {
+    const now = 1_793_500_000_000;
+    const ready = answering({ uncovered: [], watched: true, records: [] });
+    const gone = new URL('http://127.0.0.1:1/gone/');
+    // A 6-day gap: over 500 windows per peer. The ready peer has already answered every window but the oldest.
+    const { store, path } = archiveWithPolls([1_792_900_000, 1_793_420_000]);
+    scheduleRepairs({ store, catalog, peers: [gone, ready.url], intervalMs, now });
+    const db = new Database(path);
+    db.run(`UPDATE repair_windows SET status = 'done' WHERE peer = ? AND "from" > 1792899880`, [ready.url.href]);
+    db.close();
+    const result = await repairNext({ store, catalog, peers: [ready.url], now });
+    expect(result).toMatchObject({ outcome: 'done', window: { from: 1_792_899_880, peer: ready.url.href } });
+    void ready.stop();
     store.close();
   });
 
@@ -335,15 +422,19 @@ describe('coverage', () => {
   };
   const at = (...seconds: number[]) => seconds.map((timestamp) => ({ ...coingecko, timestamp: String(timestamp) }));
 
-  test('spans the verified records, minus what the peer says it missed, or splits by gap when it does not say', () => {
-    expect(coverageOf(window, at(100, 400, 800), [])).toMatchObject([{ from: 100, to: 800 }]);
-    expect(coverageOf(window, at(100, 400, 800), [{ from: 450, to: 700 }])).toMatchObject([
+  test('spans the verified records, split where they are more than the gap threshold apart, minus what the peer missed', () => {
+    expect(coverageOf(window, at(100, 250, 400, 550, 700, 800), [])).toMatchObject([{ from: 100, to: 800 }]);
+    expect(coverageOf(window, at(100, 250, 400, 550, 700, 800), [{ from: 450, to: 700 }])).toMatchObject([
       { from: 100, to: 450 },
       { from: 700, to: 800 },
     ]);
-    // An archive that doesn't say gets the conservative reading: 400 to 800 is more than the gap threshold.
     expect(coverageOf(window, at(100, 200, 800), null)).toMatchObject([{ from: 100, to: 200 }]);
     expect(coverageOf(window, at(500), [])).toEqual([]);
+  });
+
+  test("never takes a peer's word for a stretch its records don't fill", () => {
+    // Two genuine records 800 s apart and a claim of having missed nothing still cover nothing in between.
+    expect(coverageOf(window, at(100, 900), [])).toEqual([]);
   });
 
   test('stretches from consecutive windows merge into one, so a window seam leaves no shading', () => {
@@ -377,7 +468,8 @@ describe('GET /api/records', () => {
   });
 
   test('refuses unknown airnodes and windows that are missing, reversed or too long', () => {
-    expect(get('airnode=0x0000000000000000000000000000000000000001&from=1&to=2').status).toBe(404);
+    // 400, which the asker treats as final: a peer that doesn't know an airnode won't learn it by being asked again.
+    expect(get('airnode=0x0000000000000000000000000000000000000001&from=1&to=2').status).toBe(400);
     expect(get(`airnode=${coingecko.airnode}&to=2`).status).toBe(400);
     expect(get(`airnode=${coingecko.airnode}&from=5&to=2`).status).toBe(400);
     expect(get(`airnode=${coingecko.airnode}&from=0&to=901`).status).toBe(400);

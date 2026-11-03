@@ -87,17 +87,26 @@ export function Chart({ data, label, stale = false, onPick }: ChartProps) {
       const anchor: 'start' | 'end' | 'middle' = i === 0 ? 'start' : i === tickCount ? 'end' : 'middle';
       return { x: x(t), label: new Date(t * 1000).toLocaleString(undefined, options), anchor };
     });
+    // Enough decimals to tell neighbouring ticks apart, however close the prices are.
+    const step = (v1 - v0) / 4;
+    const decimals = Math.min(20, Math.max(0, Math.ceil(-Math.log10(step))));
     const priceTicks = Array.from({ length: 5 }, (_, i) => {
-      const v = v0 + ((v1 - v0) * i) / 4;
-      return { y: y(v), label: formatPrice(v) };
+      const v = v0 + step * i;
+      return {
+        y: y(v),
+        label: v.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals }),
+      };
     });
     // A line across a gap would claim the price held steady while nobody was watching, so break it there.
     const crossesGap = (a: number, b: number) => data.gaps.some((gap) => a < gap.to && b > gap.from);
     const paths = series.map(({ provider, color, points }) => {
+      const breaks = points.map(({ t }, i) => i === 0 || crossesGap(points[i - 1]?.t ?? t, t));
       const d = points
         .map(({ t, v }, i) => {
-          const move = i === 0 || crossesGap(points[i - 1]?.t ?? t, t) ? 'M' : 'L';
-          return `${move}${x(t).toFixed(1)},${y(v).toFixed(1)}`;
+          const at = `${x(t).toFixed(1)},${y(v).toFixed(1)}`;
+          if (!breaks[i]) return `L${at}`;
+          // A point alone between breaks has no line; a zero-length stroke with round caps draws it as a dot.
+          return breaks[i + 1] === false ? `M${at}` : `M${at}h0`;
         })
         .join('');
       return { provider, color, points, times: points.map(({ t }) => t), d };
@@ -192,7 +201,8 @@ export function Chart({ data, label, stale = false, onPick }: ChartProps) {
           >
             <svg viewBox={`0 0 ${width} ${HEIGHT}`} aria-hidden="true">
               {geometry.priceTicks.map(({ y, label: text }) => (
-                <g key={text}>
+                // Keyed by position: labels can repeat when rounded, positions are evenly spaced and distinct.
+                <g key={y}>
                   <line className="grid" x1={PAD.left} x2={width - PAD.right} y1={y} y2={y} />
                   <text className="axis" x={width - PAD.right + 8} y={y + 4}>
                     {text}

@@ -46,6 +46,13 @@ export function parseSeconds(value: string) {
   return seconds;
 }
 
+// For a switch given a value, as an env var always is: SERVE=false must turn it off, not on.
+export function parseSwitch(value: string) {
+  if (/^(true|1|yes|on)$/i.test(value)) return true;
+  if (/^(false|0|no|off)$/i.test(value)) return false;
+  throw new Error('must be true or false');
+}
+
 export function parsePeerUrl(value: string) {
   const url = URL.canParse(value) ? new URL(value) : null;
   if (!url || (url.protocol !== 'https:' && url.protocol !== 'http:')) throw new Error('must be an http(s) URL');
@@ -80,7 +87,7 @@ const section = (shape: Shape) => {
     if (typeof value !== 'object' || value === null || Array.isArray(value)) return fail(path, 'must be a mapping');
     const result: Record<string, unknown> = {};
     for (const [key, field] of Object.entries(value)) {
-      const parse = shape[key];
+      const parse = Object.hasOwn(shape, key) ? shape[key] : undefined;
       if (!parse)
         return fail(path ? `${path}.${key}` : key, `is not a known setting (known: ${Object.keys(shape).join(', ')})`);
       if (field !== null) result[key] = parse(field, path ? `${path}.${key}` : key);
@@ -184,10 +191,12 @@ async function readListFile(path: string) {
   return Bun.file(path).text();
 }
 
-// Reads a settings file and the airnode and feed lists it names.
+// Reads a settings file and the airnode and feed lists it names. Paths in the file are relative to the file, so it
+// means the same archive whatever directory the command runs in (an MCP client, cron or Docker each pick their own).
 export async function loadConfig(path: string) {
   const settings = parseSettings(await Bun.file(path).text());
   const base = dirname(path);
+  if (settings.db) settings.db = resolve(base, settings.db);
   const airnodesPath = resolve(base, settings.catalog?.airnodes ?? DEFAULT_AIRNODES_PATH);
   const feedsPath = resolve(base, settings.catalog?.feeds ?? DEFAULT_FEEDS_PATH);
   const airnodeList = parseAirnodes(await readListFile(airnodesPath));
@@ -201,8 +210,9 @@ export async function loadConfig(path: string) {
 // Reads the settings file named by --config or CONFIG, or the default file if it exists. The path is found before
 // commander runs, because the file supplies commander's defaults. Without any file there is nothing to archive.
 export async function loadSettings(argv: readonly string[], env: Record<string, string | undefined>) {
-  const flagIndex = argv.findIndex((arg) => arg === '--config' || arg.startsWith('--config='));
-  const fromFlag = flagIndex === -1 ? undefined : (argv[flagIndex]?.split('=')[1] ?? argv[flagIndex + 1]);
+  const flagIndex = argv.findLastIndex((arg) => arg === '--config' || arg.startsWith('--config='));
+  const flag = argv[flagIndex];
+  const fromFlag = flag === '--config' ? argv[flagIndex + 1] : flag?.slice('--config='.length);
   const explicit = fromFlag ?? (env.CONFIG || undefined);
   const path = explicit ?? DEFAULT_CONFIG_PATH;
   if (!explicit && !existsSync(path)) {

@@ -77,20 +77,39 @@ describe('summarizeConflicts', () => {
   test('finds nothing outside the range asked for', () => {
     expect(summarizeConflicts(reader, catalog, 1_793_219_957, 1_800_000_000)).toEqual([]);
   });
+
+  test('reports a zero-median conflict as undefined spread, never zero disagreement', () => {
+    const path = join(dir, 'zero-median.sqlite');
+    const store = openStore(path);
+    // Synthetic stored rows exercise arithmetic only; signature verification has its own real fixtures.
+    for (const encodedValue of [`0x${'f'.repeat(64)}`, `0x${'0'.repeat(63)}1`] as const) {
+      store.add([{ datum: { ...coingecko, encodedValue }, endpoint: 'public', fetchedAt: 1 }], []);
+    }
+    store.close();
+    const zeroReader = openReader(path);
+    try {
+      expect(summarizeConflicts(zeroReader, catalog, 1, 1_800_000_000)).toMatchObject([
+        { conflicts: 1, spreadBps: { median: null, p90: null, max: null }, widest: { spreadBps: null } },
+      ]);
+    } finally {
+      zeroReader.close();
+    }
+  });
 });
 
 describe('GET /api/conflicts', () => {
   const get = (query: string) => handleApi(reader, catalog, new URL(`http://x/api/conflicts?${query}`), 1_793_400_000);
 
   test('returns the summaries for the range, the last day by default', async () => {
-    const all = await get('from=0&to=1800000000').json();
+    const all = await get('from=1793200000&to=1793400000').json();
     expect(all.summaries.map(({ provider }: { provider: string }) => provider)).toEqual(['blocksize', 'coingecko']);
     // The fixtures were signed more than a day before `now`, so the default range has none.
     expect(await get('').json()).toEqual({ from: 1_793_313_600, to: 1_793_400_000, summaries: [] });
   });
 
-  test('refuses a reversed or malformed range', () => {
+  test('refuses a reversed or malformed range, or one longer than a week, which would read too many records', () => {
     expect(get('from=5&to=2').status).toBe(400);
     expect(get('from=soon').status).toBe(400);
+    expect(get('from=0&to=1800000000').status).toBe(400);
   });
 });

@@ -1,10 +1,11 @@
 import { createInterface } from 'node:readline';
 import pkg from '../package.json' with { type: 'json' };
+import { MAX_CONFLICT_SECONDS } from './api.ts';
 import type { Catalog, FeedSource } from './catalog.ts';
 import { ENDPOINTS, type Endpoint, isEndpoint } from './config.ts';
 import { summarizeConflicts } from './conflicts.ts';
 import { errorMessage, log } from './logger.ts';
-import { decodeValue, median, medianPrice } from './price.ts';
+import { decodeValue, medianPrice, spreadBps } from './price.ts';
 import type { Reader, SignedPrice } from './reader.ts';
 import { hasValidSignature } from './signed-data.ts';
 
@@ -29,6 +30,8 @@ type JsonRpcResponse =
 
 // A tool argument that is wrong is the caller's mistake, reported as a tool error the agent can read and correct.
 class ArgumentError extends Error {}
+// A tool that doesn't exist is a protocol error (-32602), as MCP specifies.
+class UnknownTool extends Error {}
 
 const endpointSchema = {
   type: 'string',
@@ -37,7 +40,7 @@ const endpointSchema = {
 };
 const timeSchema = {
   type: ['string', 'number'],
-  description: 'An ISO 8601 time such as 2026-10-29T22:30:00Z, or unix seconds.',
+  description: 'An ISO 8601 time with a zone, such as 2026-10-29T22:30:00Z, a date (UTC midnight), or unix seconds.',
 };
 const feedSchema = { type: 'string', description: "A feed name such as 'ETH/USD'; see list_feeds." };
 
@@ -73,7 +76,8 @@ const TOOLS = [
     title: 'Is this price safe to use?',
     description:
       'Checks the latest signed prices of a feed: are they fresh, do the providers agree, and did any provider sign ' +
-      'two values for one moment. Returns a verdict and the issues found.',
+      'two values for one moment. Returns a verdict, the issues found, and the records checked with their raw signed ' +
+      'fields.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -112,17 +116,32 @@ const TOOLS = [
     description:
       'Moments when a provider signed more than one value for the same feed and second, per provider: how often, how ' +
       'far apart the values were in basis points, and the widest example. Whoever updates on-chain can choose between ' +
-      'such values. Counts are a lower bound, since the archive samples each provider about once a minute.',
+      'such values. Counts are a lower bound, since the archive samples each provider about once a minute. The range ' +
+      'is at most 7 days, the last day by default. Re-check the widest example with get_price_at at its second: both ' +
+      'signed values come back with their raw fields.',
     inputSchema: { type: 'object', properties: { from: timeSchema, to: timeSchema } },
   },
 ].map((tool) => ({ ...tool, annotations: { readOnlyHint: true, openWorldHint: false } }));
 
+// Unix seconds above this are almost certainly milliseconds (it is the year 5138).
+const MAX_SECONDS = 1e11;
+// A date, or a date and time with a zone. A time without one would be read in the server's own zone.
+const ISO_TIME = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2}))?$/;
+
 // Unix seconds from an ISO 8601 string or a number of seconds.
 function parseTime(value: unknown, name: string): number {
-  if (typeof value === 'number' && Number.isFinite(value) && value >= 0) return Math.floor(value);
-  if (typeof value === 'string' && /^\d+$/.test(value)) return Number(value);
-  if (typeof value === 'string' && !Number.isNaN(Date.parse(value))) return Math.floor(Date.parse(value) / 1000);
-  throw new ArgumentError(`${name} must be an ISO 8601 time or unix seconds`);
+  const seconds = typeof value === 'string' && /^\d+$/.test(value) ? Number(value) : value;
+  if (typeof seconds === 'number' && Number.isFinite(seconds) && seconds >= 0) {
+    if (seconds >= MAX_SECONDS) throw new ArgumentError(`${name} must be unix seconds, not milliseconds`);
+    return Math.floor(seconds);
+  }
+  const parsed = typeof value === 'string' && ISO_TIME.test(value) ? Date.parse(value) : Number.NaN;
+  if (!Number.isNaN(parsed) && typeof value === 'string') {
+    // Date.parse normalizes impossible dates such as February 30 into the next month.
+    const date = value.slice(0, 10);
+    if (new Date(`${date}T00:00:00Z`).toISOString().startsWith(date)) return Math.floor(parsed / 1000);
+  }
+  throw new ArgumentError(`${name} must be an ISO 8601 time with a zone (e.g. 2026-10-29T22:30:00Z) or unix seconds`);
 }
 
 const readEndpoint = (value: unknown): Endpoint => {
@@ -135,6 +154,12 @@ const readNumber = (value: unknown, name: string, fallback: number, max = Number
   if (value === undefined) return fallback;
   if (typeof value === 'number' && Number.isFinite(value) && value > 0) return Math.min(value, max);
   throw new ArgumentError(`${name} must be a positive number`);
+};
+
+const readCount = (value: unknown, name: string, fallback: number, max: number) => {
+  if (value === undefined) return fallback;
+  if (Number.isSafeInteger(value) && (value as number) >= 1) return Math.min(value as number, max);
+  throw new ArgumentError(`${name} must be a whole number of at least 1`);
 };
 
 function sourcesOf(catalog: Catalog, feed: unknown, endpoint: Endpoint): FeedSource[] {
@@ -171,15 +196,6 @@ async function describeRecords(catalog: Catalog, feed: string, endpoint: Endpoin
     })
   );
 }
-
-const spreadBps = (records: readonly SignedPrice[]) => {
-  const values = records.map(({ encodedValue }) => decodeValue(encodedValue));
-  const middle = median(values);
-  if (values.length < 2 || middle === null || middle === 0n) return 0;
-  const sorted = [...values].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
-  const spread = (sorted.at(-1) ?? 0n) - (sorted[0] ?? 0n);
-  return Number((spread * 1_000_000n) / (middle < 0n ? -middle : middle)) / 100;
-};
 
 type ToolArguments = Record<string, unknown>;
 
@@ -235,21 +251,27 @@ async function callTool(reader: Reader, catalog: Catalog, name: string, args: To
       if (unverified.length > 0) issues.push(`failed verification: ${unverified.join(', ')}`);
       const conflicting = [...new Set(described.filter(({ conflicting: c }) => c).map(({ provider }) => provider))];
       if (conflicting.length > 0) issues.push(`signed two values for one moment: ${conflicting.join(', ')}`);
-      const spread = spreadBps(verified);
-      if (spread > maxSpread) issues.push(`providers disagree by ${spread} bps (limit ${maxSpread})`);
-      const providers = new Set(verified.map(({ provider }) => provider)).size;
-      if (providers === 1) issues.push('only one provider signed a price');
+      // One vote per provider, as with the median.
+      const values = new Map(verified.map(({ provider, encodedValue }) => [provider, decodeValue(encodedValue)]));
+      const spread = spreadBps([...values.values()]);
+      if (spread === null) issues.push('providers disagree around a zero median; spread in bps is undefined');
+      else if (spread > maxSpread) issues.push(`providers disagree by ${spread} bps (limit ${maxSpread})`);
+      const signing = new Set(verified.map(({ provider }) => provider));
+      const silent = [...new Set(sources.map(({ provider }) => provider))].filter((name) => !signing.has(name));
+      if (silent.length > 0) issues.push(`no verified record from: ${silent.join(', ')}`);
+      if (signing.size === 1) issues.push('only one provider signed a price');
       return {
         feed: args.feed,
         endpoint,
         verdict: issues.length === 0 ? 'ok' : 'warn',
         issues,
         median: medianPrice(verified),
-        providers,
+        providers: signing.size,
         spreadBps: spread,
         newestAgeSeconds: described.length > 0 ? Math.min(...described.map(({ ageSeconds }) => ageSeconds)) : null,
         oldestAgeSeconds: described.length > 0 ? Math.max(...described.map(({ ageSeconds }) => ageSeconds)) : null,
         checkedAt: iso(now),
+        records: described,
       };
     }
     case 'get_price_history': {
@@ -258,7 +280,7 @@ async function callTool(reader: Reader, catalog: Catalog, name: string, args: To
       const from = parseTime(args.from, 'from');
       const to = parseTime(args.to, 'to');
       if (from > to) throw new ArgumentError('from must not be after to');
-      const points = Math.floor(readNumber(args.points, 'points', DEFAULT_HISTORY_POINTS, MAX_HISTORY_POINTS));
+      const points = readCount(args.points, 'points', DEFAULT_HISTORY_POINTS, MAX_HISTORY_POINTS);
       const providers = reader.history(sources, from, to, points).map(({ provider, points: series }) => {
         return { provider, points: series.map(({ timestamp, price }) => ({ signedAt: iso(timestamp), price })) };
       });
@@ -269,13 +291,17 @@ async function callTool(reader: Reader, catalog: Catalog, name: string, args: To
       const to = args.to === undefined ? now : parseTime(args.to, 'to');
       const from = args.from === undefined ? to - 24 * 60 * 60 : parseTime(args.from, 'from');
       if (from > to) throw new ArgumentError('from must not be after to');
+      if (to - from > MAX_CONFLICT_SECONDS) throw new ArgumentError('the range must be at most 7 days');
       const summaries = summarizeConflicts(reader, catalog, from, to).map((summary) => {
-        return { ...summary, widest: { ...summary.widest, signedAt: iso(summary.widest.timestamp) } };
+        const { feed, timestamp } = summary.widest;
+        const endpoint = summary.endpoint === 'public' ? {} : { endpoint: summary.endpoint };
+        const recheck = { tool: 'get_price_at', arguments: { feed, time: timestamp, ...endpoint } };
+        return { ...summary, widest: { ...summary.widest, signedAt: iso(timestamp), recheck } };
       });
       return { from: iso(from), to: iso(to), summaries };
     }
     default:
-      throw new ArgumentError(`unknown tool ${name}`);
+      throw new UnknownTool(`unknown tool ${name}`);
   }
 }
 
@@ -288,7 +314,11 @@ const fail = (id: JsonRpcRequest['id'], code: number, message: string): JsonRpcR
   return { jsonrpc: '2.0', id: id ?? null, error: { code, message } };
 };
 
-// Answers one JSON-RPC message. Notifications (no id) get no answer: null.
+const isId = (id: unknown): id is JsonRpcRequest['id'] => {
+  return id === undefined || id === null || typeof id === 'string' || typeof id === 'number';
+};
+
+// Answers one JSON-RPC message. Notifications (no id), and responses a client sends back, get no answer: null.
 export async function handleMcp(
   reader: Reader,
   catalog: Catalog,
@@ -296,15 +326,17 @@ export async function handleMcp(
   now = Math.floor(Date.now() / 1000)
 ): Promise<JsonRpcResponse | null> {
   if (typeof message !== 'object' || message === null || Array.isArray(message)) {
-    return fail(null, -32600, 'expected a single JSON-RPC request object');
+    return fail(null, -32600, 'expected a JSON-RPC request object');
   }
-  const request = message as Partial<JsonRpcRequest>;
-  if (request.jsonrpc !== '2.0' || typeof request.method !== 'string') {
-    return fail(request.id, -32600, 'expected a JSON-RPC 2.0 request');
+  const request = message as Partial<JsonRpcRequest> & { result?: unknown; error?: unknown };
+  if (request.method === undefined && ('result' in request || 'error' in request)) return null;
+  if (request.jsonrpc !== '2.0' || typeof request.method !== 'string' || !isId(request.id)) {
+    return fail(isId(request.id) ? request.id : null, -32600, 'expected a JSON-RPC 2.0 request');
   }
-  const isNotification = request.id === undefined;
-  const params = typeof request.params === 'object' && request.params !== null ? request.params : {};
   log.debug('mcp request', { method: request.method });
+  // A notification must not be answered, so nothing it asks for is worth doing; the ones MCP defines need no action.
+  if (request.id === undefined) return null;
+  const params = typeof request.params === 'object' && request.params !== null ? request.params : {};
 
   switch (request.method) {
     case 'initialize': {
@@ -326,7 +358,7 @@ export async function handleMcp(
       });
     }
     case 'ping':
-      return isNotification ? null : reply(request.id, {});
+      return reply(request.id, {});
     case 'tools/list':
       return reply(request.id, { tools: TOOLS });
     case 'tools/call': {
@@ -345,28 +377,65 @@ export async function handleMcp(
         });
       } catch (error) {
         const failed = { ...fields, durationMs: Date.now() - startedAt, error: errorMessage(error) };
-        if (error instanceof ArgumentError) log.info('mcp tool refused', failed);
-        else log.warn('mcp tool failed', failed);
-        return reply(request.id, { content: [{ type: 'text', text: errorMessage(error) }], isError: true });
+        if (error instanceof UnknownTool) {
+          log.info('mcp tool refused', failed);
+          return fail(request.id, -32602, errorMessage(error));
+        }
+        if (error instanceof ArgumentError) {
+          log.info('mcp tool refused', failed);
+          return reply(request.id, { content: [{ type: 'text', text: errorMessage(error) }], isError: true });
+        }
+        // Internal details stay in the log; the agent only learns that the server failed.
+        log.warn('mcp tool failed', failed);
+        return reply(request.id, { content: [{ type: 'text', text: 'internal error' }], isError: true });
       }
     }
     default:
-      return isNotification ? null : fail(request.id, -32601, `method not found: ${request.method}`);
+      return fail(request.id, -32601, `method not found: ${request.method}`);
   }
 }
 
-// POST /mcp: one JSON-RPC message per request, answered as JSON (the stateless form of MCP's Streamable HTTP
-// transport). A notification gets 202 with no body.
+// One message, or a batch of them (protocol 2025-03-26 allows batches). Null when nothing needs an answer.
+async function handleMessage(reader: Reader, catalog: Catalog, message: unknown) {
+  if (!Array.isArray(message)) return handleMcp(reader, catalog, message);
+  if (message.length === 0) return fail(null, -32600, 'empty batch');
+  const responses: JsonRpcResponse[] = [];
+  for (const item of message) {
+    const response = await handleMcp(reader, catalog, item);
+    if (response) responses.push(response);
+  }
+  return responses.length > 0 ? responses : null;
+}
+
+const LOOPBACK = new Set(['localhost', '127.0.0.1', '[::1]']);
+
+// Browsers send Origin with every cross-site POST, and with one from a page that rebound its own domain to this
+// server, so only pages served from this machine may call the tools. Agents that aren't browsers send no Origin.
+const isAllowedOrigin = (origin: string | null) => origin === null || LOOPBACK.has(URL.parse(origin)?.hostname ?? '');
+
+// POST /mcp: JSON-RPC messages, answered as JSON (the stateless form of MCP's Streamable HTTP transport). A message
+// that needs no answer gets 202 with no body.
 export async function handleMcpHttp(reader: Reader, catalog: Catalog, request: Request): Promise<Response> {
-  if (request.method !== 'POST')
+  if (request.method !== 'POST') {
     return new Response('POST JSON-RPC messages here', { status: 405, headers: { allow: 'POST' } });
+  }
+  if (!isAllowedOrigin(request.headers.get('origin'))) {
+    return Response.json(fail(null, -32600, 'origin not allowed'), { status: 403 });
+  }
+  if (!(request.headers.get('content-type') ?? '').toLowerCase().startsWith('application/json')) {
+    return Response.json(fail(null, -32700, 'expected content-type application/json'), { status: 415 });
+  }
+  const version = request.headers.get('mcp-protocol-version');
+  if (version !== null && !PROTOCOL_VERSIONS.includes(version)) {
+    return Response.json(fail(null, -32600, `unsupported protocol version ${version}`), { status: 400 });
+  }
   let message: unknown;
   try {
     message = await request.json();
   } catch {
     return Response.json(fail(null, -32700, 'invalid JSON'), { status: 400 });
   }
-  const response = await handleMcp(reader, catalog, message);
+  const response = await handleMessage(reader, catalog, message);
   return response ? Response.json(response) : new Response(null, { status: 202 });
 }
 
@@ -388,7 +457,7 @@ export async function runMcpStdio(
       output.write(`${JSON.stringify(fail(null, -32700, 'invalid JSON'))}\n`);
       continue;
     }
-    const response = await handleMcp(reader, catalog, message);
+    const response = await handleMessage(reader, catalog, message);
     if (response) output.write(`${JSON.stringify(response)}\n`);
   }
 }

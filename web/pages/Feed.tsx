@@ -2,6 +2,7 @@ import { getRouteApi } from '@tanstack/react-router';
 import { type JSX, useId } from 'react';
 import type { MomentResponse } from '../../src/api.ts';
 import { decodePrice, medianPrice } from '../../src/price.ts';
+import { toSignedDatum } from '../../src/signed-data.ts';
 import { useCatalog, useFeeds, useHistory, useMoment, useSignatureChecks } from '../api.ts';
 import { Chart } from '../components/Chart.tsx';
 import { Segmented } from '../components/Segmented.tsx';
@@ -13,7 +14,9 @@ const route = getRouteApi('/feed');
 const ENDPOINT_LABELS = { public: 'Base', 'public-oev': 'OEV' } as const;
 const CHECK_LABELS = {
   pending: 'checking…',
+  unchecked: 'not checked',
   valid: '✓ Valid',
+  'after-time': '✗ Signed after the chosen time',
   'wrong-source': "✗ Not this feed's provider",
   'bad-signature': '✗ Invalid signature',
 } as const;
@@ -80,7 +83,12 @@ export function FeedPage(): JSX.Element {
               )}
             </p>
           </div>
-          <p className="big">{newest ? formatPrice(newest.price) : ''}</p>
+          {newest ? (
+            <div>
+              <span className="muted small">Latest chart point, unverified</span>
+              <p className="big">{formatPrice(newest.price)}</p>
+            </div>
+          ) : null}
         </div>
         {history.error ? <p className="bad">{history.error.message}</p> : null}
         {history.data ? (
@@ -104,16 +112,13 @@ function MomentPanel({ search, onTime }: { search: FeedSearch; onTime: (time: nu
   const moment = useMoment(search.feed, search.endpoint, search.time);
   const data = moment.data;
   const records = data?.records ?? [];
+  // While a switch to another live feed loads, the previous feed's records stay on screen, dimmed and unchecked.
+  const stale = moment.isPlaceholderData;
   const catalog = useCatalog();
-  const checks = useSignatureChecks(
-    catalog.data,
-    data?.feed ?? search.feed,
-    data?.endpoint ?? search.endpoint,
-    records
-  );
+  const checks = useSignatureChecks(catalog.data, search.feed, search.endpoint, search.time, stale ? [] : records);
   // Prices and the median are decoded here from the signed values, never taken from the server's strings, and the
   // median only counts records that passed the checks above.
-  const verified = records.filter((_, index) => checks[index]?.data === 'valid');
+  const verified = stale ? [] : records.filter((_, index) => checks[index]?.data === 'valid');
   const median = medianPrice(verified);
   // A provider with more than one record signed different values for the same moment: equivocation.
   // Without a chosen time the panel follows the latest prices; ages are measured from when they were fetched.
@@ -167,7 +172,8 @@ function MomentPanel({ search, onTime }: { search: FeedSearch; onTime: (time: nu
         </form>
       </div>
 
-      {data && records.length > 0 ? (
+      {catalog.error ? <p className="bad">Signatures can't be checked: {catalog.error.message}</p> : null}
+      {data && records.length > 0 && !stale ? (
         <div className="summary">
           <div>
             <span className="muted small">Median of verified providers</span>
@@ -185,7 +191,7 @@ function MomentPanel({ search, onTime }: { search: FeedSearch; onTime: (time: nu
         </div>
       ) : null}
 
-      <div className="table-wrap">
+      <div className={stale ? 'table-wrap stale' : 'table-wrap'}>
         <table>
           <thead>
             <tr>
@@ -197,8 +203,9 @@ function MomentPanel({ search, onTime }: { search: FeedSearch; onTime: (time: nu
           </thead>
           <tbody>
             {records.map((record, index) => {
-              const check = checks[index]?.data;
-              const price = decodePrice(record.encodedValue);
+              const check = checks[index]?.data ?? (catalog.error || stale ? 'unchecked' : 'pending');
+              // Only a record with the exact signed shape is decoded; anything else would throw during render.
+              const price = priceOf(record);
               const age = reference - Number(record.timestamp);
               return (
                 <tr key={`${record.provider}-${record.encodedValue}`}>
@@ -211,14 +218,18 @@ function MomentPanel({ search, onTime }: { search: FeedSearch; onTime: (time: nu
                       </span>
                     ) : null}
                   </td>
-                  <td className="num" title={price}>
-                    {formatPrice(price)}
+                  <td className="num" title={price ?? 'malformed record'}>
+                    {price === null ? '—' : formatPrice(price)}
                   </td>
                   <td title={`${formatAge(Math.max(0, age))} ${live ? 'old when fetched' : 'before the chosen time'}`}>
                     {formatTime(Number(record.timestamp))}
                   </td>
-                  <td className={check === undefined ? 'muted' : check === 'valid' ? 'ok' : 'bad'}>
-                    <span title={`Signer ${record.airnode}`}>{CHECK_LABELS[check ?? 'pending']}</span>
+                  <td
+                    className={
+                      check === 'pending' || check === 'unchecked' ? 'muted' : check === 'valid' ? 'ok' : 'bad'
+                    }
+                  >
+                    <span title={`Signer ${record.airnode}`}>{CHECK_LABELS[check]}</span>
                   </td>
                 </tr>
               );
@@ -240,6 +251,11 @@ function MomentPanel({ search, onTime }: { search: FeedSearch; onTime: (time: nu
   );
 }
 
+function priceOf(record: unknown) {
+  const datum = toSignedDatum(record);
+  return datum === null ? null : decodePrice(datum.encodedValue);
+}
+
 // `median` is the browser's own, over verified records; prices are re-decoded from the signed values.
 function downloadProof(moment: MomentResponse, median: string | null) {
   const proof = {
@@ -248,7 +264,7 @@ function downloadProof(moment: MomentResponse, median: string | null) {
       "To tie a record to the feed, airnode must be the provider's address and templateId the feed's template ID in @api3/api-integrations (for OEV data, keccak256 of it).",
     ...moment,
     median,
-    records: moment.records.map((record) => ({ ...record, price: decodePrice(record.encodedValue) })),
+    records: moment.records.map((record) => ({ ...record, price: priceOf(record) })),
   };
   const link = document.createElement('a');
   link.href = URL.createObjectURL(new Blob([JSON.stringify(proof, null, 2)], { type: 'application/json' }));

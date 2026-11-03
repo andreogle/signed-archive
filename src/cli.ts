@@ -5,7 +5,7 @@ import { createCatalog } from './catalog.ts';
 import { DEFAULT_DB_PATH, DEFAULT_HOST, DEFAULT_INTERVAL_SECONDS, DEFAULT_PORT } from './config.ts';
 import { parseHeartbeatUrl } from './heartbeat.ts';
 import { errorMessage, LOG_LEVELS, type LogLevel, log, setLogLevel } from './logger.ts';
-import { DEFAULT_CONFIG_PATH, loadSettings, parseInterval, parsePort, parseSeconds } from './settings.ts';
+import { DEFAULT_CONFIG_PATH, loadSettings, parseInterval, parsePort, parseSeconds, parseSwitch } from './settings.ts';
 
 // Command-line parsers report problems through commander, so bad input fails before anything runs.
 const argParser = <T>(parse: (value: string) => T) => {
@@ -95,11 +95,14 @@ program
   .addOption(
     new Option('--heartbeat-url <url>', "URL to ping after each cycle that reached the API (dead man's switch)")
       .argParser(argParser(parseHeartbeatUrl))
-      .default(settings.archive?.heartbeatUrl)
+      // The URL is a secret, so help says where it came from instead of printing it.
+      .default(settings.archive?.heartbeatUrl, settings.archive?.heartbeatUrl ? 'set in the config file' : undefined)
       .env('HEARTBEAT_URL')
   )
   .addOption(
-    new Option('--serve', 'also serve the explorer, as the serve command does')
+    new Option('--serve [on]', 'also serve the explorer, as the serve command does (true or false)')
+      .argParser(argParser(parseSwitch))
+      .preset(true)
       .default(settings.archive?.serve ?? false)
       .env('SERVE')
   )

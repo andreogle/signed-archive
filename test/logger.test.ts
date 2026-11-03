@@ -20,6 +20,10 @@ test('quotes values with spaces, quotes, equals signs or nothing at all, and dro
   );
 });
 
+test('escapes control characters, so text from the network cannot send escape sequences to the terminal', () => {
+  expect(formatLine('warn', 'x', { error: 'a\u001b[2Jb' }, time)).toBe('04:05:06.007 [warn] x error="a\\u001b[2Jb"');
+});
+
 test('writes only lines at or above the configured level, to stderr', () => {
   const stderr = spyOn(process.stderr, 'write').mockImplementation(() => true);
   setLogLevel('warn');

@@ -53,7 +53,8 @@ export interface RecordsResponse {
 }
 
 // GET /api/conflicts: moments when a provider signed more than one value for one feed and second, per provider and
-// endpoint. It scans every record in the range, so the web app asks for it rarely.
+// endpoint. It reads every record in the range, so the range is capped and the web app asks for it rarely.
+export const MAX_CONFLICT_SECONDS = 7 * 24 * 60 * 60;
 export interface ConflictsResponse {
   from: number;
   to: number;
@@ -92,8 +93,9 @@ export function handleApi(reader: Reader, catalog: Catalog, url: URL, now = Math
 
   if (url.pathname === '/api/records') {
     const airnode = params.get('airnode') ?? '';
+    // 400, not 404: the asking peer reads 400 as final, and a catalog that differs from ours stays different.
     const known = isAddress(airnode) && catalog.knows(airnode);
-    if (!known) return fail(404, 'unknown airnode');
+    if (!known) return fail(400, 'unknown airnode');
     const from = parseSeconds(params.get('from'), -1);
     const to = parseSeconds(params.get('to'), -1);
     if (from === null || to === null || from < 0 || to < from || to - from > PEER_WINDOW_SECONDS) {
@@ -119,7 +121,9 @@ export function handleApi(reader: Reader, catalog: Catalog, url: URL, now = Math
   if (url.pathname === '/api/conflicts') {
     const to = parseSeconds(params.get('to'), now);
     const from = parseSeconds(params.get('from'), (to ?? now) - 24 * 60 * 60);
-    if (from === null || to === null || from > to) return fail(400, 'from and to must be unix seconds, from <= to');
+    if (from === null || to === null || from > to || to - from > MAX_CONFLICT_SECONDS) {
+      return fail(400, `from and to must be unix seconds, from <= to, at most ${MAX_CONFLICT_SECONDS} s apart`);
+    }
     return json({ from, to, summaries: summarizeConflicts(reader, catalog, from, to) } satisfies ConflictsResponse);
   }
 

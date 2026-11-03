@@ -53,13 +53,15 @@ async function toRecord(row: SourceRow, store: Store, catalog: Catalog): Promise
 }
 
 // Polls aren't signed: they are the other archiver's claim of when it was watching. They are merged
-// so its coverage fills our gaps, which is why only archives you run or trust should be merged.
-function toPoll(row: SourcePoll, catalog: Catalog): StoredPoll | null {
+// so its coverage fills our gaps, which is why only archives you run or trust should be merged. A poll dated after
+// `now` is refused: no archive has polled the future, and one would read as a gap reaching into it.
+function toPoll(row: SourcePoll, catalog: Catalog, now: number): StoredPoll | null {
   const airnode = hex(row.airnode);
   const statusOk = row.status === null || isCount(row.status);
   if (!airnode || !catalog.knows(airnode) || !isEndpoint(row.endpoint) || !isCount(row.fetchedAt) || !statusOk) {
     return null;
   }
+  if (row.fetchedAt > now) return null;
   if (!isCount(row.received) || !isCount(row.rejected) || !isCount(row.saved) || !isSource(row.source)) return null;
   return {
     airnode: airnode as StoredPoll['airnode'],
@@ -79,10 +81,12 @@ export async function mergeArchive({
   sourcePath,
   dbPath,
   catalog,
+  now = Date.now(),
 }: {
   sourcePath: string;
   dbPath: string;
   catalog: Catalog;
+  now?: number;
 }) {
   if (existsSync(dbPath) && realpathSync(sourcePath) === realpathSync(dbPath)) {
     throw new Error('source and target are the same archive');
@@ -125,7 +129,7 @@ export async function mergeArchive({
                 ${sourceColumn} FROM polls`
       );
       for (const row of pollRows.iterate()) {
-        const poll = toPoll(row, catalog);
+        const poll = toPoll(row, catalog, now);
         if (poll === null) {
           rejectedPolls += 1;
           continue;

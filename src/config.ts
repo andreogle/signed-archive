@@ -22,4 +22,6 @@ export const DEFAULT_PORT = 3000;
 
 export const REQUEST_TIMEOUT_MS = 10_000;
 export const MAX_BACKOFF_MS = 30 * 60 * 1000;
+// Largest response read from a Signed API or a peer. A Signed API answer for one airnode is under 100 KB.
+export const MAX_RESPONSE_BYTES = 16 * 1024 * 1024;
 export const USER_AGENT = 'signed-archive/0.1 (polite poller, one request at a time)';

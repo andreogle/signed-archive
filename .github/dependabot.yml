@@ -1,7 +1,7 @@
 version: 2
 updates:
   # A bump of @api3/api-integrations can change the provider list. CI fails until
-  # `bun run airnodes` is run and src/airnodes.json is committed on the PR.
+  # `bun run airnodes` is run and the regenerated config/airnodes.yaml and config/feeds.yaml are committed on the PR.
   - package-ecosystem: bun
     directory: "/"
     schedule:

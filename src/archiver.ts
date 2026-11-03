@@ -1,3 +1,4 @@
+import { SQLiteError } from 'bun:sqlite';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { type Address, isAddressEqual } from 'viem';
 import type { Catalog } from './catalog.ts';
@@ -6,18 +7,20 @@ import {
   ENDPOINTS,
   type Endpoint,
   MAX_BACKOFF_MS,
+  MAX_RESPONSE_BYTES,
   REQUEST_TIMEOUT_MS,
   SOURCES,
   type Source,
   USER_AGENT,
 } from './config.ts';
 import { sendHeartbeat } from './heartbeat.ts';
+import { readCapped, retryAfterMs } from './http.ts';
 import { errorMessage, log } from './logger.ts';
 import { runRepairs } from './repair.ts';
 import { hasValidSignature, type SignedDatum, toSignedDatum } from './signed-data.ts';
 import { openStore } from './store.ts';
 
-interface Target {
+export interface Target {
   alias: string;
   airnode: Address;
   endpoint: Endpoint;
@@ -25,6 +28,8 @@ interface Target {
   // Signed API base URL for this source: API3's, or the provider's own.
   baseUrl: string;
   failures: number;
+  // When the target may be asked again, on the monotonic clock (`performance.now()`), so a wall-clock step can't
+  // stretch or skip a backoff.
   retryAt: number;
   // Template IDs seen so far; null until the first successful fetch.
   feeds: Set<string> | null;
@@ -38,14 +43,19 @@ export interface ArchiverOptions {
   catalog: Catalog;
   heartbeatUrl?: URL | undefined;
   peers?: readonly URL[];
+  // API3's Signed API; tests point it at a local server.
+  api3Url?: string;
+  // Stops the archiver like SIGINT or SIGTERM do.
+  signal?: AbortSignal;
 }
 
-function backOff(target: Target, intervalMs: number, retryAfter: string | null) {
+export function backOff(target: Target, intervalMs: number, retryAfter: string | null) {
   target.failures += 1;
-  const retryAfterMs = Number(retryAfter) * 1000;
-  const delay = Number.isFinite(retryAfterMs) && retryAfterMs > 0 ? retryAfterMs : intervalMs * 2 ** target.failures;
-  target.retryAt = Date.now() + Math.min(delay, MAX_BACKOFF_MS);
-  return Math.round((target.retryAt - Date.now()) / 1000);
+  const asked = retryAfterMs(retryAfter, Date.now());
+  const delay = asked !== null && asked > 0 ? asked : intervalMs * 2 ** target.failures;
+  const capped = Math.min(delay, MAX_BACKOFF_MS);
+  target.retryAt = performance.now() + capped;
+  return Math.round(capped / 1000);
 }
 
 const fieldsOf = ({ alias, endpoint, source }: Target) => ({ provider: alias, endpoint, source });
@@ -66,19 +76,25 @@ function trackFeeds(target: Target, data: readonly SignedDatum[]) {
 
 // Records a request that saved nothing, so the coverage log shows the provider (not the archiver) was down.
 // `status` is the HTTP status, or null when no usable response came back.
+// A database error here is logged rather than thrown, so it can't stop the archiver.
 function recordFailure(store: Store, target: Target, status: number | null) {
-  store.save([], {
-    airnode: target.airnode,
-    endpoint: target.endpoint,
-    source: target.source,
-    fetchedAt: Date.now(),
-    status,
-    received: 0,
-    rejected: 0,
-  });
+  try {
+    store.save([], {
+      airnode: target.airnode,
+      endpoint: target.endpoint,
+      source: target.source,
+      fetchedAt: Date.now(),
+      status,
+      received: 0,
+      rejected: 0,
+    });
+  } catch (error) {
+    if (!(error instanceof SQLiteError)) throw error;
+    log.error('save failed', { ...fieldsOf(target), error: errorMessage(error) });
+  }
 }
 
-async function poll(target: Target, store: Store, intervalMs: number, stop: AbortSignal) {
+export async function poll(target: Target, store: Store, intervalMs: number, stop: AbortSignal) {
   const fields = fieldsOf(target);
   const response = await fetch(`${target.baseUrl}/${target.endpoint}/${target.airnode}`, {
     headers: { 'user-agent': USER_AGENT },
@@ -91,14 +107,22 @@ async function poll(target: Target, store: Store, intervalMs: number, stop: Abor
     return null;
   }
   const fetchedAt = Date.now();
-  const body: unknown = await response.json();
+  const text = await readCapped(response, MAX_RESPONSE_BYTES);
+  if (text === null) throw new Error(`response over ${MAX_RESPONSE_BYTES} bytes`);
+  const body: unknown = JSON.parse(text);
   const raw = typeof body === 'object' && body !== null ? (body as { data?: unknown }).data : undefined;
   if (typeof raw !== 'object' || raw === null) throw new Error('response has no data object');
 
+  // Duplicates are dropped before the signature check, the slow step, so a host repeating one record can't stall
+  // the loop. Include the signer and signature so a forged copy cannot hide a genuine one that follows it.
+  const seen = new Set<string>();
   const valid = [];
   let rejected = 0;
   for (const value of Object.values(raw)) {
     const datum = toSignedDatum(value);
+    const key = datum && Object.values(datum).join(':').toLowerCase();
+    if (key !== null && seen.has(key)) continue;
+    if (key !== null) seen.add(key);
     if (datum && isAddressEqual(datum.airnode, target.airnode) && (await hasValidSignature(datum))) {
       valid.push(datum);
     } else {
@@ -124,12 +148,34 @@ async function poll(target: Target, store: Store, intervalMs: number, stop: Abor
   return { saved, rejected };
 }
 
-export async function runArchiver({ intervalSeconds, dbPath, catalog, heartbeatUrl, peers = [] }: ArchiverOptions) {
+// A request that threw. A fetch or response error is the host's: the target backs off and the failure is recorded. A
+// database error is ours, so the host isn't blamed or backed off; the next request tries the database again.
+function noteFailure(store: Store, target: Target, intervalMs: number, error: unknown) {
+  const fields = fieldsOf(target);
+  if (error instanceof SQLiteError) {
+    log.error('save failed', { ...fields, error: errorMessage(error) });
+    return;
+  }
+  const retryInSeconds = backOff(target, intervalMs, null);
+  log.warn('fetch failed', { ...fields, error: errorMessage(error), retryInSeconds });
+  recordFailure(store, target, null);
+}
+
+export async function runArchiver({
+  intervalSeconds,
+  dbPath,
+  catalog,
+  heartbeatUrl,
+  peers = [],
+  api3Url = BASE_URL,
+  signal,
+}: ArchiverOptions) {
+  if (signal?.aborted) return;
   const intervalMs = intervalSeconds * 1000;
   const targets: Target[] = catalog.airnodes.flatMap(({ alias, airnode, signedApiUrl }) => {
     return ENDPOINTS.flatMap((endpoint) => {
       return SOURCES.map((source) => {
-        const baseUrl = source === 'api3' ? BASE_URL : signedApiUrl;
+        const baseUrl = source === 'api3' ? api3Url : signedApiUrl;
         return { alias, airnode, endpoint, source, baseUrl, failures: 0, retryAt: 0, feeds: null };
       });
     });
@@ -141,16 +187,20 @@ export async function runArchiver({ intervalSeconds, dbPath, catalog, heartbeatU
   // The first signal cancels the request in flight and the wait before the next one; a second exits at once.
   // Each save is one SQLite transaction, so even a forced exit leaves no half-written records.
   const stop = new AbortController();
-  for (const signal of ['SIGINT', 'SIGTERM'] as const) {
-    process.on(signal, () => {
+  const onAbort = () => stop.abort();
+  signal?.addEventListener('abort', onAbort, { once: true });
+  const handlers = (['SIGINT', 'SIGTERM'] as const).map((name) => {
+    const handler = () => {
       if (stop.signal.aborted) {
-        log.warn('forced stop', { signal });
-        process.exit(signal === 'SIGINT' ? 130 : 143);
+        log.warn('forced stop', { signal: name });
+        process.exit(name === 'SIGINT' ? 130 : 143);
       }
-      log.info('stopping', { signal });
+      log.info('stopping', { signal: name });
       stop.abort();
-    });
-  }
+    };
+    process.on(name, handler);
+    return { name, handler };
+  });
 
   log.info('archiver started', {
     providers: catalog.airnodes.length,
@@ -172,7 +222,7 @@ export async function runArchiver({ intervalSeconds, dbPath, catalog, heartbeatU
     let succeeded = 0;
     for (const target of targets) {
       if (stop.signal.aborted) break;
-      const startedAt = Date.now();
+      const startedAt = performance.now();
       if (target.retryAt > startedAt) {
         backingOff += 1;
       } else {
@@ -188,17 +238,11 @@ export async function runArchiver({ intervalSeconds, dbPath, catalog, heartbeatU
         } catch (error) {
           if (stop.signal.aborted) break;
           failed += 1;
-          recordFailure(store, target, null);
-          const retryInSeconds = backOff(target, intervalMs, null);
-          log.warn('fetch failed', {
-            ...fieldsOf(target),
-            error: errorMessage(error),
-            retryInSeconds,
-          });
+          noteFailure(store, target, intervalMs, error);
         }
       }
       try {
-        await sleep(Math.max(0, gapMs - (Date.now() - startedAt)), undefined, { signal: stop.signal });
+        await sleep(Math.max(0, gapMs - (performance.now() - startedAt)), undefined, { signal: stop.signal });
       } catch {
         break;
       }
@@ -215,5 +259,7 @@ export async function runArchiver({ intervalSeconds, dbPath, catalog, heartbeatU
   }
   await repairing;
   store.close();
+  signal?.removeEventListener('abort', onAbort);
+  for (const { name, handler } of handlers) process.off(name, handler);
   log.info('archiver stopped');
 }

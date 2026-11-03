@@ -79,6 +79,13 @@ interface Row {
 
 const toHex = (hex: string) => `0x${hex.toLowerCase()}` as Hex;
 
+// One entry per airnode and template, so a template listed under two feed names is read once.
+const unique = (sources: readonly FeedSource[]) => {
+  return [
+    ...new Map(sources.map((source) => [`${source.airnode}:${source.templateId}`.toLowerCase(), source])).values(),
+  ];
+};
+
 // Read-only, so it can run beside the archiver: WAL mode lets readers and the writer work at once.
 export function openReader(path: string) {
   const db = new Database(path, { readonly: true, strict: true });
@@ -174,57 +181,53 @@ export function openReader(path: string) {
     return times.length > 0 ? Math.min(...times) : null;
   }
 
-  // Every record of every (airnode, template, timestamp) that has more than one signed value in [from, to] (unix
-  // seconds), with the Signed API that served it: matched through the poll that saved it. Records merged or repaired
-  // from another archive have no matching poll, so their source is null.
-  function conflictRecords(from: number, to: number) {
+  // Every record of the sources' (airnode, template, timestamp) moments that have more than one signed value in
+  // [from, to] (unix seconds), with the Signed API that served it: matched through the poll that saved it. Records
+  // merged or repaired from another archive have no matching poll, so their source is null. Each source is read on
+  // the primary key, so the cost follows the range, not the size of the archive.
+  function conflictRecords(sources: readonly FeedSource[], from: number, to: number) {
     const sourced = hasTable(db, 'polls') && hasColumn(db, 'polls', 'source');
-    const source = sourced ? 'p.source' : 'NULL';
-    const join = sourced
-      ? 'LEFT JOIN polls p ON p.airnode = d.airnode AND p.endpoint = d.endpoint AND p.fetched_at = d.fetched_at'
-      : '';
-    return db
-      .query<
-        {
-          airnode: string;
-          templateId: string;
-          timestamp: number;
-          endpoint: string;
-          value: string;
-          source: string | null;
-        },
-        { from: number; to: number }
-      >(
-        `WITH conflicted AS (
-           SELECT airnode, template_id, timestamp FROM datapoints WHERE timestamp BETWEEN $from AND $to
-           GROUP BY airnode, template_id, timestamp HAVING count(*) > 1
-         )
-         SELECT hex(d.airnode) AS airnode, hex(d.template_id) AS templateId, d.timestamp, d.endpoint,
-                hex(d.value) AS value, ${source} AS source
-         FROM datapoints d JOIN conflicted c
-           ON c.airnode = d.airnode AND c.template_id = d.template_id AND c.timestamp = d.timestamp
-         ${join}
-         ORDER BY d.airnode, d.template_id, d.timestamp, d.value`
-      )
-      .all({ from, to })
-      .map((row) => ({
-        ...row,
-        airnode: toHex(row.airnode),
-        templateId: toHex(row.templateId),
-        value: toHex(row.value),
-      }));
+    const query = db.prepare<
+      { timestamp: number; endpoint: string; value: string; source: string | null },
+      { airnode: Uint8Array; templateId: Uint8Array; from: number; to: number }
+    >(
+      `WITH conflicted AS (
+         SELECT timestamp FROM datapoints
+         WHERE airnode = $airnode AND template_id = $templateId AND timestamp BETWEEN $from AND $to
+         GROUP BY timestamp HAVING count(*) > 1
+       )
+       SELECT d.timestamp, d.endpoint, hex(d.value) AS value, ${sourced ? 'p.source' : 'NULL'} AS source
+       FROM conflicted c JOIN datapoints d
+         ON d.airnode = $airnode AND d.template_id = $templateId AND d.timestamp = c.timestamp
+       ${sourced ? 'LEFT JOIN polls p ON p.airnode = d.airnode AND p.endpoint = d.endpoint AND p.fetched_at = d.fetched_at' : ''}
+       ORDER BY d.timestamp, d.value`
+    );
+    return unique(sources).flatMap((source) => {
+      return query.all({ ...keyOf(source), from, to }).map((row) => {
+        return { ...row, value: toHex(row.value), airnode: source.airnode, templateId: source.templateId };
+      });
+    });
   }
 
-  // How many distinct signed moments (template and timestamp) each airnode and endpoint has in [from, to].
-  function momentCounts(from: number, to: number) {
-    return db
-      .query<{ airnode: string; endpoint: string; moments: number }, { from: number; to: number }>(
-        `SELECT hex(airnode) AS airnode, endpoint, count(*) AS moments FROM (
-           SELECT DISTINCT airnode, endpoint, template_id, timestamp FROM datapoints WHERE timestamp BETWEEN $from AND $to
-         ) GROUP BY airnode, endpoint`
-      )
-      .all({ from, to })
-      .map((row) => ({ ...row, airnode: toHex(row.airnode) }));
+  // How many distinct signed moments (template and second) each airnode and endpoint has in [from, to].
+  function momentCounts(sources: readonly FeedSource[], from: number, to: number) {
+    const query = db.prepare<
+      { endpoint: string; moments: number },
+      { airnode: Uint8Array; templateId: Uint8Array; from: number; to: number }
+    >(
+      `SELECT endpoint, count(DISTINCT timestamp) AS moments FROM datapoints
+       WHERE airnode = $airnode AND template_id = $templateId AND timestamp BETWEEN $from AND $to GROUP BY endpoint`
+    );
+    const counts = new Map<string, { airnode: Address; endpoint: string; moments: number }>();
+    for (const source of unique(sources)) {
+      for (const { endpoint, moments } of query.all({ ...keyOf(source), from, to })) {
+        const key = `${source.airnode.toLowerCase()}:${endpoint}`;
+        const count = counts.get(key) ?? { airnode: source.airnode, endpoint, moments: 0 };
+        count.moments += moments;
+        counts.set(key, count);
+      }
+    }
+    return [...counts.values()];
   }
 
   // When the archiver last recorded a request, in unix milliseconds, or null if it never has.
@@ -261,7 +264,8 @@ export function openReader(path: string) {
           )
           .all({ airnode: key.airnode, endpoint, from, to })
       : [];
-    return subtractCovered(union([...head, ...found, ...tail]), covered, GAP_SECONDS);
+    // Sliver smoothing is only for the chart, never for coverage advertised to another archive.
+    return subtractCovered(union([...head, ...found, ...tail]), covered, beforeFirst ? 0 : GAP_SECONDS);
   }
 
   // Stretches inside [from, to] when this archive has no data for some provider of a feed (`sources`, all on one

@@ -3,10 +3,11 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
+import { createCatalog } from '../src/catalog.ts';
 import { handleMcp, handleMcpHttp, runMcpStdio } from '../src/mcp.ts';
 import { openReader } from '../src/reader.ts';
 import { openStore } from '../src/store.ts';
-import { catalog, coingecko, fixtureDb, zecConflict } from './fixtures.ts';
+import { blocksize, catalog, coingecko, coinmetrics, fixtureDb, zecConflict } from './fixtures.ts';
 
 // Real ETH/USD records signed 1793206903-1793206951 by blocksize, coingecko and coinmetrics; one coingecko OEV record.
 const db = fixtureDb();
@@ -106,9 +107,33 @@ describe('tools', () => {
     });
   });
 
-  test('check_price passes fresh agreeing prices and names stale ones', async () => {
-    const fresh = (await call('check_price', { feed: 'ETH/USD', maxAgeSeconds: 120 })).structuredContent;
-    expect(fresh).toMatchObject({ verdict: 'ok', issues: [], providers: 3 });
+  test('check_price passes fresh agreeing prices, with the records it checked, and names stale ones', async () => {
+    // The archive holds three of ETH/USD's providers; with only those three in the catalog, nothing is missing.
+    const feeds = {
+      'ETH/USD': {
+        blocksize: blocksize[0]?.templateId ?? '0x',
+        coingecko: coingecko.templateId,
+        coinmetrics: coinmetrics.templateId,
+      },
+    };
+    const three = createCatalog({ airnodes: catalog.input.airnodes, feeds });
+    const checked = await handleMcp(
+      reader,
+      three,
+      {
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'tools/call',
+        params: { name: 'check_price', arguments: { feed: 'ETH/USD', maxAgeSeconds: 120 } },
+      },
+      now
+    );
+    // biome-ignore lint/suspicious/noExplicitAny: tool results are free-form JSON, inspected field by field below
+    const fresh = (checked && 'result' in checked ? checked.result : null) as any;
+    expect(fresh.structuredContent).toMatchObject({ verdict: 'ok', issues: [], providers: 3 });
+    expect(fresh.structuredContent.records[0].signed).toMatchObject({ signature: expect.stringMatching(/^0x/) });
+    const everyone = (await call('check_price', { feed: 'ETH/USD', maxAgeSeconds: 120 })).structuredContent;
+    expect(everyone.issues).toEqual(['no verified record from: coinpaprika, ncfx, nodary, shiftmarkets']);
     const strict = (await call('check_price', { feed: 'ETH/USD', maxAgeSeconds: 60, maxSpreadBps: 1 }))
       .structuredContent;
     expect(strict.verdict).toBe('warn');
@@ -139,7 +164,14 @@ describe('tools', () => {
       ['check_price', { feed: 'ETH/USD', maxAgeSeconds: -5 }, 'maxAgeSeconds must be a positive number'],
       ['get_price_history', { feed: 'ETH/USD', from: 10, to: 5 }, 'from must not be after to'],
       ['get_conflicts', { from: 10, to: 5 }, 'from must not be after to'],
-      ['launch_rockets', {}, 'unknown tool launch_rockets'],
+      ['get_conflicts', { from: 0, to: now }, 'at most 7 days'],
+      // A time without a zone would be read in the server's own; milliseconds would land in the far future.
+      ['get_price_at', { feed: 'ETH/USD', time: '2026-10-29T22:30:00' }, 'with a zone'],
+      ['get_price_at', { feed: 'ETH/USD', time: 1_793_206_951_000 }, 'not milliseconds'],
+      ['get_price_at', { feed: 'ETH/USD', time: '99999999999999999999' }, 'not milliseconds'],
+      ['get_price_history', { feed: 'ETH/USD', from: 0, to: now, points: 0.5 }, 'whole number of at least 1'],
+      ['get_price_at', { feed: 'ETH/USD', time: '2026-02-30' }, 'ISO 8601'],
+      ['get_price_at', { feed: 'ETH/USD', time: '2026-02-30T12:00:00+02:00' }, 'ISO 8601'],
     ];
     for (const [name, args, message] of cases) {
       const result = await call(name, args);
@@ -147,23 +179,65 @@ describe('tools', () => {
       expect(result.content[0].text).toContain(message);
     }
   });
+
+  test('reads a date as UTC midnight, and an offset as written', async () => {
+    const at = async (time: string) => (await call('get_price_at', { feed: 'ETH/USD', time })).structuredContent.time;
+    expect(await at('2026-10-29')).toBe('2026-10-29T00:00:00.000Z');
+    expect(await at('2026-10-29T22:30:00+02:00')).toBe('2026-10-29T20:30:00.000Z');
+  });
+
+  test('reports an unknown tool as a protocol error', async () => {
+    expect(await rpc('tools/call', { name: 'launch_rockets', arguments: {} })).toMatchObject({
+      error: { code: -32602, message: 'unknown tool launch_rockets' },
+    });
+  });
 });
 
 describe('POST /mcp', () => {
-  const post = (body: string, method = 'POST') => {
+  const post = (body: unknown, method = 'POST', headers: Record<string, string> = {}) => {
     return handleMcpHttp(
       reader,
       catalog,
-      new Request('http://x/mcp', { method, body: method === 'POST' ? body : null })
+      new Request('http://x/mcp', {
+        method,
+        headers: { 'content-type': 'application/json', ...headers },
+        body: method === 'POST' ? (typeof body === 'string' ? body : JSON.stringify(body)) : null,
+      })
     );
   };
 
   test('answers a request as JSON, a notification with 202, and refuses other methods and bad JSON', async () => {
-    const answer = await post(JSON.stringify({ jsonrpc: '2.0', id: 7, method: 'ping' }));
+    const answer = await post({ jsonrpc: '2.0', id: 7, method: 'ping' });
     expect(await answer.json()).toEqual({ jsonrpc: '2.0', id: 7, result: {} });
-    expect((await post(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }))).status).toBe(202);
+    expect((await post({ jsonrpc: '2.0', method: 'notifications/initialized' })).status).toBe(202);
     expect((await post('', 'GET')).status).toBe(405);
     expect((await post('{not json')).status).toBe(400);
+  });
+
+  test('never answers a notification, even one naming a tool, nor a response the client sends back', async () => {
+    const notification = { jsonrpc: '2.0', method: 'tools/call', params: { name: 'list_feeds', arguments: {} } };
+    expect((await post(notification)).status).toBe(202);
+    expect((await post({ jsonrpc: '2.0', id: 3, result: {} })).status).toBe(202);
+  });
+
+  test('answers a batch with one response per request', async () => {
+    const batch = [
+      { jsonrpc: '2.0', id: 1, method: 'ping' },
+      { jsonrpc: '2.0', method: 'notifications/initialized' },
+      { jsonrpc: '2.0', id: 2, method: 'tools/list' },
+    ];
+    const answers = await (await post(batch)).json();
+    expect(answers.map(({ id }: { id: number }) => id)).toEqual([1, 2]);
+    expect(await (await post([])).json()).toMatchObject({ error: { code: -32600 } });
+  });
+
+  test('refuses pages from other sites, other content types and unknown protocol versions', async () => {
+    const ping = { jsonrpc: '2.0', id: 1, method: 'ping' };
+    expect((await post(ping, 'POST', { origin: 'https://evil.example' })).status).toBe(403);
+    expect((await post(ping, 'POST', { origin: 'http://localhost:3000' })).status).toBe(200);
+    expect((await post(ping, 'POST', { 'content-type': 'text/plain' })).status).toBe(415);
+    expect((await post(ping, 'POST', { 'mcp-protocol-version': '1999-01-01' })).status).toBe(400);
+    expect((await post(ping, 'POST', { 'mcp-protocol-version': '2025-06-18' })).status).toBe(200);
   });
 });
 
@@ -200,7 +274,12 @@ describe('get_conflicts with a real conflict', () => {
     const response = await handleMcp(
       conflictReader,
       catalog,
-      { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'get_conflicts', arguments: { from: 0 } } },
+      {
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'tools/call',
+        params: { name: 'get_conflicts', arguments: { from: 1_793_219_000 } },
+      },
       1_793_300_000
     );
     conflictReader.close();
@@ -208,7 +287,15 @@ describe('get_conflicts with a real conflict', () => {
     const body =
       response && 'result' in response ? (response.result as { structuredContent: { summaries: unknown[] } }) : null;
     expect(body?.structuredContent.summaries).toMatchObject([
-      { provider: 'blocksize', conflicts: 1, widest: { feed: 'ZEC/USD', signedAt: '2026-10-28T20:39:16.000Z' } },
+      {
+        provider: 'blocksize',
+        conflicts: 1,
+        widest: {
+          feed: 'ZEC/USD',
+          signedAt: '2026-10-28T20:39:16.000Z',
+          recheck: { tool: 'get_price_at', arguments: { feed: 'ZEC/USD', time: 1_793_219_956 } },
+        },
+      },
     ]);
   });
 });

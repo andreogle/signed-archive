@@ -19,19 +19,20 @@ bun run dev                    # archiver + explorer, restarting on file changes
 bun run dev -- --interval 120  # flags override env vars
 ```
 
-| Flag                    | Env var                 | Default               | Notes                                    |
-| ----------------------- | ----------------------- | --------------------- | ---------------------------------------- |
-| `--interval <seconds>`  | `POLL_INTERVAL_SECONDS` | `60`                  | Minimum 15. Requests are spread evenly.  |
-| `--db <path>`           | `DB_PATH`               | `data/archive.sqlite` |                                          |
-| `--log-level <level>`   | `LOG_LEVEL`             | `info`                | `debug`, `info`, `warn` or `error`.      |
-| `--serve`               | `SERVE`                 | off                   | `archive` only: also serve the explorer. |
-| `--heartbeat-url <url>` | `HEARTBEAT_URL`         | none                  | `archive` only: ping after each cycle.   |
-| `--host <host>`         | `HOST`                  | `127.0.0.1`           | Explorer address.                        |
-| `--port <port>`         | `PORT`                  | `3000`                | Explorer port.                           |
+| Flag                    | Env var                 | Default               | Notes                                                       |
+| ----------------------- | ----------------------- | --------------------- | ----------------------------------------------------------- |
+| `--interval <seconds>`  | `POLL_INTERVAL_SECONDS` | `60`                  | Minimum 15. Requests are spread evenly.                     |
+| `--db <path>`           | `DB_PATH`               | `data/archive.sqlite` |                                                             |
+| `--log-level <level>`   | `LOG_LEVEL`             | `info`                | `debug`, `info`, `warn` or `error`.                         |
+| `--serve [on]`          | `SERVE`                 | off                   | `archive` only: also serve the explorer. `true` or `false`. |
+| `--heartbeat-url <url>` | `HEARTBEAT_URL`         | none                  | `archive` only: ping after each cycle.                      |
+| `--host <host>`         | `HOST`                  | `127.0.0.1`           | Explorer address.                                           |
+| `--port <port>`         | `PORT`                  | `3000`                | Explorer port.                                              |
 
 **Config files.** Settings live in `signed-archive.yaml` (committed, and shipped in the Docker image), or any copy
 passed with `--config <path>` / `CONFIG`. What to archive lives in two generated files it names under `catalog`:
-`config/airnodes.yaml` and `config/feeds.yaml`, resolved relative to the settings file. A flag beats an env var, which
+`config/airnodes.yaml` and `config/feeds.yaml`. Paths in the file, `db` included, are relative to the settings file, so
+it names the same archive from any working directory (a flag or env var path is relative to the working directory). A flag beats an env var, which
 beats the file, which beats the default, and a misspelled key is an error. Peers are set only in the file. The
 committed copy is public, so keep the heartbeat URL out of it: set `HEARTBEAT_URL`, or use a private copy.
 
@@ -64,7 +65,8 @@ See [IDEAS.md](IDEAS.md) for where the project could go next.
 ## Build
 
 `bun run build` compiles a self-contained native binary to `dist/signed-archive` (no Bun or `node_modules` needed to
-run it). The airnode list is baked in, so rebuild after updating it.
+run it). The airnode and feed lists are not bundled: the binary reads them from `config/` (named in the settings
+file) at run time, so updating them needs no rebuild.
 
 The binary is about 110 MB because it embeds the whole Bun runtime (about 107 MB); the app itself is under 100 KB.
 `--bytecode` compiles the code ahead of time, which cuts startup from about 11 ms to 4 ms.
@@ -156,7 +158,9 @@ Locally, over stdin and stdout (for Claude Code, for example):
 claude mcp add signed-archive -- /path/to/signed-archive mcp --config /path/to/signed-archive.yaml
 ```
 
-Remotely, the explorer serves the same tools at `POST /mcp` (MCP's Streamable HTTP transport, stateless JSON):
+Remotely, the explorer serves the same tools at `POST /mcp` (MCP's Streamable HTTP transport, stateless JSON). Agents
+that aren't browsers send no `Origin` and are served; a browser page is only served when it comes from this machine
+(`localhost`, `127.0.0.1`), so a site you visit can't call the tools or rebind its domain to reach them:
 
 ```sh
 claude mcp add --transport http signed-archive http://127.0.0.1:3000/mcp
@@ -164,7 +168,7 @@ claude mcp add --transport http signed-archive http://127.0.0.1:3000/mcp
 
 ## Conflicting values
 
-The explorer's **Conflicts** page (`/conflicts`, or `/api/conflicts?from=&to=` as JSON) lists, per provider and
+The explorer's **Conflicts** page (`/conflicts`, or `/api/conflicts?from=&to=` as JSON, at most 7 days) lists, per provider and
 endpoint, the moments when a provider signed more than one value for the same feed and second: how many (and out of
 how many archived moments), how far apart the values were in basis points (median, 90th percentile, widest), and which
 Signed APIs served each side, matched through the poll that saved each record. Each provider's widest conflict links to
@@ -173,6 +177,9 @@ the range, so the page refreshes every 5 minutes rather than every 30 seconds.
 
 The rate is a lower bound. Each host is polled about once a minute, so a conflict only shows when both copies happen
 to be serving a record from the same second.
+
+Spreads are relative to the absolute median. When differing values have a zero median, the spread is undefined
+(`null` in JSON), ranked above finite spreads; MCP's `check_price` warns instead of treating it as agreement.
 
 ## Peer repair
 
@@ -199,6 +206,9 @@ minutes up to 6 hours), so its outage doesn't use up the attempts of every windo
 never imported, because coverage claims aren't signed: the stretch stays a gap in `polls`, and `peer_coverage` records
 the stretches the peer's records actually span. The explorer shades a stretch until every provider of the feed is
 covered.
+
+Stored repair coverage preserves holes the peer reports, even when shorter than the gap threshold. The chart may
+hide short leftover slivers for readability, but `/api/records` reports them to peers without that smoothing.
 
 Nodes may poll at different intervals, run different versions or list different feeds. Records prove themselves, so
 none of that matters to what is exchanged: a peer returns whatever it holds in the window, and records under templates

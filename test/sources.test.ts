@@ -71,3 +71,21 @@ test('merging a legacy archive keeps its polls as API3, and polls from an unknow
     rejectedPolls: 1,
   });
 });
+
+test('two requests in the same millisecond each keep their poll row, and their records point at their own poll', () => {
+  const path = join(dir, 'same-millisecond.sqlite');
+  const store = openStore(path);
+  const poll = { airnode: coingecko.airnode, endpoint: 'public' as const, fetchedAt: 5000, status: 200, rejected: 0 };
+  store.save([], { ...poll, source: 'api3', received: 0 });
+  store.save([coingecko], { ...poll, source: 'provider', received: 1 });
+  store.close();
+  const db = new Database(path, { readonly: true });
+  const polls = db.query('SELECT source, fetched_at AS fetchedAt, saved FROM polls ORDER BY fetched_at').all();
+  const record = db.query<{ fetchedAt: number }, []>('SELECT fetched_at AS fetchedAt FROM datapoints').get();
+  db.close();
+  expect(polls).toEqual([
+    { source: 'api3', fetchedAt: 5000, saved: 0 },
+    { source: 'provider', fetchedAt: 5001, saved: 1 },
+  ]);
+  expect(record?.fetchedAt).toBe(5001);
+});

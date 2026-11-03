@@ -4,8 +4,10 @@ export const LOG_LEVELS = ['debug', 'info', 'warn', 'error'] as const;
 export type LogLevel = (typeof LOG_LEVELS)[number];
 export type LogFields = Record<string, string | number | boolean | undefined>;
 
+// Values are quoted (and control characters escaped) unless they are plain, so text from the network can't break a
+// line or send escape sequences to the terminal.
 const formatValue = (value: string | number | boolean) =>
-  typeof value === 'string' && !/^[^\s"=]+$/.test(value) ? JSON.stringify(value) : String(value);
+  typeof value === 'string' && !/^[^\s"=\p{Cc}]+$/u.test(value) ? JSON.stringify(value) : String(value);
 
 const pad = (value: number, length = 2) => String(value).padStart(length, '0');
 

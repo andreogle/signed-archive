@@ -211,6 +211,8 @@ describe('gaps and uncovered', () => {
     // Covered to 1400 leaves 100 s: covers are signed times, a little before the fetch that ended the gap.
     const sliver = archive({ [coingecko.airnode]: [1000, 1001, 1500] }, [[coingecko.airnode, 1001, 1400]]);
     expect(sliver.gaps(feed, 'public', 0, 1600)).toEqual([]);
+    // Display smoothing must never widen the coverage we advertise to peers.
+    expect(sliver.uncovered(coingecko.airnode, 'public', 1000, 1500)).toEqual([{ from: 1400, to: 1500 }]);
     // A short stretch no cover touches is still reported, e.g. a gap clipped by the range asked for.
     expect(sliver.gaps(feed, 'public', 1450, 1500)).toEqual([{ from: 1450, to: 1500 }]);
     sliver.close();

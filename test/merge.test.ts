@@ -12,7 +12,7 @@ const source = fixtureDb();
 const dir = mkdtempSync(join(tmpdir(), 'signed-archive-merge-'));
 const target = join(dir, 'archive.sqlite');
 
-// Rows a careless or hostile archive could hold: an edited value, an unknown signer, a bad endpoint and a broken poll.
+// Rows a careless or hostile archive could hold: an edited value, an unknown signer, a bad endpoint and broken polls.
 const tampered = new Database(source.path, { strict: true });
 const insert = tampered.prepare(
   `INSERT INTO datapoints (airnode, template_id, timestamp, value, signature, endpoint, fetched_at)
@@ -34,6 +34,11 @@ tampered.run(
   `INSERT INTO polls (airnode, endpoint, fetched_at, status, received, rejected, saved)
    VALUES (x'${coingecko.airnode.slice(2)}', 'public', 5, -1, 0, 0, 0)`
 );
+// A poll dated in 2100, which would open a gap reaching into the future.
+tampered.run(
+  `INSERT INTO polls (airnode, endpoint, fetched_at, status, received, rejected, saved)
+   VALUES (x'${coingecko.airnode.slice(2)}', 'public', 4102444800000, 200, 0, 0, 0)`
+);
 tampered.close();
 
 afterAll(() => {
@@ -44,7 +49,7 @@ afterAll(() => {
 describe('mergeArchive', () => {
   test('adds verified records and polls, and rejects anything that fails the checks', async () => {
     const result = await mergeArchive({ sourcePath: source.path, dbPath: target, catalog });
-    expect(result).toEqual({ read: 8, added: 5, rejected: 3, polls: 4, rejectedPolls: 1 });
+    expect(result).toEqual({ read: 8, added: 5, rejected: 3, polls: 5, rejectedPolls: 2 });
 
     const reader = openReader(target);
     const [latest] = reader.at(

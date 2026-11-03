@@ -30,13 +30,21 @@ export function toSignedDatum(value: unknown): SignedDatum | null {
   return { airnode, templateId, timestamp, encodedValue, signature };
 }
 
+// Half the secp256k1 group order. OpenZeppelin's ECDSA, which Api3ServerV1 uses, rejects a larger `s`.
+const MAX_S = 0x7fffffffffffffffffffffffffffffff5d576e7357a4501ddfe92f46681b20a0n;
+
 // Same check as Api3ServerV1: EIP-191 over keccak256(templateId, timestamp, data). OEV data uses
-// the same scheme; the Signed API already serves it under the OEV template ID.
+// the same scheme; the Signed API already serves it under the OEV template ID. Like the contract, it refuses the
+// malleable forms of a signature (high `s`, or `v` other than 27 or 28) that viem would accept: anyone can derive them
+// from a public record, and a stored copy the contract rejects is no evidence of what can go on-chain.
 export async function hasValidSignature(datum: SignedDatum): Promise<boolean> {
-  const hash = keccak256(
-    encodePacked(['bytes32', 'uint256', 'bytes'], [datum.templateId, BigInt(datum.timestamp), datum.encodedValue])
-  );
   try {
+    const s = BigInt(`0x${datum.signature.slice(66, 130)}`);
+    const v = datum.signature.slice(130).toLowerCase();
+    if (s > MAX_S || (v !== '1b' && v !== '1c')) return false;
+    const hash = keccak256(
+      encodePacked(['bytes32', 'uint256', 'bytes'], [datum.templateId, BigInt(datum.timestamp), datum.encodedValue])
+    );
     const signer = await recoverMessageAddress({ message: { raw: hash }, signature: datum.signature });
     return isAddressEqual(signer, datum.airnode);
   } catch {

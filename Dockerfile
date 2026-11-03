@@ -5,7 +5,8 @@ ARG BUN_VERSION=1.4.4
 FROM oven/bun:${BUN_VERSION} AS build
 WORKDIR /src
 COPY package.json bun.lock bunfig.toml ./
-# The binary needs only runtime dependencies; the provider list it bundles is already generated in src/.
+# The binary needs only runtime dependencies. The airnode and feed lists are not bundled; they are copied from config/
+# below and read at run time.
 RUN bun install --frozen-lockfile --production
 COPY tsconfig.json ./
 COPY src ./src

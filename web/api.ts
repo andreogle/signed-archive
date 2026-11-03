@@ -3,8 +3,8 @@ import type { ConflictsResponse, FeedsResponse, HistoryResponse, MomentResponse 
 import { type Catalog, type CatalogInput, createCatalog } from '../src/catalog.ts';
 import type { Endpoint } from '../src/config.ts';
 import type { SignedPrice } from '../src/reader.ts';
-import { hasValidSignature } from '../src/signed-data.ts';
-import { RANGES, type Range } from './search.ts';
+import { hasValidSignature, toSignedDatum } from '../src/signed-data.ts';
+import { type ConflictRange, RANGES, type Range } from './search.ts';
 
 // The archiver adds records about once a minute; refreshing twice as often keeps live views at most half a cycle
 // behind. TanStack Query pauses the refresh while the tab is hidden.
@@ -13,12 +13,13 @@ export const REFRESH_MS = 30_000;
 async function get<T>(path: string, query: Record<string, string | number>): Promise<T> {
   const search = new URLSearchParams(Object.entries(query).map(([key, value]) => [key, String(value)]));
   const response = await fetch(`${path}?${search}`);
-  const body: unknown = await response.json();
   if (!response.ok) {
+    // An error from a proxy in front of the server may not be JSON; the status still says what went wrong.
+    const body: unknown = await response.json().catch(() => null);
     const error = typeof body === 'object' && body !== null && 'error' in body ? String(body.error) : '';
-    throw new Error(error || response.statusText);
+    throw new Error(error || `Request failed: HTTP ${response.status} ${response.statusText}`.trim());
   }
-  return body as T;
+  return (await response.json()) as T;
 }
 
 export const now = () => Math.floor(Date.now() / 1000);
@@ -45,13 +46,12 @@ export function useHistory(feed: string, endpoint: Endpoint, range: Range) {
 }
 
 // Conflicting values over a range. Counting them scans every record in the range, so they refresh every 5 minutes.
-export function useConflicts(range: Range) {
+export function useConflicts(range: ConflictRange) {
   return useQuery({
     queryKey: ['conflicts', range],
     queryFn: () => {
       const to = now();
-      const span = RANGES[range];
-      return get<ConflictsResponse>('/api/conflicts', { from: span === null ? 0 : to - span, to });
+      return get<ConflictsResponse>('/api/conflicts', { from: to - RANGES[range], to });
     },
     placeholderData: keepPreviousData,
     refetchInterval: 5 * 60_000,
@@ -78,14 +78,17 @@ export function useCatalog() {
   });
 }
 
-export type SignatureCheck = 'valid' | 'wrong-source' | 'bad-signature';
+export type SignatureCheck = 'valid' | 'after-time' | 'wrong-source' | 'bad-signature';
 
-// The server's word is not trusted. Each record is checked in the browser: its signer and template must be the
-// feed's own (from the catalog), and the signature must recover to that signer. Checks wait for the catalog.
+// The server's word is not trusted. Each record is checked in the browser against the feed and time the user asked
+// for, not the ones the server names: it must have the exact signed shape, be signed at or before `time` (when one is
+// chosen), its signer and template must be the feed's own (from the catalog), and the signature must recover to that
+// signer. A malformed record counts as a bad signature. Checks wait for the catalog.
 export function useSignatureChecks(
   catalog: Catalog | undefined,
   feed: string,
   endpoint: Endpoint,
+  time: number | undefined,
   records: readonly SignedPrice[]
 ) {
   return useQueries({
@@ -95,6 +98,7 @@ export function useSignatureChecks(
         'signature',
         feed,
         endpoint,
+        time ?? 'latest',
         record.provider,
         record.airnode,
         record.templateId,
@@ -103,8 +107,11 @@ export function useSignatureChecks(
         record.signature,
       ],
       queryFn: async (): Promise<SignatureCheck> => {
-        if (!catalog?.isFeedRecord(feed, endpoint, record)) return 'wrong-source';
-        return (await hasValidSignature(record)) ? 'valid' : 'bad-signature';
+        const datum = toSignedDatum(record);
+        if (datum === null) return 'bad-signature';
+        if (time !== undefined && Number(datum.timestamp) > time) return 'after-time';
+        if (!catalog?.isFeedRecord(feed, endpoint, { ...datum, provider: record.provider })) return 'wrong-source';
+        return (await hasValidSignature(datum)) ? 'valid' : 'bad-signature';
       },
       staleTime: Number.POSITIVE_INFINITY,
     })),

@@ -1,6 +1,6 @@
 import { type Hex, isAddressEqual } from 'viem';
 import type { Catalog } from './catalog.ts';
-import { decodeValue, formatPrice, median } from './price.ts';
+import { decodeValue, formatPrice, spreadBps } from './price.ts';
 import type { Reader } from './reader.ts';
 
 // Moments when a provider signed more than one value for the same feed and second. Each value is genuine (the archive
@@ -13,59 +13,55 @@ export interface ConflictSummary {
   // Distinct signed moments (feed and second) in the range, and how many of them had more than one value.
   moments: number;
   conflicts: number;
-  // (highest - lowest) / median value, in basis points, over the conflicting moments.
-  spreadBps: { median: number; p90: number; max: number };
+  // (highest - lowest) / absolute median, in basis points. Null means a zero median; ranked above finite spreads.
+  spreadBps: { median: number | null; p90: number | null; max: number | null };
   // Which Signed APIs served the values of each conflicting moment: `api3+provider`, `api3`, `provider`, or with
   // `unknown` for records merged or repaired from another archive.
   sources: Record<string, number>;
-  widest: { feed: string; timestamp: number; values: string[]; spreadBps: number };
+  widest: { feed: string; timestamp: number; values: string[]; spreadBps: number | null };
 }
 
 type ConflictRecord = ReturnType<Reader['conflictRecords']>[number];
 
-// Basis points, to two decimals, of `spread` relative to `base`; null when the base is zero.
-const toBps = (spread: bigint, base: bigint) => {
-  const magnitude = base < 0n ? -base : base;
-  return magnitude === 0n ? null : Number((spread * 1_000_000n) / magnitude) / 100;
-};
-
-const percentile = (sorted: readonly number[], p: number) => {
-  return sorted[Math.min(sorted.length - 1, Math.floor(p * sorted.length))] ?? 0;
+const percentile = (sorted: readonly (number | null)[], p: number) => {
+  return sorted[Math.min(sorted.length - 1, Math.floor(p * sorted.length))] ?? null;
 };
 
 export function summarizeConflicts(reader: Reader, catalog: Catalog, from: number, to: number): ConflictSummary[] {
   const feedOf = new Map<string, string>();
-  for (const [name, sources] of catalog.feeds) {
-    for (const source of [...sources.public, ...sources['public-oev']])
-      feedOf.set(source.templateId.toLowerCase(), name);
-  }
+  const sources = [...catalog.feeds].flatMap(([name, feed]) => {
+    const all = [...feed.public, ...feed['public-oev']];
+    for (const source of all) feedOf.set(source.templateId.toLowerCase(), name);
+    return all;
+  });
 
   // One group per conflicting moment.
   const moments = new Map<string, ConflictRecord[]>();
-  for (const record of reader.conflictRecords(from, to)) {
+  for (const record of reader.conflictRecords(sources, from, to)) {
     const key = `${record.airnode}:${record.templateId}:${record.timestamp}`;
     moments.set(key, [...(moments.get(key) ?? []), record]);
   }
 
   const byTarget = new Map<
     string,
-    { spreads: number[]; sources: Record<string, number>; widest: ConflictSummary['widest'] | null }
+    { spreads: (number | null)[]; sources: Record<string, number>; widest: ConflictSummary['widest'] | null }
   >();
   for (const records of moments.values()) {
     const [first] = records;
     if (!first) continue;
     const values = records.map(({ value }) => decodeValue(value as Hex));
     const sorted = [...values].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
-    const lowest = sorted[0] ?? 0n;
-    const highest = sorted.at(-1) ?? 0n;
-    const spread = toBps(highest - lowest, median(values) ?? 0n) ?? 0;
+    const spread = spreadBps(values);
     const sources = [...new Set(records.map(({ source }) => source ?? 'unknown'))].sort().join('+');
 
     const key = `${first.airnode}:${first.endpoint}`;
     const target = byTarget.get(key) ?? { spreads: [], sources: {}, widest: null };
     target.spreads.push(spread);
     target.sources[sources] = (target.sources[sources] ?? 0) + 1;
-    if (!target.widest || spread > target.widest.spreadBps) {
+    if (
+      !target.widest ||
+      (spread ?? Number.POSITIVE_INFINITY) > (target.widest.spreadBps ?? Number.POSITIVE_INFINITY)
+    ) {
       const feed = feedOf.get(first.templateId.toLowerCase()) ?? first.templateId;
       target.widest = { feed, timestamp: first.timestamp, values: sorted.map(formatPrice), spreadBps: spread };
     }
@@ -73,11 +69,13 @@ export function summarizeConflicts(reader: Reader, catalog: Catalog, from: numbe
   }
 
   return reader
-    .momentCounts(from, to)
+    .momentCounts(sources, from, to)
     .flatMap(({ airnode, endpoint, moments: total }): ConflictSummary[] => {
       const target = byTarget.get(`${airnode}:${endpoint}`);
       if (!target?.widest) return [];
-      const spreads = [...target.spreads].sort((a, b) => a - b);
+      const spreads = [...target.spreads].sort(
+        (a, b) => (a ?? Number.POSITIVE_INFINITY) - (b ?? Number.POSITIVE_INFINITY)
+      );
       const provider = catalog.airnodes.find((entry) => isAddressEqual(entry.airnode, airnode))?.alias ?? airnode;
       return [
         {
@@ -85,7 +83,7 @@ export function summarizeConflicts(reader: Reader, catalog: Catalog, from: numbe
           endpoint,
           moments: total,
           conflicts: spreads.length,
-          spreadBps: { median: percentile(spreads, 0.5), p90: percentile(spreads, 0.9), max: spreads.at(-1) ?? 0 },
+          spreadBps: { median: percentile(spreads, 0.5), p90: percentile(spreads, 0.9), max: spreads.at(-1) ?? null },
           sources: target.sources,
           widest: target.widest,
         },

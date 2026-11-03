@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadConfig, loadSettings, parseAirnodes, parseFeeds, parseSettings } from '../src/settings.ts';
+import { loadConfig, loadSettings, parseAirnodes, parseFeeds, parseSettings, parseSwitch } from '../src/settings.ts';
 
 const dir = mkdtempSync(join(tmpdir(), 'signed-archive-settings-'));
 
@@ -53,6 +53,9 @@ peers:
   test('rejects misspelled keys and bad values, naming the setting', () => {
     expect(() => parseSettings('archve:\n  interval: 60')).toThrow('config: archve is not a known setting');
     expect(() => parseSettings('archive:\n  intervl: 60')).toThrow('config: archive.intervl is not a known setting');
+    // Keys every object inherits are not settings either.
+    expect(() => parseSettings('constructor: 1')).toThrow('config: constructor is not a known setting');
+    expect(() => parseSettings('archive:\n  toString: 1')).toThrow('archive.toString is not a known setting');
     expect(() => parseSettings('archive:\n  interval: 5')).toThrow('config: archive.interval must be a number >= 15');
     expect(() => parseSettings('serve:\n  port: 70000')).toThrow('config: serve.port must be 1-65535');
     expect(() => parseSettings('logLevel: loud')).toThrow('config: logLevel must be one of');
@@ -106,10 +109,19 @@ describe('airnode and feed lists', () => {
   });
 });
 
+test('parseSwitch reads true and false as a flag value or env var gives them, and refuses anything else', () => {
+  expect(['true', '1', 'yes', 'ON'].map(parseSwitch)).toEqual([true, true, true, true]);
+  expect(['false', '0', 'no', 'Off'].map(parseSwitch)).toEqual([false, false, false, false]);
+  expect(() => parseSwitch('maybe')).toThrow('must be true or false');
+});
+
 describe('loadSettings', () => {
   // A settings file with its list files beside it, at paths relative to the settings file.
   const path = join(dir, 'archive.yaml');
-  writeFileSync(path, 'archive:\n  interval: 90\ncatalog:\n  airnodes: lists/a.yaml\n  feeds: lists/f.yaml\n');
+  writeFileSync(
+    path,
+    'db: data/archive.sqlite\narchive:\n  interval: 90\ncatalog:\n  airnodes: lists/a.yaml\n  feeds: lists/f.yaml\n'
+  );
   mkdirSync(join(dir, 'lists'), { recursive: true });
   writeFileSync(
     join(dir, 'lists/a.yaml'),
@@ -118,7 +130,12 @@ describe('loadSettings', () => {
   writeFileSync(join(dir, 'lists/f.yaml'), 'feeds:\n  X/USD: {}\n');
   const expected: Awaited<ReturnType<typeof loadConfig>> = {
     path,
-    settings: { archive: { interval: 90 }, catalog: { airnodes: 'lists/a.yaml', feeds: 'lists/f.yaml' } },
+    // The database path is relative to the settings file, like the list paths, not to the working directory.
+    settings: {
+      db: join(dir, 'data/archive.sqlite'),
+      archive: { interval: 90 },
+      catalog: { airnodes: 'lists/a.yaml', feeds: 'lists/f.yaml' },
+    },
     catalog: {
       airnodes: [
         { alias: 'x', airnode: '0x9dB03a07bE313B3C08261B1d1606D511f3560D9e', signedApiUrl: 'https://x.example' },
@@ -135,6 +152,13 @@ describe('loadSettings', () => {
     ] as const) {
       expect(await loadSettings(argv, env)).toEqual(expected);
     }
+  });
+
+  test('preserves equals signs in a config path and uses the last flag, like commander', async () => {
+    const withEquals = join(dir, 'archive=copy.yaml');
+    writeFileSync(withEquals, await Bun.file(path).text());
+    expect((await loadSettings(['bun', 'cli.ts', `--config=${withEquals}`], {})).path).toBe(withEquals);
+    expect((await loadSettings(['bun', 'cli.ts', '--config', 'missing.yaml', '--config', path], {})).path).toBe(path);
   });
 
   test('a missing default file means no settings; a missing named file is an error', async () => {

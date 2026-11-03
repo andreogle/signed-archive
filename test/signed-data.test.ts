@@ -32,8 +32,20 @@ describe('hasValidSignature', () => {
     expect(await hasValidSignature({ ...base, airnode: '0x0000000000000000000000000000000000000001' })).toBe(false);
   });
 
-  test('rejects a well-formed but unrecoverable signature instead of throwing', async () => {
+  test('rejects the malleable forms of a valid signature, as Api3ServerV1 does', async () => {
+    const n = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141n;
+    const r = base.signature.slice(2, 66);
+    const s = BigInt(`0x${base.signature.slice(66, 130)}`);
+    const v = Number.parseInt(base.signature.slice(130), 16);
+    const highS = `0x${r}${(n - s).toString(16).padStart(64, '0')}${(27 + ((v - 27) ^ 1)).toString(16)}` as const;
+    const parity = `0x${r}${s.toString(16).padStart(64, '0')}${(v - 27).toString(16).padStart(2, '0')}` as const;
+    expect(await hasValidSignature({ ...base, signature: highS })).toBe(false);
+    expect(await hasValidSignature({ ...base, signature: parity })).toBe(false);
+  });
+
+  test('rejects a well-formed but unrecoverable signature, or a malformed record, instead of throwing', async () => {
     expect(await hasValidSignature({ ...base, signature: `0x${'00'.repeat(65)}` })).toBe(false);
+    expect(await hasValidSignature({ ...base, timestamp: 'soon' })).toBe(false);
   });
 });
 

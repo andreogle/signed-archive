@@ -34,3 +34,7 @@ jobs:
 
       - name: Check
         run: bun run check
+
+      # The compiled binary is what the Docker image ships, so a break in it fails here too.
+      - name: Build
+        run: bun run build

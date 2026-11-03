@@ -5,7 +5,7 @@ import { useConflicts } from '../api.ts';
 import { Segmented } from '../components/Segmented.tsx';
 import { UpdatedAgo } from '../components/UpdatedAgo.tsx';
 import { formatPrice, formatTime } from '../format.ts';
-import { RANGES, type Range } from '../search.ts';
+import { CONFLICT_RANGES } from '../search.ts';
 
 const route = getRouteApi('/conflicts');
 const ENDPOINT_LABELS: Record<string, string> = { public: 'Base', 'public-oev': 'OEV' };
@@ -17,6 +17,7 @@ const SOURCE_LABELS: Record<string, string> = {
 };
 const sourceLabel = (pairing: string) =>
   SOURCE_LABELS[pairing] ?? pairing.replaceAll('unknown', 'merged from another archive');
+const formatSpread = (spread: number | null) => (spread === null ? 'undefined' : spread.toFixed(2));
 
 export function ConflictsPage(): JSX.Element {
   const titleId = useId();
@@ -39,7 +40,7 @@ export function ConflictsPage(): JSX.Element {
       <section className="controls" aria-label="Choose a range">
         <Segmented
           label="Range"
-          options={Object.keys(RANGES) as Range[]}
+          options={CONFLICT_RANGES}
           value={search.range}
           display={(range) => range.toUpperCase()}
           onChange={(range) => void navigate({ search: { range }, replace: true })}
@@ -57,8 +58,9 @@ export function ConflictsPage(): JSX.Element {
             <h2 id={titleId}>By provider</h2>
             <p className="muted">
               Spread is the gap between the highest and lowest price signed for one moment, relative to their median, in
-              basis points (1 bps = 0.01%). The counts are a lower bound: each Signed API is polled about once a minute,
-              so a conflict only shows when both are sampled at the same signed second.
+              basis points (1 bps = 0.01%). A zero median makes the spread undefined. The counts are a lower bound: each
+              Signed API is polled about once a minute, so a conflict only shows when both are sampled at the same
+              signed second.
             </p>
           </div>
         </div>
@@ -86,9 +88,9 @@ export function ConflictsPage(): JSX.Element {
                   <td className="num">{summary.conflicts.toLocaleString()}</td>
                   <td className="num">{summary.moments.toLocaleString()}</td>
                   <td className="num">{((100 * summary.conflicts) / summary.moments).toFixed(2)}%</td>
-                  <td className="num">{summary.spreadBps.median.toFixed(2)}</td>
-                  <td className="num">{summary.spreadBps.p90.toFixed(2)}</td>
-                  <td className="num">{summary.spreadBps.max.toFixed(2)}</td>
+                  <td className="num">{formatSpread(summary.spreadBps.median)}</td>
+                  <td className="num">{formatSpread(summary.spreadBps.p90)}</td>
+                  <td className="num">{formatSpread(summary.spreadBps.max)}</td>
                   <td>
                     {Object.entries(summary.sources)
                       .map(([pairing, count]) => `${sourceLabel(pairing)} (${count.toLocaleString()})`)
@@ -156,7 +158,7 @@ function WidestConflicts({ summaries }: { summaries: readonly ConflictSummary[] 
                 </td>
                 <td>{formatTime(widest.timestamp)}</td>
                 <td className="num">{widest.values.map((value) => formatPrice(value)).join(' vs ')}</td>
-                <td className="num">{widest.spreadBps.toFixed(2)}</td>
+                <td className="num">{formatSpread(widest.spreadBps)}</td>
               </tr>
             ))}
           </tbody>

@@ -2,7 +2,8 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { isAddressEqual } from 'viem';
 import { PEER_WINDOW_SECONDS } from './api.ts';
 import type { Catalog } from './catalog.ts';
-import { type Endpoint, isEndpoint, REQUEST_TIMEOUT_MS, USER_AGENT } from './config.ts';
+import { type Endpoint, isEndpoint, MAX_RESPONSE_BYTES, REQUEST_TIMEOUT_MS, USER_AGENT } from './config.ts';
+import { readCapped, retryAfterMs } from './http.ts';
 import { errorMessage, log } from './logger.ts';
 import { GAP_SECONDS, type Gap, subtractCovered } from './reader.ts';
 import { hasValidSignature, type SignedDatum, toSignedDatum } from './signed-data.ts';
@@ -40,7 +41,6 @@ const WINDOW_MARGIN_SECONDS = 120;
 // Long enough for a peer that also missed the stretch to repair it from its own peers.
 const RECHECK_AFTER_MS = 60 * 60 * 1000;
 // An honest window is at most a few thousand records (about 1 MB); these limits only stop a broken or hostile peer.
-const MAX_RESPONSE_BYTES = 16 * 1024 * 1024;
 const MAX_RECORDS = 50_000;
 
 type Store = ReturnType<typeof openStore>;
@@ -62,35 +62,6 @@ type Answer =
   | { kind: 'records'; data: unknown[]; uncovered: Gap[] | null; watched: boolean }
   | { kind: 'retry'; error: string; retryAfterMs: number | null }
   | { kind: 'refused'; reason: string };
-
-// Retry-After in seconds or as an HTTP date; anything else is ignored.
-function retryAfterMs(header: string | null, now: number) {
-  if (header === null) return null;
-  const seconds = Number(header);
-  if (Number.isFinite(seconds) && seconds >= 0) return seconds * 1000;
-  const date = Date.parse(header);
-  return Number.isNaN(date) ? null : Math.max(0, date - now);
-}
-
-// The body as text, refusing more than MAX_RESPONSE_BYTES however it is sent.
-async function readCapped(response: Response) {
-  if (Number(response.headers.get('content-length') ?? 0) > MAX_RESPONSE_BYTES) return null;
-  const reader = response.body?.getReader();
-  if (!reader) return '';
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    size += value.byteLength;
-    if (size > MAX_RESPONSE_BYTES) {
-      await reader.cancel();
-      return null;
-    }
-    chunks.push(value);
-  }
-  return new TextDecoder().decode(Buffer.concat(chunks));
-}
 
 const isGapList = (value: unknown): value is Gap[] => {
   return (
@@ -126,7 +97,7 @@ async function ask(peer: URL, window: RepairWindow, now: number, signal?: AbortS
       const retryAfter = retryAfterMs(response.headers.get('retry-after'), now);
       return { kind: 'retry', error: `HTTP ${response.status}`, retryAfterMs: retryAfter };
     }
-    const text = await readCapped(response);
+    const text = await readCapped(response, MAX_RESPONSE_BYTES);
     if (text === null) return { kind: 'refused', reason: `response over ${MAX_RESPONSE_BYTES} bytes` };
     const body: unknown = JSON.parse(text);
     const fields = typeof body === 'object' && body !== null ? (body as Record<string, unknown>) : {};
@@ -165,7 +136,8 @@ async function verify(catalog: Catalog, data: readonly unknown[], window: Repair
       rejected += 1;
       continue;
     }
-    const key = `${datum.templateId.toLowerCase()}:${datum.timestamp}:${datum.encodedValue.toLowerCase()}`;
+    // A different signature is a different input: a forged copy must not hide the genuine record.
+    const key = Object.values(datum).join(':').toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
     if (!templates.has(datum.templateId.toLowerCase())) unknown += 1;
@@ -175,25 +147,18 @@ async function verify(catalog: Catalog, data: readonly unknown[], window: Repair
   return { valid, rejected, unknown };
 }
 
-// The stretches a peer's answer covers, in signed seconds, between its first and last verified record. When the peer
-// says where in the window it had nothing, those stretches are left out; an archive that doesn't say gets the
-// conservative reading, where records more than GAP_SECONDS apart are separate stretches. A lone record covers nothing.
+// The stretches a peer's verified records cover, in signed seconds: records more than GAP_SECONDS apart are separate
+// stretches, so a peer can't claim a long stretch with a record at each end. Where the peer says it had nothing is
+// left out too. A lone record covers nothing.
 export function coverageOf(window: RepairWindow, valid: readonly SignedDatum[], uncovered: Gap[] | null): Coverage[] {
   const times = [...new Set(valid.map(({ timestamp }) => Number(timestamp)))].sort((a, b) => a - b);
-  const first = times[0];
-  const last = times.at(-1);
-  if (first === undefined || last === undefined || last <= first) return [];
-  let stretches: Gap[];
-  if (uncovered) {
-    stretches = subtractCovered([{ from: first, to: last }], uncovered);
-  } else {
-    stretches = [];
-    for (const time of times) {
-      const current = stretches.at(-1);
-      if (current && time - current.to <= GAP_SECONDS) current.to = time;
-      else stretches.push({ from: time, to: time });
-    }
+  const dense: Gap[] = [];
+  for (const time of times) {
+    const current = dense.at(-1);
+    if (current && time - current.to <= GAP_SECONDS) current.to = time;
+    else dense.push({ from: time, to: time });
   }
+  const stretches = uncovered ? subtractCovered(dense, uncovered) : dense;
   return stretches
     .filter(({ from, to }) => to > from)
     .map(({ from, to }) => ({ airnode: window.airnode, endpoint: window.endpoint, from, to, peer: window.peer }));
@@ -225,7 +190,7 @@ export function scheduleRepairs({
   // and a shorter threshold would read every ordinary pause in it as an outage.
   const threshold = Math.max(3 * intervalMs, GAP_SECONDS * 1000);
   const gaps = store
-    .closedGaps(now - LOOKBACK_MS, threshold)
+    .closedGaps(now - LOOKBACK_MS, threshold, now)
     .filter(({ airnode, endpoint }) => isEndpoint(endpoint) && catalog.sourcesOfAirnode(airnode, endpoint).length > 0);
   const rows = gaps.flatMap((gap) => {
     return windowsOf(gap).flatMap(({ from, to }) => {
@@ -257,15 +222,14 @@ export async function repairNext({
   const byHref = new Map(peers.map((peer) => [peer.href, peer]));
   // Windows of peers removed from the config stay pending, untouched, in case the peer comes back. Windows of a
   // paused peer wait for the pause to end.
-  const window = store
-    .dueWindows(now, 500)
-    .find(({ peer }) => byHref.has(peer) && (health.get(peer)?.pausedUntil ?? 0) <= now);
+  const ready = [...byHref.keys()].filter((href) => (health.get(href)?.pausedUntil ?? 0) <= now);
+  const [window] = store.dueWindows(now, 1, ready);
   const peer = window && byHref.get(window.peer);
   if (!window || !peer) return null;
   const fields = fieldsOf(catalog, window, peer);
 
   const known = catalog.sourcesOfAirnode(window.airnode, window.endpoint).length > 0;
-  if (!known || store.isCovered(window.airnode, window.endpoint, window.from, window.to, GAP_SECONDS)) {
+  if (!known || store.isCovered(window, GAP_SECONDS)) {
     store.putWindow({ ...window, status: 'skipped' });
     return { window, outcome: 'skipped' as const, requested: false, added: 0, rejected: 0, unknown: 0 };
   }
@@ -309,7 +273,8 @@ export async function repairNext({
     checked.valid.map((datum) => ({ datum, endpoint: window.endpoint, fetchedAt: Date.now() })),
     []
   );
-  store.addCoverage(coverageOf(window, checked.valid, answer.uncovered), GAP_SECONDS);
+  // Only overlap may be merged; joining across a short hole would undo the peer's `uncovered` report.
+  store.addCoverage(coverageOf(window, checked.valid, answer.uncovered), 0);
   if (checked.rejected > 0) log.warn('rejected records', { ...fields, rejected: checked.rejected });
   if (checked.unknown > 0) log.debug('unknown templates', { ...fields, records: checked.unknown });
 

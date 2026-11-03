@@ -26,3 +26,13 @@ export function medianPrice(records: readonly { provider: string; encodedValue: 
   const middle = median([...byProvider.values()].map(decodeValue));
   return middle === null ? null : formatPrice(middle);
 }
+
+// Spread relative to the median, in basis points to two decimals. A zero median with differing values is undefined.
+export function spreadBps(values: readonly bigint[]): number | null {
+  const sorted = [...values].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+  const spread = (sorted.at(-1) ?? 0n) - (sorted[0] ?? 0n);
+  if (spread === 0n) return 0;
+  const middle = median(sorted) ?? 0n;
+  if (middle === 0n) return null;
+  return Number((spread * 1_000_000n) / (middle < 0n ? -middle : middle)) / 100;
+}

@@ -7,6 +7,6 @@ minimumReleaseAge = 259200
 [test]
 root = "test"
 coverageSkipTestFiles = true
-# Applied per source file the tests load. The polling loop and CLI talk to the
-# network and are exercised by a live run, not unit tests, so they aren't loaded.
+# Applied per source file the tests load. Polling and repair use local fixture servers;
+# the CLI and browser components are checked by TypeScript and the native build.
 coverageThreshold = { lines = 0.9, functions = 0.9 }
