@@ -1,265 +1,301 @@
 # signed-archive
 
-Records API3's public signed data so it has a history. The Signed API (`signed-api.api3.org`) only serves the latest
-value per feed, and every record carries the provider's signature, so the archive is evidence anyone can re-check.
+signed-archive keeps a history of API3's public signed price data.
 
-Each cycle fetches `/public/<airnode>` (base data, delayed ~15 s) and `/public-oev/<airnode>` for every airnode in
-the config file, from two sources: API3's Signed API and the provider's own (every provider pushes the same signed
-data to both). It checks each signature the way `Api3ServerV1` does and stores new records in SQLite. A record both
-sources served is stored once.
+API3's Signed API (`signed-api.api3.org`) serves only the latest value of each feed. signed-archive polls it and
+stores every new record in SQLite. Each record carries the provider's signature, so anyone can check that the archive
+is genuine. You don't have to trust whoever runs it.
 
-## Run
+With the archive you can:
+
+- see what each provider signed at any past moment, and download the proof
+- find moments when a provider signed two different values for the same feed and second
+- give AI agents verified prices through MCP
+
+## Contents
+
+- [How it works](#how-it-works)
+- [Quick start](#quick-start)
+- [Run with Docker](#run-with-docker)
+- [Configuration](#configuration)
+- [Explorer and API](#explorer-and-api)
+- [MCP for AI agents](#mcp-for-ai-agents)
+- [Catalogue updates](#catalogue-updates)
+- [Filling gaps](#filling-gaps)
+- [Conflicting values](#conflicting-values)
+- [Parquet files](#parquet-files)
+- [Querying the database](#querying-the-database)
+- [Development](#development)
+
+## How it works
+
+Every cycle, the archiver asks for each provider's latest records on two endpoints:
+
+- `/public/<airnode>`: base data, about 15 seconds old
+- `/public-oev/<airnode>`: fresher data, signed under the OEV template ID
+
+It asks two hosts for each: API3's Signed API and the provider's own Signed API. Both serve the same signed data, so
+a record seen on both is stored once.
+
+Each signature is checked the same way the `Api3ServerV1` contract checks it. Records that fail are counted and
+dropped. Records that pass are stored exactly as signed.
+
+The archiver is polite to the API:
+
+- It sends one request at a time, spread evenly across the poll interval. By default that is 44 requests a minute:
+  22 to `signed-api.api3.org` and 2 to each provider's own API.
+- A host that fails waits before it is tried again. The wait doubles each time, up to 30 minutes, and follows
+  `Retry-After`.
+
+## Quick start
+
+Install the tools and dependencies:
 
 ```sh
 mise install
 bun install
-bun start                      # same as: bun src/cli.ts archive
-bun run serve                  # explorer at http://127.0.0.1:3000, reading the archive read-only
-bun run dev                    # archiver + explorer, restarting on file changes (development only)
-bun run dev -- --interval 120  # flags override env vars
 ```
 
-| Flag                         | Env var                 | Default                  | Notes                                                             |
-| ---------------------------- | ----------------------- | ------------------------ | ----------------------------------------------------------------- |
-| `--interval <seconds>`       | `POLL_INTERVAL_SECONDS` | `60`                     | Minimum 15. Requests are spread evenly.                           |
-| `--db <path>`                | `DB_PATH`               | `data/archive.sqlite`    |                                                                   |
-| `--log-level <level>`        | `LOG_LEVEL`             | `info`                   | `debug`, `info`, `warn` or `error`.                               |
-| `--serve [on]`               | `SERVE`                 | off                      | `archive` only: also serve the explorer. `true` or `false`.       |
-| `--heartbeat-url <url>`      | `HEARTBEAT_URL`         | none                     | `archive` only: ping after each cycle.                            |
-| `--catalog-auto-update [on]` | `CATALOG_AUTO_UPDATE`   | on in the shipped config | Discover API3 catalogue changes hourly. Disable for custom lists. |
-| `--host <host>`              | `HOST`                  | `127.0.0.1`              | Explorer address.                                                 |
-| `--port <port>`              | `PORT`                  | `3000`                   | Explorer port.                                                    |
+Start the archiver. It writes to `data/archive.sqlite`:
 
-**Config files.** Settings live in `signed-archive.yaml` (committed, and shipped in the Docker image), or any copy
-passed with `--config <path>` / `CONFIG`. The initial catalogue lives in two generated files named under `catalog`:
-`config/airnodes.yaml` and `config/feeds.yaml`. Paths in the file, `db` included, are relative to the settings file, so
-it names the same archive from any working directory (a flag or env var path is relative to the working directory). A flag beats an env var, which
-beats the file, which beats the default, and a misspelled key is an error. Peers are set only in the file. The
-committed copy is public, so keep the heartbeat URL out of it: set `HEARTBEAT_URL`, or use a private copy.
+```sh
+bun start
+```
 
-Logs go to stderr, one line per event, with `key=value` fields:
+In another terminal, start the explorer. Then open http://127.0.0.1:3000:
+
+```sh
+bun run serve
+```
+
+The explorer opens the database read-only, so it can run beside the archiver.
+
+> [!WARNING]
+> A moment the archiver misses can't be fetched again later. Use `bun start` or Docker for an archive you keep.
+> `bun run dev` restarts on every file change, and each restart leaves a gap.
+
+## Run with Docker
+
+Docker is the recommended way to run an archive long-term. `compose.yaml` runs two services from one image:
+
+- **archiver** polls the API and writes to the `archive` volume. It restarts unless you stop it.
+- **explorer** serves the explorer from the same volume on `127.0.0.1:3000`. Set `PORT` to change the host port.
+
+```sh
+docker compose up -d --build
+docker compose logs -f archiver
+```
+
+### Monitoring
+
+Docker marks the archiver unhealthy when it records no request for 5 minutes. Docker does not restart it, so add an
+outside alert too:
+
+1. Create a check on healthchecks.io, or a push monitor in Uptime Kuma.
+2. Put its URL in a `.env` file next to `compose.yaml`: `HEARTBEAT_URL=https://...`
+
+The archiver pings the URL after every cycle that reached the API. The monitor alerts you when the pings stop.
+`.env` is gitignored, because the URL is a secret.
+
+### Backups
+
+Make a consistent copy into the `backups` volume. This is safe while the archiver runs:
+
+```sh
+docker compose run --rm backup
+```
+
+Never copy the live database file. Run the backup nightly and move the copies off the machine:
+
+```sh
+# crontab
+0 3 * * * cd /path/to/signed-archive && docker compose run --rm backup
+
+# copy the backups to the current directory
+docker run --rm -v signed-archive_backups:/backups -v "$PWD":/out busybox cp -r /backups/. /out/
+```
+
+Each backup has two parts:
+
+- a SQLite copy with recent records (about the last week)
+- a `parquet/` folder with every older day (see [Parquet files](#parquet-files))
+
+You can delete old SQLite copies once they are stored elsewhere. Keep `parquet/`.
+
+## Configuration
+
+Settings come from four places. Each one overrides the ones below it:
+
+1. command-line flags
+2. environment variables
+3. the settings file, `signed-archive.yaml` (or the file given with `--config` / `CONFIG`)
+4. built-in defaults
+
+| Flag                          | Env var                 | Default               | Notes                                           |
+| ----------------------------- | ----------------------- | --------------------- | ----------------------------------------------- |
+| `--interval <seconds>`        | `POLL_INTERVAL_SECONDS` | `60`                  | Minimum 15.                                     |
+| `--db <path>`                 | `DB_PATH`               | `data/archive.sqlite` |                                                 |
+| `--log-level <level>`         | `LOG_LEVEL`             | `info`                | `debug`, `info`, `warn` or `error`.             |
+| `--serve [on]`                | `SERVE`                 | off                   | `archive` only. Also serve the explorer.        |
+| `--heartbeat-url <url>`       | `HEARTBEAT_URL`         | none                  | `archive` only. Ping this URL after each cycle. |
+| `--catalog-auto-update [on]`  | `CATALOG_AUTO_UPDATE`   | on (shipped config)   | See [Catalogue updates](#catalogue-updates).    |
+| `--parquet-after-days <days>` | `PARQUET_AFTER_DAYS`    | `7`                   | See [Parquet files](#parquet-files).            |
+| `--parquet-dir <path>`        | `PARQUET_DIR`           | `parquet/` by the db  |                                                 |
+| `--host <host>`               | `HOST`                  | `127.0.0.1`           | Explorer address.                               |
+| `--port <port>`               | `PORT`                  | `3000`                | Explorer port.                                  |
+
+Some rules for the settings file:
+
+- Paths in the file are relative to the file. Paths in flags and env vars are relative to the working directory.
+- A misspelled key is an error.
+- Peers can be set only in the file. See [Filling gaps](#filling-gaps).
+- The committed file is public. Keep the heartbeat URL out of it: use `HEARTBEAT_URL` or a private copy.
+
+Logs go to stderr, one line per event:
 
 ```
 14:15:23.917 [info] cycle done saved=2116 rejected=0 durationMs=59940
 ```
 
-## Explorer
+## Explorer and API
 
-`serve` runs a web explorer (React, in `web/`) and a small JSON API over the archive. It opens the database read-only,
-so it can run beside the archiver.
+`bun run serve` (or `archive --serve`) starts a web explorer and a JSON API. The explorer has three pages:
 
 - **Feeds**: every archived feed with its current median price.
-- **Explorer**: price history per provider, base or OEV data, and every provider's signed price at any moment. Each
-  signature is re-checked in your browser, and "Download proof" saves the raw signed records. Until you pick a time it
-  shows the latest signed prices.
+- **Explorer**: price history per provider, and every provider's signed price at any moment. Your browser re-checks
+  each signature. "Download proof" saves the raw signed records.
+- **Conflicts**: values signed twice for the same moment. See [Conflicting values](#conflicting-values).
 
-The feed list, the chart and the latest prices refresh every 30 seconds while the tab is open, and each says when it
-last updated.
-- **API**: `/api/feeds`, `/api/history?feed=ETH/USD&from=&to=` and `/api/at?feed=ETH/USD&time=` (unix seconds; add
-  `endpoint=public-oev` for OEV data).
+The feed list, chart and latest prices refresh every 30 seconds.
 
-- **Data**: `/data/manifest.json` lists the moved days' Parquet files with their SHA-256, and `/data/<name>` serves each
-  one (see [Parquet files](#parquet-files)).
+The API uses unix seconds. Add `endpoint=public-oev` for OEV data.
 
-Feed names come from the archive's catalogue snapshots (initially `config/feeds.yaml`). The page refreshes the mappings from
-`/api/catalog` and checks every record against them in the browser.
+| Route                                    | Returns                                             |
+| ---------------------------------------- | --------------------------------------------------- |
+| `/api/feeds`                             | every feed with its current median                  |
+| `/api/history?feed=ETH/USD&from=&to=`    | price history per provider                          |
+| `/api/at?feed=ETH/USD&time=`             | every provider's signed price at a moment           |
+| `/api/conflicts?from=&to=`               | conflicting values, for at most 7 days              |
+| `/api/catalog`                           | the providers and feeds the explorer checks against |
+| `/data/manifest.json`, `/data/<name>`    | the Parquet files and their SHA-256                 |
 
 See [IDEAS.md](IDEAS.md) for where the project could go next.
 
-## Build
+## MCP for AI agents
 
-`bun run build` compiles a self-contained native binary to `dist/signed-archive` (no Bun or `node_modules` needed to
-run it). The airnode and feed lists are not bundled: the binary reads them from `config/` (named in the settings
-file) at run time, so updating them needs no rebuild.
+The archive is also a read-only MCP server. An agent can ask for signed prices and gets the proof with each answer.
 
-The binary is about 110 MB because it embeds the whole Bun runtime (about 107 MB); the app itself is under 100 KB.
-`--bytecode` compiles the code ahead of time, which cuts startup from about 11 ms to 4 ms.
+| Tool                | What it does                                                                         |
+| ------------------- | ------------------------------------------------------------------------------------ |
+| `list_feeds`        | Lists feeds with their current median. Filter by name.                               |
+| `get_price_at`      | Each provider's signed price at a moment, with the median and raw signed fields.     |
+| `check_price`       | Says whether the latest price is safe to use: fresh, agreed and without conflicts.   |
+| `get_price_history` | Price points per provider over a range, and the stretches with no data.              |
+| `get_conflicts`     | Values signed twice for the same second, per provider.                               |
 
-## Docker
-
-This is the way to run the long-lived archive. `compose.yaml` runs two services from one image (the compiled binary on
-a distroless base, as a non-root user):
-
-- **archiver**: polls and writes the archive to the `archive` volume. It restarts unless stopped, stops cleanly on
-  `SIGTERM`, and reports unhealthy when no request was recorded for 5 minutes (`signed-archive health`).
-- **explorer**: serves the explorer from the same volume, published on `127.0.0.1:3000` (`PORT` changes the host port).
-
-```sh
-docker compose up -d --build
-docker compose logs -f archiver
-docker compose run --rm backup    # one consistent copy into the `backups` volume
-```
-
-Docker reports an unhealthy container but does not restart it, so add an outside alert as well: create a check on
-healthchecks.io (or an Uptime Kuma push monitor) and put its URL in a `.env` file next to `compose.yaml` as
-`HEARTBEAT_URL=...`. The archiver pings it after every cycle that reached the API, so the monitor alerts when pings
-stop. `.env` is gitignored, since the URL is a secret.
-
-**Backups.** `backup` writes a timestamped `VACUUM INTO` copy, which is safe while the archiver runs; never copy the
-live file. Run it nightly from the host's cron and move the copies off the machine, for example:
-
-```sh
-0 3 * * * cd /path/to/signed-archive && docker compose run --rm backup
-docker run --rm -v signed-archive_backups:/backups -v "$PWD":/out busybox cp -r /backups/. /out/
-```
-
-Each copy holds what is still in SQLite (about the last week), plus a `parquet/` folder beside it with every moved
-day. Parquet files never change, so they are copied once and checked against their registered SHA-256; prune old
-SQLite copies once they are stored elsewhere, but keep `parquet/`.
-
-`bun run dev` stays the development loop. Don't point it at the Docker volume: under `--watch` every edit restarts the
-archiver and leaves a gap.
-
-## Development
-
-`bun run check` checks the airnode list is current, then runs Biome, the type checker and the tests with coverage.
-
-## Airnodes and feeds
-
-`config/airnodes.yaml` and `config/feeds.yaml` are generated from API3's provider list in `@api3/api-integrations`
-(mock providers excluded). After bumping that package, run `bun run airnodes` and commit the result; `bun run check`
-fails while they are stale. These files bootstrap a new archive; they are not rewritten at runtime.
-
-The shipped configuration enables `catalog.autoUpdate`. At startup and hourly, the archiver checks
-[API3's published integration data](https://github.com/api3dao/api-integrations-data). It pins all provider JSON files
-to one Git revision, validates the complete snapshot, and derives template IDs locally without downloading executable
-code or loading the integrations package. This trusts API3's repository for provider identities and feed names, just
-as the generated catalogue trusts API3's package; every signed record is still independently verified.
-
-Additions enter the next polling cycle. Address and Signed API URL changes replace only the affected targets; other
-targets keep their backoff. Removed providers stop being polled. Discovery runs beside polling, with timeouts, bounded
-responses, retry backoff and rate-limit handling. Invalid or incomplete updates leave the last valid catalogue in use.
-
-Each accepted snapshot is kept in SQLite and included in backups. Restarts use the persisted catalogue. The explorer,
-MCP and peer repair follow it without restarting; browser mappings refresh every 30 seconds. Retired feed and signer
-mappings remain available for historical queries and signature checks, including records in Parquet. Latest historical
-queries still return last-known observations with their original timestamps; MCP `check_price` uses only current feed
-membership. Provider rotations are combined into one chart series and one provider vote. Retirement does not shade an
-endless outage after the observed removal. Snapshots record when we learned a change, not its exact upstream effective
-time, and cannot reconstruct mappings removed before this archive began retaining snapshots.
-
-For a custom set, set `catalog.autoUpdate: false` (or `CATALOG_AUTO_UPDATE=false`) and point `catalog.airnodes` /
-`catalog.feeds` at your files. With discovery disabled, startup uses those files and retains earlier mappings for history.
-
-## Being polite
-
-One request at a time, spread across the interval: 44 requests per minute by default, of which 22 go to
-`signed-api.api3.org` and 2 to each provider's own Signed API. Failed targets back off
-exponentially up to 30 minutes and honour `Retry-After`.
-
-## Coverage and redundancy
-
-The Signed API only serves the latest value, so a moment the archiver misses is gone. Two things help:
-
-- **Coverage log.** Every request, failed or not, adds a row to `polls`. A stretch with no polls means the archiver was
-  down; a failed status means the provider was. The explorer shades the gaps and doesn't draw lines across them.
-- **Merging.** Run more than one archiver and merge their archives. Copy the other archive with SQLite's backup first,
-  never by copying the live file:
-
-  ```sh
-  sqlite3 other/archive.sqlite "VACUUM INTO 'other-copy.sqlite'"
-  bun src/cli.ts merge other-copy.sqlite        # into data/archive.sqlite, or --db <path>
-  ```
-
-  Every record is checked as if it came from the network (shape, known airnode, signature) and only added, never
-  overwritten. Records the target already has are skipped, so merging again is fast. Polls are merged too; they are
-  the other archiver's unsigned claim of when it was watching, so only merge archives you run or trust.
-
-## For AI agents (MCP)
-
-The archive is also an MCP server, so an agent can ask for signed prices at past moments and get the proof with the
-answer. It is read-only and has five tools:
-
-- `list_feeds`: feeds with their current median, filterable by name.
-- `get_price_at`: every provider's latest signed price at or before a moment, its age, the median, and the raw signed
-  fields so the answer can be verified independently.
-- `check_price`: is the latest price safe to use? Freshness, agreement between providers, conflicting signatures, and
-  a verdict with the issues found.
-- `get_price_history`: downsampled points per provider over a range, and the stretches with no data.
-- `get_conflicts`: values signed twice for the same second, per provider.
-
-Locally, over stdin and stdout (for Claude Code, for example):
+Connect locally, over stdin and stdout:
 
 ```sh
 claude mcp add signed-archive -- /path/to/signed-archive mcp --config /path/to/signed-archive.yaml
 ```
 
-Remotely, the explorer serves the same tools at `POST /mcp` (MCP's Streamable HTTP transport, stateless JSON). Agents
-that aren't browsers send no `Origin` and are served; a browser page is only served when it comes from this machine
-(`localhost`, `127.0.0.1`), so a site you visit can't call the tools or rebind its domain to reach them:
+Or connect to a running explorer over HTTP:
 
 ```sh
 claude mcp add --transport http signed-archive http://127.0.0.1:3000/mcp
 ```
 
+`POST /mcp` serves agents, which send no `Origin` header. It serves browser pages only from `localhost` or
+`127.0.0.1`, so a website you visit can't call the tools.
+
+## Catalogue updates
+
+The catalogue is the list of providers and feeds to archive. A new archive starts from two generated files:
+`config/airnodes.yaml` and `config/feeds.yaml`.
+
+The shipped config turns on `catalog.autoUpdate`. With it on, the archiver checks
+[API3's published integration data](https://github.com/api3dao/api-integrations-data) at startup and then hourly:
+
+- It reads every provider file from one Git revision and checks the whole set before using it.
+- A bad or incomplete update is ignored. The last good catalogue stays in use.
+- New providers are polled from the next cycle. Removed providers are no longer polled.
+- Each accepted catalogue is saved in SQLite, so restarts, backups, the explorer, MCP and peer repair all use it.
+- Old providers and feeds stay known, so their records can still be found and checked.
+
+This trusts API3's repository for provider names and feed names. Every signed record is still checked on its own.
+
+To archive your own set of providers or feeds:
+
+1. Set `catalog.autoUpdate: false` (or `CATALOG_AUTO_UPDATE=false`).
+2. Point `catalog.airnodes` and `catalog.feeds` at your own files.
+
+To regenerate the shipped files after bumping `@api3/api-integrations`, run `bun run airnodes` and commit the result.
+`bun run check` fails while they are out of date.
+
+## Filling gaps
+
+The Signed API serves only the latest value, so a moment the archiver misses is gone from the API. Three things
+help.
+
+**The coverage log.** Every request writes a row to `polls`, even when it fails. No polls means the archiver was
+down. A failed status means the provider was down. The explorer shades the gaps.
+
+**Merging.** Run more than one archiver and merge their archives. Copy the other archive with SQLite's backup first:
+
+```sh
+sqlite3 other/archive.sqlite "VACUUM INTO 'other-copy.sqlite'"
+bun src/cli.ts merge other-copy.sqlite        # into data/archive.sqlite, or use --db <path>
+```
+
+Each record is checked as if it came from the network, and records are only added, never overwritten. The other
+archive's polls are merged too. Polls are not signed, so merge only archives you run or trust. `merge` reads only the
+other archive's SQLite, not its Parquet files.
+
+**Peer repair.** List other archives under `peers` in the settings file, by the base URL of their explorer. The
+archiver then asks them for records it missed:
+
+- Every 10 minutes it looks for gaps that have closed. A gap is a stretch longer than three poll intervals, and at
+  least 3 minutes, with no successful request.
+- It splits each gap into windows of up to 15 minutes. It asks peers for one window every 5 seconds, newest first.
+- Every record a peer returns is checked like any other input. Oversized answers and redirects are refused.
+- Failed requests are retried up to three times. A peer that keeps failing is paused for 5 minutes to 6 hours.
+- A peer's polls are never copied. Only what its signed records cover counts as filled.
+
+Repair runs beside polling, so a slow peer never holds up archiving. Peers can run different versions, intervals or
+feed lists. Records under feeds this archive doesn't know are skipped.
+
+To be someone's peer, make your explorer's `/api/records` route reachable to them, for example through a reverse
+proxy.
+
 ## Conflicting values
 
-The explorer's **Conflicts** page (`/conflicts`, or `/api/conflicts?from=&to=` as JSON, at most 7 days) lists, per provider and
-endpoint, the moments when a provider signed more than one value for the same feed and second: how many (and out of
-how many archived moments), how far apart the values were in basis points (median, 90th percentile, widest), and which
-Signed APIs served each side, matched through the poll that saved each record. Each provider's widest conflict links to
-the feed at that second, where both signed values are shown and checked in the browser. Counting scans every record in
-the range, so the page refreshes every 5 minutes rather than every 30 seconds.
+Sometimes a provider signs two different values for the same feed and second. The archive keeps both, because that
+pair is evidence.
 
-The rate is a lower bound. Each host is polled about once a minute, so a conflict only shows when both copies happen
-to be serving a record from the same second.
+The **Conflicts** page (`/conflicts`) shows, per provider and endpoint:
 
-Spreads are relative to the absolute median. When differing values have a zero median, the spread is undefined
-(`null` in JSON), ranked above finite spreads; MCP's `check_price` warns instead of treating it as agreement.
+- how many moments had more than one value, out of how many archived
+- how far apart the values were, in basis points
+- which Signed API served each value
 
-## Peer repair
+Each provider's widest conflict links to the feed at that second, with both values checked in your browser. The page
+refreshes every 5 minutes, because counting reads every record in the range.
 
-A moment the archiver misses can never be fetched from the Signed API again, but another archive that was polling
-then may have it. List other archives under `peers` in the config file (the base URL of their explorer). Repair runs
-beside polling, never inside it, so a slow or unreachable peer can't hold up archiving:
-
-1. After the first polling cycle, then every 10 minutes, it finds gaps that have closed: stretches with no successful
-   request for an airnode and endpoint longer than three polling intervals, and never shorter than 3 minutes. A gap
-   that ended in the last week is found whole, however long ago it started.
-2. Each gap is split once into windows of at most 15 minutes, with 2 minutes of margin on both sides for signing
-   delays and clock drift, and each window is recorded for each peer in `repair_windows`.
-3. Due windows are asked one every 5 seconds, newest first, through
-   `GET /api/records?airnode=&endpoint=&from=&to=`. A window another peer already covered is skipped.
-4. Every record that comes back is checked like any other input (shape, the asked airnode and window, a known
-   template, valid signature) and added if it passes. Responses over 16 MB or 50,000 records, and redirects, are
-   refused; duplicates are dropped before the signature check.
-
-A peer also says where in the window it has nothing itself (`uncovered`). A peer that watched the whole window and
-has nothing is final: it can never gain the data later. A window the peer missed part of is asked once more an hour
-later, since the peer may have filled it from its own peers. Network errors, 429 and other non-400 errors are retried
-up to three times with backoff, honouring `Retry-After`; a peer that keeps failing is paused as a whole (from 5
-minutes up to 6 hours), so its outage doesn't use up the attempts of every window waiting on it. Peers' polls are
-never imported, because coverage claims aren't signed: the stretch stays a gap in `polls`, and `peer_coverage` records
-the stretches the peer's records actually span. The explorer shades a stretch until every provider of the feed is
-covered.
-
-Stored repair coverage preserves holes the peer reports, even when shorter than the gap threshold. The chart may
-hide short leftover slivers for readability, but `/api/records` reports them to peers without that smoothing.
-
-Nodes may poll at different intervals, run different versions or list different feeds. Records prove themselves, so
-none of that matters to what is exchanged: a peer returns whatever it holds in the window, and records under templates
-this archive doesn't know are skipped (and counted) rather than treated as suspicious. An archive that doesn't send
-`uncovered` is read through its `watched` flag.
-
-Known cost: merging polls into an old gap changes where the gap starts, so its pieces are asked about again (windows
-already covered are skipped).
-
-To be someone's peer, expose your explorer (only `/api/records` is needed) where they can reach it, for example
-through a reverse proxy in front of the `explorer` container.
+The count is a lower bound. Each host is polled about once a minute, so a conflict shows only when both values happen
+to be served at polling time.
 
 ## Parquet files
 
-Closed days move out of SQLite into Parquet files once they ended 7 days ago (`parquet.afterDays` in the config,
-`--parquet-after-days`, `PARQUET_AFTER_DAYS`). The files go to `parquet/` next to the database (`parquet.dir`,
-`--parquet-dir`, `PARQUET_DIR`), so the Docker volume holds both. The archiver checks hourly, beside polling.
+Once a day is 7 days old, the archiver moves its records from SQLite into Parquet files in `parquet/` next to the
+database. Parquet takes about a third of the space.
 
-A day is moved only after its file has been written, flushed to disk, read back and matched against SQLite row for row,
-and registered with its SHA-256; only then are those rows deleted from SQLite, in small batches. Files are never changed.
-A record that arrives later for a moved day (from a peer, a merge, or a feed still serving an old value) goes to SQLite,
-and the next move writes it to another part of that day, or drops it if a file already holds it.
+A day is moved only after its file is written, read back and matched against SQLite row for row. Only then are those
+rows deleted from SQLite. Files are never changed. A record that arrives later for a moved day goes into a new file
+for that day.
 
-Each day is one or more files named `YYYY-MM-DD.NNN.parquet`, about 73 bytes per record (the 65-byte signature doesn't
-compress), roughly a third of SQLite. Every column is kept exactly as signed, as bytes:
+The explorer, API and MCP read SQLite and Parquet together, so nothing changes for them.
+
+Each day is one or more files named `YYYY-MM-DD.NNN.parquet`. Every field is kept exactly as signed:
 
 | Column        | Type           | Notes                                                  |
 | ------------- | -------------- | ------------------------------------------------------ |
@@ -272,16 +308,19 @@ compress), roughly a third of SQLite. Every column is kept exactly as signed, as
 | `fetched_at`  | int64          | unix milliseconds, when this archive fetched it        |
 | `source`      | string or null | `api3` or `provider`; null for merged or repaired ones |
 
-The explorer, API and MCP read SQLite and the files together, so nothing changes for them. To query the files yourself,
-download them from `/data/` or query one in place with DuckDB, which reads only the parts it needs over HTTP (a URL
-can't be a glob; take the names from the manifest):
+Download the files from `/data/`, or query one in place with DuckDB. DuckDB reads only the parts it needs. Take file
+names from `/data/manifest.json`, because a URL can't be a glob:
 
 ```sql
 SELECT '0x' || lower(hex(airnode)) AS airnode, count(*) AS records
 FROM read_parquet('https://archive.example.org/data/2026-11-02.000.parquet')
 GROUP BY ALL;
--- Recent days are still in SQLite: read both together. DuckDB can't scan `datapoints` directly (it has no rowid),
--- so pass the query through to SQLite, and compare keys as hex.
+```
+
+To read recent days too, combine the files with SQLite. DuckDB can't scan `datapoints` directly, so pass the query
+through to SQLite:
+
+```sql
 ATTACH 'data/archive.sqlite' AS live (TYPE sqlite, READ_ONLY);
 SELECT count(*) FROM (
   SELECT hex(airnode), hex(template_id), timestamp, hex(value) FROM read_parquet('data/parquet/*.parquet')
@@ -290,16 +329,31 @@ SELECT count(*) FROM (
 );
 ```
 
-`merge` reads only the other archive's SQLite, so records it has already moved to Parquet are not merged.
+## Querying the database
 
-## Querying
-
-Hex fields are stored as bytes:
+Hex fields are stored as bytes. Read them with `hex()`:
 
 ```sql
 SELECT endpoint, hex(template_id), timestamp, hex(value) FROM datapoints ORDER BY timestamp DESC LIMIT 10;
--- When the archiver was not polling (fetched_at is unix milliseconds):
+```
+
+Find when the archiver was not polling. `fetched_at` is in unix milliseconds:
+
+```sql
 SELECT previous, fetched_at FROM (
   SELECT fetched_at, lag(fetched_at) OVER (ORDER BY fetched_at) AS previous FROM polls
 ) WHERE fetched_at - previous > 180000;
 ```
+
+## Development
+
+| Command         | What it does                                                         |
+| --------------- | -------------------------------------------------------------------- |
+| `bun run dev`   | Runs the archiver and explorer, restarting on file changes.          |
+| `bun run check` | Checks the airnode list, then runs Biome, `tsc` and the tests.       |
+| `bun run build` | Compiles a native binary to `dist/signed-archive`.                   |
+
+The binary needs no Bun or `node_modules`. It reads the airnode and feed lists from `config/` at run time, so updating
+them needs no rebuild. It is about 110 MB, almost all of it the embedded Bun runtime.
+
+Never point `bun run dev` at the Docker volume. Every restart leaves a gap in the history.
