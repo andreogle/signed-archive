@@ -4,7 +4,8 @@ import { join } from 'node:path';
 import { setTimeout as sleep, setImmediate as yieldToLoop } from 'node:timers/promises';
 import { type AsyncBuffer, type FileMetaData, parquetMetadataAsync, parquetRead } from 'hyparquet';
 import { fileWriter, ParquetWriter } from 'hyparquet-writer';
-import { errorMessage, log } from './logger.ts';
+import { log } from './logger.ts';
+import { go } from './result.ts';
 import { hasTable } from './store.ts';
 
 // Closed days of records leave SQLite for Parquet files, one or more per UTC day of signed timestamps. A day moves
@@ -357,10 +358,11 @@ async function moveDay(db: Database, dir: string, day: string, maxRowsPerFile: n
 
   let partNumber = priorFiles.length;
   const nameOf = (part: number) => `${day}.${String(part).padStart(3, '0')}.parquet`;
-  let part: ReturnType<typeof startPart> | null = null;
+  // Asserted, not annotated: the part is assigned inside a closure, so narrowing it to null would be wrong.
+  let part = null as ReturnType<typeof startPart> | null;
   const parts: Part[] = [];
   const duplicates: StoredRow[] = [];
-  try {
+  const [error] = await go(async () => {
     for (const key of [...keysOf(db)]) {
       if (signal?.aborted) break;
       const rows = rowsOfKey.all({ ...key, from, to });
@@ -387,7 +389,8 @@ async function moveDay(db: Database, dir: string, day: string, maxRowsPerFile: n
     }
     if (part) parts.push(await part.finish());
     part = null;
-  } catch (error) {
+  });
+  if (error) {
     part?.abandon();
     throw error;
   }
@@ -584,17 +587,13 @@ const MOVE_EVERY_MS = 60 * 60 * 1000;
 export async function runMoves(options: Omit<MoveOptions, 'now'> & { signal: AbortSignal }) {
   let wait = FIRST_MOVE_MS;
   while (!options.signal.aborted) {
-    try {
-      await sleep(wait, undefined, { signal: options.signal });
-    } catch {
-      return;
-    }
+    const [stopped] = await go(() => sleep(wait, undefined, { signal: options.signal }));
+    if (stopped) return;
     wait = MOVE_EVERY_MS;
-    try {
-      const { files, written, deleted } = await moveDays(options);
-      if (files.length > 0 || deleted > 0) log.info('days moved', { files: files.length, written, deleted });
-    } catch (error) {
-      log.warn('move failed', { error: errorMessage(error) });
+    const [error, moved] = await go(() => moveDays(options));
+    if (error) log.warn('move failed', { error: error.message });
+    else if (moved.files.length > 0 || moved.deleted > 0) {
+      log.info('days moved', { files: moved.files.length, written: moved.written, deleted: moved.deleted });
     }
   }
 }

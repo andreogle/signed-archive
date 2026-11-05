@@ -4,7 +4,8 @@ import { concatHex, encodeAbiParameters, type Hex, keccak256, stringToHex } from
 import { type Catalog, type CatalogInput, createCatalog } from './catalog.ts';
 import { MAX_RESPONSE_BYTES, REQUEST_TIMEOUT_MS, USER_AGENT } from './config.ts';
 import { readCapped, retryAfterMs } from './http.ts';
-import { errorMessage, log } from './logger.ts';
+import { log } from './logger.ts';
+import { go } from './result.ts';
 import { parseAirnodes, parseFeeds } from './settings.ts';
 
 const REPOSITORY = 'api3dao/api-integrations-data';
@@ -30,19 +31,20 @@ export function catalogReader(db: Database) {
   return (fallback: Catalog): Catalog => {
     const exists = db.query("SELECT 1 FROM sqlite_master WHERE name = 'catalog_snapshots' AND type = 'table'").get();
     if (!exists) return fallback;
-    const latest = db
-      .query<Snapshot, []>('SELECT id, revision, contents FROM catalog_snapshots ORDER BY id DESC LIMIT 1')
-      .get();
+    // Only the id per call: contents are parsed again only when a new snapshot lands.
+    const latest = db.query<{ id: number }, []>('SELECT id FROM catalog_snapshots ORDER BY id DESC LIMIT 1').get();
     if (!latest) return fallback;
     if (cached?.id === latest.id) return cached.catalog;
-    const current = JSON.parse(latest.contents) as CatalogInput;
+    // The last row read below is the latest snapshot.
+    let current: CatalogInput = { airnodes: [], feeds: {} };
     const historical = new Map<string, NonNullable<CatalogInput['historical']>[number]>();
     for (const row of db
       .query<Snapshot, { id: number }>(
         'SELECT id, revision, contents, observed_at FROM catalog_snapshots WHERE id <= $id ORDER BY id'
       )
       .all({ id: latest.id })) {
-      const snapshot = createCatalog(JSON.parse(row.contents) as CatalogInput);
+      current = JSON.parse(row.contents) as CatalogInput;
+      const snapshot = createCatalog(current);
       const active = new Set<string>();
       for (const [feed, sources] of snapshot.feeds) {
         for (const source of sources.public) {
@@ -69,12 +71,14 @@ export function saveCatalog(db: Database, input: CatalogInput, revision: string)
   const last = db
     .query<Snapshot, []>('SELECT id, revision, contents FROM catalog_snapshots ORDER BY id DESC LIMIT 1')
     .get();
-  if (last?.revision === revision && last.contents === contents) return;
+  // An upstream commit that leaves the catalogue unchanged adds no row: every row is reparsed when a new one lands.
+  if (last?.contents === contents) return false;
   db.query('INSERT INTO catalog_snapshots (revision, observed_at, contents) VALUES ($revision, $at, $contents)').run({
     revision,
     at: Date.now(),
     contents,
   });
+  return true;
 }
 
 const object = (value: unknown): Record<string, unknown> => {
@@ -214,7 +218,8 @@ export async function discoverCatalog({
 
 export interface CatalogUpdateOptions extends Omit<DiscoveryOptions, 'revision'> {
   revision: () => string | undefined;
-  apply: (input: CatalogInput, revision: string) => void;
+  // Whether the snapshot was new; an unchanged catalogue under a new revision adds nothing.
+  apply: (input: CatalogInput, revision: string) => boolean;
   checkEveryMs?: number;
 }
 
@@ -226,22 +231,26 @@ export async function runCatalogUpdates({
   ...options
 }: CatalogUpdateOptions) {
   let failures = 0;
+  // The newest revision checked, newer than the stored one when upstream changed nothing this archive keeps.
+  let checked: string | undefined;
   while (!options.signal.aborted) {
     let wait = checkEveryMs;
-    try {
-      const result = await discoverCatalog({ ...options, revision: revision() });
-      if (options.signal.aborted) break;
-      if (result) {
-        apply(result.input, result.revision);
-        log.info('catalog updated', {
-          revision: result.revision,
-          providers: result.input.airnodes.length,
-          feeds: Object.keys(result.input.feeds).length,
-        });
-      }
+    const [error] = await go(async () => {
+      const result = await discoverCatalog({ ...options, revision: checked ?? revision() });
+      if (!result || options.signal.aborted) return;
+      const changed = apply(result.input, result.revision);
+      checked = result.revision;
+      if (!changed) return;
+      log.info('catalog updated', {
+        revision: result.revision,
+        providers: result.input.airnodes.length,
+        feeds: Object.keys(result.input.feeds).length,
+      });
+    });
+    if (options.signal.aborted) break;
+    if (error === undefined) {
       failures = 0;
-    } catch (error) {
-      if (options.signal.aborted) break;
+    } else {
       failures += 1;
       wait = Math.min(
         24 * CHECK_EVERY_MS,
@@ -250,12 +259,9 @@ export async function runCatalogUpdates({
           error instanceof CatalogFetchError ? (error.retryMs ?? 0) : 0
         )
       );
-      log.warn('catalog update failed', { error: errorMessage(error), retryInSeconds: Math.ceil(wait / 1000) });
+      log.warn('catalog update failed', { error: error.message, retryInSeconds: Math.ceil(wait / 1000) });
     }
-    try {
-      await sleep(wait, undefined, { signal: options.signal });
-    } catch {
-      break;
-    }
+    const [stopped] = await go(() => sleep(wait, undefined, { signal: options.signal }));
+    if (stopped) break;
   }
 }

@@ -4,8 +4,9 @@ import { PEER_WINDOW_SECONDS } from './api.ts';
 import type { Catalog } from './catalog.ts';
 import { type Endpoint, isEndpoint, MAX_RESPONSE_BYTES, REQUEST_TIMEOUT_MS, USER_AGENT } from './config.ts';
 import { readCapped, retryAfterMs } from './http.ts';
-import { errorMessage, log } from './logger.ts';
+import { log } from './logger.ts';
 import { GAP_SECONDS, type Gap, subtractCovered } from './reader.ts';
+import { go } from './result.ts';
 import { hasValidSignature, type SignedDatum, toSignedDatum } from './signed-data.ts';
 import type { Coverage, openStore, RepairWindow } from './store.ts';
 
@@ -80,7 +81,7 @@ async function ask(peer: URL, window: RepairWindow, now: number, signal?: AbortS
     from: String(window.from),
     to: String(window.to),
   }).toString();
-  try {
+  const [error, answer] = await go(async (): Promise<Answer> => {
     const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
     const response = await fetch(url, {
       headers: { 'user-agent': USER_AGENT },
@@ -107,9 +108,8 @@ async function ask(peer: URL, window: RepairWindow, now: number, signal?: AbortS
     // Archives without the `uncovered` field only say whether they polled at all in the window.
     const uncovered = isGapList(fields.uncovered) ? fields.uncovered : null;
     return { kind: 'records', data: fields.records, uncovered, watched: fields.watched === true };
-  } catch (error) {
-    return { kind: 'retry', error: errorMessage(error), retryAfterMs: null };
-  }
+  });
+  return error ? { kind: 'retry', error: error.message, retryAfterMs: null } : answer;
 }
 
 // The checks a record from the Signed API gets, plus: it is for the window's airnode and signed inside the window.
@@ -325,7 +325,7 @@ export async function runRepairs({
   while (!signal.aborted) {
     const catalog = currentCatalog?.() ?? initialCatalog;
     let worked = false;
-    try {
+    const [error] = await go(async () => {
       if (Date.now() >= nextSchedule) {
         const scheduled = scheduleRepairs({ store, catalog, peers, intervalMs });
         nextSchedule = Date.now() + SCHEDULE_EVERY_MS;
@@ -333,14 +333,10 @@ export async function runRepairs({
       }
       const result = await repairNext({ store, catalog, peers, signal, health });
       worked = result !== null;
-    } catch (error) {
-      log.warn('repair step failed', { error: errorMessage(error) });
-    }
+    });
+    if (error) log.warn('repair step failed', { error: error.message });
     const wait = worked ? REQUEST_SPACING_MS : Math.min(IDLE_MS, Math.max(0, nextSchedule - Date.now()));
-    try {
-      await sleep(wait, undefined, { signal });
-    } catch {
-      break;
-    }
+    const [stopped] = await go(() => sleep(wait, undefined, { signal }));
+    if (stopped) break;
   }
 }

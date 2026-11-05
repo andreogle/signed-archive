@@ -19,6 +19,7 @@ import { readCapped, retryAfterMs } from './http.ts';
 import { errorMessage, log } from './logger.ts';
 import { DEFAULT_AFTER_DAYS, runMoves } from './parquet.ts';
 import { runRepairs } from './repair.ts';
+import { go, goSync } from './result.ts';
 import { hasValidSignature, type SignedDatum, toSignedDatum } from './signed-data.ts';
 import { openStore } from './store.ts';
 
@@ -108,8 +109,8 @@ function trackFeeds(target: Target, data: readonly SignedDatum[]) {
 // `status` is the HTTP status, or null when no usable response came back.
 // A database error here is logged rather than thrown, so it can't stop the archiver.
 function recordFailure(store: Store, target: Target, status: number | null) {
-  try {
-    store.save([], {
+  const [error] = goSync(() => {
+    return store.save([], {
       airnode: target.airnode,
       endpoint: target.endpoint,
       source: target.source,
@@ -118,10 +119,10 @@ function recordFailure(store: Store, target: Target, status: number | null) {
       received: 0,
       rejected: 0,
     });
-  } catch (error) {
-    if (!(error instanceof SQLiteError)) throw error;
-    log.error('save failed', { ...fieldsOf(target), error: errorMessage(error) });
-  }
+  });
+  if (!error) return;
+  if (!(error instanceof SQLiteError)) throw error;
+  log.error('save failed', { ...fieldsOf(target), error: error.message });
 }
 
 export async function poll(target: Target, store: Store, intervalMs: number, stop: AbortSignal) {
@@ -267,11 +268,8 @@ export async function runArchiver({
     let succeeded = 0;
     // An empty catalogue is a valid retirement of every provider, not a busy loop.
     if (targets.length === 0) {
-      try {
-        await sleep(intervalMs, undefined, { signal: stop.signal });
-      } catch {
-        break;
-      }
+      const [stopped] = await go(() => sleep(intervalMs, undefined, { signal: stop.signal }));
+      if (stopped) break;
     }
     for (const target of targets) {
       if (stop.signal.aborted) break;
@@ -279,26 +277,23 @@ export async function runArchiver({
       if (target.retryAt > startedAt) {
         backingOff += 1;
       } else {
-        try {
-          const result = await poll(target, store, intervalMs, stop.signal);
-          if (result) {
-            succeeded += 1;
-            saved += result.saved;
-            rejected += result.rejected;
-          } else {
-            failed += 1;
-          }
-        } catch (error) {
+        const [error, result] = await go(() => poll(target, store, intervalMs, stop.signal));
+        if (error) {
           if (stop.signal.aborted) break;
           failed += 1;
           noteFailure(store, target, intervalMs, error);
+        } else if (result) {
+          succeeded += 1;
+          saved += result.saved;
+          rejected += result.rejected;
+        } else {
+          failed += 1;
         }
       }
-      try {
-        await sleep(Math.max(0, gapMs - (performance.now() - startedAt)), undefined, { signal: stop.signal });
-      } catch {
-        break;
-      }
+      const [stopped] = await go(() => {
+        return sleep(Math.max(0, gapMs - (performance.now() - startedAt)), undefined, { signal: stop.signal });
+      });
+      if (stopped) break;
     }
     log.info(stop.signal.aborted ? 'cycle interrupted' : 'cycle done', {
       saved,

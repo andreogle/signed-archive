@@ -38,6 +38,7 @@ This file holds what is specific to this project and the invariants that must ne
 **TypeScript style**
 - Multi-line arrow functions use braces and an explicit `return`, never a multi-line implicit return. If the body fits on one line (120 cols), collapse it to a one-line implicit return
 - Code comments state the rule or the reason, never the history of the change
+- Catch errors with `go` (async) or `goSync` from `src/result.ts`, not `try`/`catch`: `const [error, value] = await go(() => ...)`, then handle `error` first. It keeps `Error` instances (so `instanceof` checks still work) and wraps anything else. `try`/`finally` for cleanup stays. An abortable sleep is `const [stopped] = await go(() => sleep(ms, undefined, { signal }))`: pass the signal to `sleep` itself, not to `go`, so the timer is cancelled too
 
 ## Workflow
 

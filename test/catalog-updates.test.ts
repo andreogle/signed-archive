@@ -155,6 +155,7 @@ test('background discovery retries failure, preserves a rejected snapshot and st
     apply: (next) => {
       applied.push(next);
       stop.abort();
+      return true;
     },
   });
   expect(attempts).toBe(2);
@@ -225,8 +226,10 @@ test('readers, API and MCP follow snapshots and retain removed mappings after re
   const store = openStore(path);
   const reader = openReader(path);
   expect(reader.catalog(empty)).toBe(empty);
-  store.saveCatalog(input, 'first');
-  store.saveCatalog(input, 'first');
+  expect(store.saveCatalog(input, 'first')).toBe(true);
+  expect(store.saveCatalog(input, 'first')).toBe(false);
+  // A new upstream revision with the same catalogue adds no snapshot, so readers keep their cached catalog.
+  expect(store.saveCatalog(input, 'unrelated-commit')).toBe(false);
   const first = reader.catalog(empty);
   expect(first.input.revision).toBe(1);
   expect(reader.catalog(empty)).toBe(first);

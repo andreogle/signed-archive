@@ -5,6 +5,7 @@ import type { AirnodeEntry, CatalogInput } from './catalog.ts';
 import { MIN_INTERVAL_SECONDS } from './config.ts';
 import { parseHeartbeatUrl } from './heartbeat.ts';
 import { LOG_LEVELS, type LogLevel } from './logger.ts';
+import { goSync } from './result.ts';
 
 // The settings file. Setting keys mirror command-line options; precedence is flag, then environment variable, then
 // this file, then the built-in default. What to archive lives in two more files it names under `catalog`: the airnode
@@ -77,11 +78,8 @@ const fail = (path: string, message: string): never => {
 const scalar = (parse: (value: string) => unknown) => {
   return (value: unknown, path: string) => {
     if (typeof value !== 'string' && typeof value !== 'number') return fail(path, 'must be a string or number');
-    try {
-      return parse(String(value));
-    } catch (error) {
-      return fail(path, error instanceof Error ? error.message : String(error));
-    }
+    const [error, parsed] = goSync(() => parse(String(value)));
+    return error ? fail(path, error.message) : parsed;
   };
 };
 

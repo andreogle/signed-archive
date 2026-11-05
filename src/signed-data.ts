@@ -1,4 +1,5 @@
 import { type Address, encodePacked, type Hex, isAddressEqual, keccak256, recoverMessageAddress } from 'viem';
+import { go } from './result.ts';
 
 export interface SignedDatum {
   airnode: Address;
@@ -38,7 +39,7 @@ const MAX_S = 0x7fffffffffffffffffffffffffffffff5d576e7357a4501ddfe92f46681b20a0
 // malleable forms of a signature (high `s`, or `v` other than 27 or 28) that viem would accept: anyone can derive them
 // from a public record, and a stored copy the contract rejects is no evidence of what can go on-chain.
 export async function hasValidSignature(datum: SignedDatum): Promise<boolean> {
-  try {
+  const [error, valid] = await go(async () => {
     const s = BigInt(`0x${datum.signature.slice(66, 130)}`);
     const v = datum.signature.slice(130).toLowerCase();
     if (s > MAX_S || (v !== '1b' && v !== '1c')) return false;
@@ -47,7 +48,6 @@ export async function hasValidSignature(datum: SignedDatum): Promise<boolean> {
     );
     const signer = await recoverMessageAddress({ message: { raw: hash }, signature: datum.signature });
     return isAddressEqual(signer, datum.airnode);
-  } catch {
-    return false;
-  }
+  });
+  return error === undefined && valid;
 }
