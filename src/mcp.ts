@@ -239,7 +239,8 @@ async function callTool(reader: Reader, catalog: Catalog, name: string, args: To
     }
     case 'check_price': {
       const endpoint = readEndpoint(args.endpoint);
-      const sources = sourcesOf(catalog, args.feed, endpoint);
+      sourcesOf(catalog, args.feed, endpoint);
+      const sources = catalog.activeFeeds.get(String(args.feed))?.[endpoint] ?? [];
       const maxAge = readNumber(args.maxAgeSeconds, 'maxAgeSeconds', 300);
       const maxSpread = readNumber(args.maxSpreadBps, 'maxSpreadBps', 100);
       const records = await reader.at(sources, now);
@@ -323,10 +324,11 @@ const isId = (id: unknown): id is JsonRpcRequest['id'] => {
 // Answers one JSON-RPC message. Notifications (no id), and responses a client sends back, get no answer: null.
 export async function handleMcp(
   reader: Reader,
-  catalog: Catalog,
+  configuredCatalog: Catalog,
   message: unknown,
   now = Math.floor(Date.now() / 1000)
 ): Promise<JsonRpcResponse | null> {
+  const catalog = reader.catalog(configuredCatalog);
   if (typeof message !== 'object' || message === null || Array.isArray(message)) {
     return fail(null, -32600, 'expected a JSON-RPC request object');
   }

@@ -80,7 +80,7 @@ function toPoll(row: SourcePoll, catalog: Catalog, now: number): StoredPoll | nu
 export async function mergeArchive({
   sourcePath,
   dbPath,
-  catalog,
+  catalog: configuredCatalog,
   now = Date.now(),
 }: {
   sourcePath: string;
@@ -93,6 +93,7 @@ export async function mergeArchive({
   }
   const source = new Database(sourcePath, { readonly: true, strict: true });
   const store = openStore(dbPath);
+  const catalog = store.catalog(configuredCatalog);
   let read = 0;
   let added = 0;
   let rejected = 0;

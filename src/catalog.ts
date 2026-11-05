@@ -1,7 +1,7 @@
 import { type Address, type Hex, isAddressEqual, keccak256 } from 'viem';
 import type { Endpoint } from './config.ts';
 
-// What to archive and how to name it, from the config file: the providers' airnodes, and each feed's base template ID
+// What to archive and how to name it, from local files or a persisted snapshot: providers and base template IDs
 // per provider. Pure (viem only, no Bun or Node imports), so the web app builds the same catalog in the browser from
 // /api/catalog and runs the same checks with it.
 
@@ -13,15 +13,20 @@ export interface AirnodeEntry {
 }
 
 export interface CatalogInput {
+  revision?: number;
   airnodes: AirnodeEntry[];
   // Feed name -> provider alias -> base template ID.
   feeds: Record<string, Record<string, Hex>>;
+  // Older signer/template mappings remain evidence even after a provider or feed is retired.
+  historical?: (FeedSource & { feed: string })[];
 }
 
 export interface FeedSource {
   provider: string;
   airnode: Address;
   templateId: Hex;
+  // When this archive observed removal (unix seconds), not when the provider stopped signing.
+  retiredAt?: number;
 }
 
 // Chart colour slot per provider. A slot belongs to the provider, never to its rank in a list, so a provider keeps its
@@ -49,7 +54,7 @@ function assignSlots(feeds: ReadonlyMap<string, Record<Endpoint, FeedSource[]>>)
 export function createCatalog(input: CatalogInput) {
   const airnodeByAlias = new Map(input.airnodes.map(({ alias, airnode }) => [alias, airnode]));
   // The Signed API serves OEV data under keccak256(base template ID), so each feed has one source list per endpoint.
-  const feeds: ReadonlyMap<string, Record<Endpoint, FeedSource[]>> = new Map(
+  const feeds = new Map<string, Record<Endpoint, FeedSource[]>>(
     Object.entries(input.feeds).map(([name, providers]) => {
       const base = Object.entries(providers).flatMap(([provider, templateId]) => {
         const airnode = airnodeByAlias.get(provider);
@@ -59,10 +64,32 @@ export function createCatalog(input: CatalogInput) {
       return [name, { public: base, 'public-oev': oev }];
     })
   );
+  const activeFeeds: ReadonlyMap<string, Record<Endpoint, FeedSource[]>> = new Map(
+    [...feeds].map(([name, sources]) => {
+      return [name, { public: [...sources.public], 'public-oev': [...sources['public-oev']] }];
+    })
+  );
+  for (const { feed, ...source } of input.historical ?? []) {
+    const held = feeds.get(feed) ?? { public: [], 'public-oev': [] };
+    if (
+      !held.public.some((entry) => {
+        return (
+          isAddressEqual(entry.airnode, source.airnode) &&
+          entry.templateId.toLowerCase() === source.templateId.toLowerCase()
+        );
+      })
+    ) {
+      held.public.push(source);
+      held['public-oev'].push({ ...source, templateId: keccak256(source.templateId) });
+    }
+    feeds.set(feed, held);
+  }
   const slots: ReadonlyMap<string, number> = assignSlots(feeds);
 
   const entryOf = (airnode: string) =>
     input.airnodes.find((entry) => isAddressEqual(entry.airnode, airnode as Address));
+  const previousOf = (airnode: string) =>
+    input.historical?.find((entry) => isAddressEqual(entry.airnode, airnode as Address));
 
   // Whether a record belongs to this feed: signed by the provider's listed airnode, under the feed's template ID for
   // this endpoint. A valid signature alone only proves who signed; this ties the signer and template to the feed name.
@@ -97,12 +124,13 @@ export function createCatalog(input: CatalogInput) {
     input,
     airnodes: input.airnodes,
     feeds,
+    activeFeeds,
     slots,
     isFeedRecord,
     sourcesOfAirnode,
     // Whether the airnode is one of the configured providers.
-    knows: (airnode: string) => entryOf(airnode) !== undefined,
-    aliasOf: (airnode: string) => entryOf(airnode)?.alias,
+    knows: (airnode: string) => entryOf(airnode) !== undefined || previousOf(airnode) !== undefined,
+    aliasOf: (airnode: string) => entryOf(airnode)?.alias ?? previousOf(airnode)?.provider,
   };
 }
 

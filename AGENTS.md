@@ -65,6 +65,7 @@ This file holds what is specific to this project and the invariants that must ne
 ## Patterns and gotchas
 
 **Signed API**
+- With `catalog.autoUpdate`, `src/catalog-updates.ts` discovers API3's published JSON in the background, pinned to one Git revision. Validate the whole snapshot before appending it to `catalog_snapshots`; failed updates keep the last valid catalogue. Only current airnodes are polling targets, but old signer/template mappings remain queryable and verifiable. Readers/MCP/repair follow persisted snapshots; never replace this with an in-memory-only reload or import peer catalogues as trusted metadata.
 - `/public/<airnode>` serves base data delayed ~15 s; `/public-oev/<airnode>` serves fresher data already under the OEV template ID (`keccak256(templateId)`). Both verify with the same scheme
 - The API's `/airnodes` route is disabled. Settings live in `signed-archive.yaml`; what to archive lives in `config/airnodes.yaml` and `config/feeds.yaml`, which the settings file names under `catalog` (paths relative to it) and `bun run airnodes` generates from `@api3/api-integrations`. Never edit the generated files by hand; `bun run check` fails if they're stale (e.g. after a Dependabot bump of that package). The lists reach code only through a `Catalog` (`src/catalog.ts`), passed in, never module-level state. Addresses and template IDs stay quoted: YAML may read an unquoted `0x...` as a number
 - Responses carry `Cache-Control: max-age=1`; a fresh fetch per cycle is expected

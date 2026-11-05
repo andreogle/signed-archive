@@ -26,7 +26,7 @@ export interface Settings {
   // Other archives to ask for records this one missed. See src/repair.ts.
   peers?: URL[];
   // The airnode and feed list files, relative to the settings file.
-  catalog?: { airnodes?: string; feeds?: string };
+  catalog?: { airnodes?: string; feeds?: string; autoUpdate?: boolean };
 }
 
 export function parseInterval(value: string) {
@@ -141,7 +141,7 @@ const airnodes = (value: unknown, path: string) => {
 
 const feeds = (value: unknown, path: string) => {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return fail(path, 'must be a mapping');
-  const result: Record<string, Record<string, Hex>> = {};
+  const result: Record<string, Record<string, Hex>> = Object.create(null);
   for (const [name, providers] of Object.entries(value)) {
     if (typeof providers !== 'object' || providers === null || Array.isArray(providers)) {
       fail(`${path}.${name}`, 'must map provider aliases to template IDs');
@@ -165,7 +165,7 @@ const SETTINGS = section({
   health: section({ maxAge: scalar(parseSeconds) }),
   parquet: section({ dir: text, afterDays: scalar(parseDays) }),
   peers,
-  catalog: section({ airnodes: text, feeds: text }),
+  catalog: section({ airnodes: text, feeds: text, autoUpdate: flag }),
 });
 
 // Parses and checks the YAML text of a settings file. An empty file means no settings.

@@ -116,6 +116,16 @@ program
   )
   .addOption(dbOption())
   .addOption(
+    new Option(
+      '--catalog-auto-update [on]',
+      'discover API3 catalogue updates hourly without restarting (true or false)'
+    )
+      .argParser(argParser(parseSwitch))
+      .preset(true)
+      .default(settings.catalog?.autoUpdate ?? false)
+      .env('CATALOG_AUTO_UPDATE')
+  )
+  .addOption(
     new Option('--heartbeat-url <url>', "URL to ping after each cycle that reached the API (dead man's switch)")
       .argParser(argParser(parseHeartbeatUrl))
       // The URL is a secret, so help says where it came from instead of printing it.
@@ -140,7 +150,13 @@ program
   .addOption(portOption())
   .action(
     async (
-      options: ServeOptions & { interval: number; serve?: boolean; heartbeatUrl?: URL; parquetAfterDays: number }
+      options: ServeOptions & {
+        interval: number;
+        serve?: boolean;
+        heartbeatUrl?: URL;
+        parquetAfterDays: number;
+        catalogAutoUpdate: boolean;
+      }
     ) => {
       // runArchiver creates the database before its first await, so the read-only server can open it.
       const archiving = runArchiver({
@@ -151,6 +167,7 @@ program
         peers: settings.peers ?? [],
         parquetDir: parquetDirOf(options),
         afterDays: options.parquetAfterDays,
+        discoverCatalog: options.catalogAutoUpdate,
       });
       const server = options.serve ? await serve(options) : null;
       await archiving;

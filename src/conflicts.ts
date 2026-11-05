@@ -1,4 +1,4 @@
-import { type Hex, isAddressEqual } from 'viem';
+import type { Hex } from 'viem';
 import type { Catalog } from './catalog.ts';
 import { decodeValue, formatPrice, spreadBps } from './price.ts';
 import type { Reader } from './reader.ts';
@@ -80,7 +80,7 @@ export async function summarizeConflicts(
       const spreads = [...target.spreads].sort(
         (a, b) => (a ?? Number.POSITIVE_INFINITY) - (b ?? Number.POSITIVE_INFINITY)
       );
-      const provider = catalog.airnodes.find((entry) => isAddressEqual(entry.airnode, airnode))?.alias ?? airnode;
+      const provider = catalog.aliasOf(airnode) ?? airnode;
       return [
         {
           provider,

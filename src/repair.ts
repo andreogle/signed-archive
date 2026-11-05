@@ -306,15 +306,24 @@ export interface RepairLoopOptions {
   peers: readonly URL[];
   intervalMs: number;
   signal: AbortSignal;
+  currentCatalog?: () => Catalog;
 }
 
 // Runs beside the archiver until `signal` aborts. Gaps are scheduled after the first polling cycle, which closes the
 // gap a restart leaves, then every 10 minutes; due windows are asked one every few seconds. A failure in one step is
 // logged and the loop carries on.
-export async function runRepairs({ store, catalog, peers, intervalMs, signal }: RepairLoopOptions) {
+export async function runRepairs({
+  store,
+  catalog: initialCatalog,
+  currentCatalog,
+  peers,
+  intervalMs,
+  signal,
+}: RepairLoopOptions) {
   let nextSchedule = Date.now() + intervalMs + REQUEST_SPACING_MS;
   const health: PeerHealth = new Map();
   while (!signal.aborted) {
+    const catalog = currentCatalog?.() ?? initialCatalog;
     let worked = false;
     try {
       if (Date.now() >= nextSchedule) {
