@@ -618,7 +618,6 @@ feeds:
     "nodary": "0xeaea95044c8fee3bbc32bf6e51f47f7bd1c66b25ff3aec28abcf179e882b7595"
     "shiftmarkets": "0x691c9cca8b869e882a18e36269ec8b4413d475dd69478855eeaaddec112c167e"
   "REUSD/USD":
-    "blocksize": "0xa337b4da098d854e4b3058ce5fa7d3e7a82c5998868bf9691eebbe0573f0e701"
     "coingecko": "0x86dcc18095a5603a10f75ed1b6be70f786dd3b4cba9e5aa6f5ab9c29a3c841ac"
     "coinpaprika": "0x7a657394284f4cc0180e62786ae174bd8f9449f3e6c4731b6f3e4daf24caac8c"
   "RLUSD/USD":
