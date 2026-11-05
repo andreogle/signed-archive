@@ -170,14 +170,14 @@ The feed list, chart and latest prices refresh every 30 seconds.
 
 The API uses unix seconds. Add `endpoint=public-oev` for OEV data.
 
-| Route                                    | Returns                                             |
-| ---------------------------------------- | --------------------------------------------------- |
-| `/api/feeds`                             | every feed with its current median                  |
-| `/api/history?feed=ETH/USD&from=&to=`    | price history per provider                          |
-| `/api/at?feed=ETH/USD&time=`             | every provider's signed price at a moment           |
-| `/api/conflicts?from=&to=`               | conflicting values, for at most 7 days              |
-| `/api/catalog`                           | the providers and feeds the explorer checks against |
-| `/data/manifest.json`, `/data/<name>`    | the Parquet files and their SHA-256                 |
+| Route                                 | Returns                                             |
+| ------------------------------------- | --------------------------------------------------- |
+| `/api/feeds`                          | every feed with its current median                  |
+| `/api/history?feed=ETH/USD&from=&to=` | price history per provider                          |
+| `/api/at?feed=ETH/USD&time=`          | every provider's signed price at a moment           |
+| `/api/conflicts?from=&to=`            | conflicting values, for at most 7 days              |
+| `/api/catalog`                        | the providers and feeds the explorer checks against |
+| `/data/manifest.json`, `/data/<name>` | the Parquet files and their SHA-256                 |
 
 See [IDEAS.md](IDEAS.md) for where the project could go next.
 
@@ -185,13 +185,13 @@ See [IDEAS.md](IDEAS.md) for where the project could go next.
 
 The archive is also a read-only MCP server. An agent can ask for signed prices and gets the proof with each answer.
 
-| Tool                | What it does                                                                         |
-| ------------------- | ------------------------------------------------------------------------------------ |
-| `list_feeds`        | Lists feeds with their current median. Filter by name.                               |
-| `get_price_at`      | Each provider's signed price at a moment, with the median and raw signed fields.     |
-| `check_price`       | Says whether the latest price is safe to use: fresh, agreed and without conflicts.   |
-| `get_price_history` | Price points per provider over a range, and the stretches with no data.              |
-| `get_conflicts`     | Values signed twice for the same second, per provider.                               |
+| Tool                | What it does                                                                       |
+| ------------------- | ---------------------------------------------------------------------------------- |
+| `list_feeds`        | Lists feeds with their current median. Filter by name.                             |
+| `get_price_at`      | Each provider's signed price at a moment, with the median and raw signed fields.   |
+| `check_price`       | Says whether the latest price is safe to use: fresh, agreed and without conflicts. |
+| `get_price_history` | Price points per provider over a range, and the stretches with no data.            |
+| `get_conflicts`     | Values signed twice for the same second, per provider.                             |
 
 Connect locally, over stdin and stdout:
 
@@ -347,11 +347,11 @@ SELECT previous, fetched_at FROM (
 
 ## Development
 
-| Command         | What it does                                                         |
-| --------------- | -------------------------------------------------------------------- |
-| `bun run dev`   | Runs the archiver and explorer, restarting on file changes.          |
-| `bun run check` | Checks the airnode list, then runs Biome, `tsc` and the tests.       |
-| `bun run build` | Compiles a native binary to `dist/signed-archive`.                   |
+| Command         | What it does                                                   |
+| --------------- | -------------------------------------------------------------- |
+| `bun run dev`   | Runs the archiver and explorer, restarting on file changes.    |
+| `bun run check` | Checks the airnode list, then runs Biome, `tsc` and the tests. |
+| `bun run build` | Compiles a native binary to `dist/signed-archive`.             |
 
 The binary needs no Bun or `node_modules`. It reads the airnode and feed lists from `config/` at run time, so updating
 them needs no rebuild. It is about 110 MB, almost all of it the embedded Bun runtime.
