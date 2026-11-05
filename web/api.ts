@@ -68,13 +68,13 @@ export function useMoment(feed: string, endpoint: Endpoint, time: number | undef
   });
 }
 
-// The archive's airnodes and feeds, fetched once. It comes from the same server as this page's code, so it is trusted
+// The archive's current and historical mappings. It comes from the same server as this page's code, so it is trusted
 // as far as the page itself is; what it rules out is a record relabelled as another provider or feed.
 export function useCatalog() {
   return useQuery({
     queryKey: ['catalog'],
     queryFn: async () => createCatalog(await get<CatalogInput>('/api/catalog', {})),
-    staleTime: Number.POSITIVE_INFINITY,
+    refetchInterval: REFRESH_MS,
   });
 }
 
@@ -96,6 +96,7 @@ export function useSignatureChecks(
       enabled: catalog !== undefined,
       queryKey: [
         'signature',
+        catalog?.input.revision,
         feed,
         endpoint,
         time ?? 'latest',

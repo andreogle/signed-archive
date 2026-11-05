@@ -5,8 +5,9 @@ import { runArchiver } from './archiver.ts';
 import { createCatalog } from './catalog.ts';
 import { DEFAULT_DB_PATH, DEFAULT_HOST, DEFAULT_INTERVAL_SECONDS, DEFAULT_PORT } from './config.ts';
 import { parseHeartbeatUrl } from './heartbeat.ts';
-import { errorMessage, LOG_LEVELS, type LogLevel, log, setLogLevel } from './logger.ts';
+import { LOG_LEVELS, type LogLevel, log, setLogLevel } from './logger.ts';
 import { DEFAULT_AFTER_DAYS } from './parquet.ts';
+import { go, goSync } from './result.ts';
 import {
   DEFAULT_CONFIG_PATH,
   loadSettings,
@@ -20,19 +21,15 @@ import {
 // Command-line parsers report problems through commander, so bad input fails before anything runs.
 const argParser = <T>(parse: (value: string) => T) => {
   return (value: string) => {
-    try {
-      return parse(value);
-    } catch (error) {
-      throw new InvalidArgumentError(errorMessage(error));
-    }
+    const [error, parsed] = goSync(() => parse(value));
+    if (error) throw new InvalidArgumentError(error.message);
+    return parsed;
   };
 };
 
-let config: Awaited<ReturnType<typeof loadSettings>>;
-try {
-  config = await loadSettings(process.argv, process.env);
-} catch (error) {
-  log.error('fatal', { error: errorMessage(error) });
+const [configError, config] = await go(() => loadSettings(process.argv, process.env));
+if (configError) {
+  log.error('fatal', { error: configError.message });
   process.exit(1);
 }
 const { settings } = config;
@@ -116,6 +113,16 @@ program
   )
   .addOption(dbOption())
   .addOption(
+    new Option(
+      '--catalog-auto-update [on]',
+      'discover API3 catalogue updates hourly without restarting (true or false)'
+    )
+      .argParser(argParser(parseSwitch))
+      .preset(true)
+      .default(settings.catalog?.autoUpdate ?? false)
+      .env('CATALOG_AUTO_UPDATE')
+  )
+  .addOption(
     new Option('--heartbeat-url <url>', "URL to ping after each cycle that reached the API (dead man's switch)")
       .argParser(argParser(parseHeartbeatUrl))
       // The URL is a secret, so help says where it came from instead of printing it.
@@ -140,7 +147,13 @@ program
   .addOption(portOption())
   .action(
     async (
-      options: ServeOptions & { interval: number; serve?: boolean; heartbeatUrl?: URL; parquetAfterDays: number }
+      options: ServeOptions & {
+        interval: number;
+        serve?: boolean;
+        heartbeatUrl?: URL;
+        parquetAfterDays: number;
+        catalogAutoUpdate: boolean;
+      }
     ) => {
       // runArchiver creates the database before its first await, so the read-only server can open it.
       const archiving = runArchiver({
@@ -151,6 +164,7 @@ program
         peers: settings.peers ?? [],
         parquetDir: parquetDirOf(options),
         afterDays: options.parquetAfterDays,
+        discoverCatalog: options.catalogAutoUpdate,
       });
       const server = options.serve ? await serve(options) : null;
       await archiving;
@@ -232,9 +246,8 @@ program
     log.info('backup done', { path, parquetCopied, durationMs: Date.now() - startedAt });
   });
 
-try {
-  await program.parseAsync();
-} catch (error) {
-  log.error('fatal', { error: errorMessage(error) });
+const [fatal] = await go(() => program.parseAsync());
+if (fatal) {
+  log.error('fatal', { error: fatal.message });
   process.exit(1);
 }

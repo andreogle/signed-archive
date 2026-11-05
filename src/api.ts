@@ -75,10 +75,11 @@ const providerCount = (records: readonly SignedPrice[]) => new Set(records.map((
 // GET /api/feeds, /api/history and /api/at. Times are unix seconds, like the signed timestamps.
 export async function handleApi(
   reader: Reader,
-  catalog: Catalog,
+  configuredCatalog: Catalog,
   url: URL,
   now = Math.floor(Date.now() / 1000)
 ): Promise<Response> {
+  const catalog = reader.catalog(configuredCatalog);
   // The airnodes and feeds this archive keeps, so the web app checks records against the same lists.
   if (url.pathname === '/api/catalog') return json(catalog.input);
 

@@ -159,4 +159,56 @@ describe('runArchiver', () => {
     reader.close();
     expect(['SIGINT', 'SIGTERM'].map((name) => process.listenerCount(name))).toEqual(listeners);
   });
+
+  test('adopts additions and deletions between cycles without restarting, including an empty catalogue', async () => {
+    const dbPath = join(dir, 'changes.sqlite');
+    const stop = new AbortController();
+    const original = createCatalog({
+      airnodes: [{ alias: 'coingecko', airnode: coingecko.airnode, signedApiUrl: apiUrl }],
+      feeds: { 'ETH/USD': { coingecko: coingecko.templateId } },
+    });
+    const added = blocksize[0];
+    if (!added) throw new Error('missing fixture');
+    const updated = {
+      airnodes: [{ alias: 'blocksize', airnode: added.airnode, signedApiUrl: apiUrl }],
+      feeds: { 'ETH/USD': { blocksize: added.templateId } },
+    };
+    let phase = 0;
+    let finishedRequests = 0;
+    const changed = () => {
+      const writer = openStore(dbPath);
+      writer.saveCatalog(updated, 'added');
+      writer.close();
+      phase = 1;
+      return Response.json({ data: { original: coingecko } });
+    };
+    const retired = () => {
+      if (phase === 1) {
+        const writer = openStore(dbPath);
+        writer.saveCatalog({ airnodes: [], feeds: {} }, 'deleted');
+        writer.close();
+        phase = 2;
+        // Leave enough time for the in-flight cycle to finish and the empty one to wait.
+        setTimeout(() => {
+          finishedRequests = requests.length;
+        }, 100);
+        setTimeout(() => stop.abort(), 200);
+      }
+      return Response.json({ data: { added } });
+    };
+    answers.set(path, changed);
+    answers.set(`/public/${added.airnode}`, retired);
+    const deadline = setTimeout(() => stop.abort(), 2000);
+    await runArchiver({ intervalSeconds: 0.08, dbPath, catalog: original, api3Url: apiUrl, signal: stop.signal });
+    clearTimeout(deadline);
+    expect(phase).toBe(2);
+    expect(requests.length).toBe(finishedRequests);
+    const reader = openReader(dbPath);
+    const final = reader.catalog(original);
+    expect(final.airnodes).toEqual([]);
+    expect(final.knows(coingecko.airnode)).toBe(true);
+    expect(final.knows(added.airnode)).toBe(true);
+    expect(await reader.records(final.feeds.get('ETH/USD')?.public ?? [], 0, 2e9)).toHaveLength(2);
+    reader.close();
+  });
 });

@@ -4,9 +4,10 @@ import { MAX_CONFLICT_SECONDS } from './api.ts';
 import type { Catalog, FeedSource } from './catalog.ts';
 import { ENDPOINTS, type Endpoint, isEndpoint } from './config.ts';
 import { summarizeConflicts } from './conflicts.ts';
-import { errorMessage, log } from './logger.ts';
+import { log } from './logger.ts';
 import { decodeValue, medianPrice, spreadBps } from './price.ts';
 import type { Reader, SignedPrice } from './reader.ts';
+import { go, goSync } from './result.ts';
 import { hasValidSignature } from './signed-data.ts';
 
 // A Model Context Protocol server, so AI agents can ask the archive for signed prices at past moments with the proof
@@ -239,7 +240,8 @@ async function callTool(reader: Reader, catalog: Catalog, name: string, args: To
     }
     case 'check_price': {
       const endpoint = readEndpoint(args.endpoint);
-      const sources = sourcesOf(catalog, args.feed, endpoint);
+      sourcesOf(catalog, args.feed, endpoint);
+      const sources = catalog.activeFeeds.get(String(args.feed))?.[endpoint] ?? [];
       const maxAge = readNumber(args.maxAgeSeconds, 'maxAgeSeconds', 300);
       const maxSpread = readNumber(args.maxSpreadBps, 'maxSpreadBps', 100);
       const records = await reader.at(sources, now);
@@ -323,10 +325,11 @@ const isId = (id: unknown): id is JsonRpcRequest['id'] => {
 // Answers one JSON-RPC message. Notifications (no id), and responses a client sends back, get no answer: null.
 export async function handleMcp(
   reader: Reader,
-  catalog: Catalog,
+  configuredCatalog: Catalog,
   message: unknown,
   now = Math.floor(Date.now() / 1000)
 ): Promise<JsonRpcResponse | null> {
+  const catalog = reader.catalog(configuredCatalog);
   if (typeof message !== 'object' || message === null || Array.isArray(message)) {
     return fail(null, -32600, 'expected a JSON-RPC request object');
   }
@@ -370,27 +373,26 @@ export async function handleMcp(
       ) as ToolArguments;
       const startedAt = Date.now();
       const fields = { tool: name, feed: typeof args.feed === 'string' ? args.feed : undefined };
-      try {
-        const result = await callTool(reader, catalog, name, args, now);
+      const [error, result] = await go(() => callTool(reader, catalog, name, args, now));
+      if (error === undefined) {
         log.info('mcp tool called', { ...fields, durationMs: Date.now() - startedAt });
         return reply(request.id, {
           content: [{ type: 'text', text: JSON.stringify(result) }],
           structuredContent: result,
         });
-      } catch (error) {
-        const failed = { ...fields, durationMs: Date.now() - startedAt, error: errorMessage(error) };
-        if (error instanceof UnknownTool) {
-          log.info('mcp tool refused', failed);
-          return fail(request.id, -32602, errorMessage(error));
-        }
-        if (error instanceof ArgumentError) {
-          log.info('mcp tool refused', failed);
-          return reply(request.id, { content: [{ type: 'text', text: errorMessage(error) }], isError: true });
-        }
-        // Internal details stay in the log; the agent only learns that the server failed.
-        log.warn('mcp tool failed', failed);
-        return reply(request.id, { content: [{ type: 'text', text: 'internal error' }], isError: true });
       }
+      const failed = { ...fields, durationMs: Date.now() - startedAt, error: error.message };
+      if (error instanceof UnknownTool) {
+        log.info('mcp tool refused', failed);
+        return fail(request.id, -32602, error.message);
+      }
+      if (error instanceof ArgumentError) {
+        log.info('mcp tool refused', failed);
+        return reply(request.id, { content: [{ type: 'text', text: error.message }], isError: true });
+      }
+      // Internal details stay in the log; the agent only learns that the server failed.
+      log.warn('mcp tool failed', failed);
+      return reply(request.id, { content: [{ type: 'text', text: 'internal error' }], isError: true });
     }
     default:
       return fail(request.id, -32601, `method not found: ${request.method}`);
@@ -431,12 +433,8 @@ export async function handleMcpHttp(reader: Reader, catalog: Catalog, request: R
   if (version !== null && !PROTOCOL_VERSIONS.includes(version)) {
     return Response.json(fail(null, -32600, `unsupported protocol version ${version}`), { status: 400 });
   }
-  let message: unknown;
-  try {
-    message = await request.json();
-  } catch {
-    return Response.json(fail(null, -32700, 'invalid JSON'), { status: 400 });
-  }
+  const [invalid, message] = await go((): Promise<unknown> => request.json());
+  if (invalid) return Response.json(fail(null, -32700, 'invalid JSON'), { status: 400 });
   const response = await handleMessage(reader, catalog, message);
   return response ? Response.json(response) : new Response(null, { status: 202 });
 }
@@ -452,10 +450,8 @@ export async function runMcpStdio(
   const lines = createInterface({ input, crlfDelay: Number.POSITIVE_INFINITY });
   for await (const line of lines) {
     if (line.trim() === '') continue;
-    let message: unknown;
-    try {
-      message = JSON.parse(line);
-    } catch {
+    const [invalid, message] = goSync((): unknown => JSON.parse(line));
+    if (invalid) {
       output.write(`${JSON.stringify(fail(null, -32700, 'invalid JSON'))}\n`);
       continue;
     }

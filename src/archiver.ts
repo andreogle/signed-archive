@@ -2,6 +2,7 @@ import { SQLiteError } from 'bun:sqlite';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { type Address, isAddressEqual } from 'viem';
 import type { Catalog } from './catalog.ts';
+import { type DiscoveryOptions, runCatalogUpdates } from './catalog-updates.ts';
 import {
   BASE_URL,
   ENDPOINTS,
@@ -18,6 +19,7 @@ import { readCapped, retryAfterMs } from './http.ts';
 import { errorMessage, log } from './logger.ts';
 import { DEFAULT_AFTER_DAYS, runMoves } from './parquet.ts';
 import { runRepairs } from './repair.ts';
+import { go, goSync } from './result.ts';
 import { hasValidSignature, type SignedDatum, toSignedDatum } from './signed-data.ts';
 import { openStore } from './store.ts';
 
@@ -52,6 +54,30 @@ export interface ArchiverOptions {
   api3Url?: string;
   // Stops the archiver like SIGINT or SIGTERM do.
   signal?: AbortSignal;
+  discoverCatalog?: boolean;
+  // Tests serve the catalogue from a local fixture as well as the Signed API.
+  catalogOrigin?: Pick<DiscoveryOptions, 'apiUrl' | 'rawUrl'>;
+}
+
+// Preserve host backoff for unchanged targets. A new address or URL is a new target; retired targets disappear.
+export function reconcileTargets(catalog: Catalog, previous: readonly Target[], api3Url: string): Target[] {
+  return catalog.airnodes.flatMap(({ alias, airnode, signedApiUrl }) => {
+    return ENDPOINTS.flatMap((endpoint) => {
+      return SOURCES.map((source) => {
+        const baseUrl = source === 'api3' ? api3Url : signedApiUrl;
+        const held = previous.find(
+          (target) =>
+            isAddressEqual(target.airnode, airnode) &&
+            target.endpoint === endpoint &&
+            target.source === source &&
+            target.baseUrl === baseUrl
+        );
+        return held
+          ? { ...held, alias }
+          : { alias, airnode, endpoint, source, baseUrl, failures: 0, retryAt: 0, feeds: null };
+      });
+    });
+  });
 }
 
 export function backOff(target: Target, intervalMs: number, retryAfter: string | null) {
@@ -83,8 +109,8 @@ function trackFeeds(target: Target, data: readonly SignedDatum[]) {
 // `status` is the HTTP status, or null when no usable response came back.
 // A database error here is logged rather than thrown, so it can't stop the archiver.
 function recordFailure(store: Store, target: Target, status: number | null) {
-  try {
-    store.save([], {
+  const [error] = goSync(() => {
+    return store.save([], {
       airnode: target.airnode,
       endpoint: target.endpoint,
       source: target.source,
@@ -93,10 +119,10 @@ function recordFailure(store: Store, target: Target, status: number | null) {
       received: 0,
       rejected: 0,
     });
-  } catch (error) {
-    if (!(error instanceof SQLiteError)) throw error;
-    log.error('save failed', { ...fieldsOf(target), error: errorMessage(error) });
-  }
+  });
+  if (!error) return;
+  if (!(error instanceof SQLiteError)) throw error;
+  log.error('save failed', { ...fieldsOf(target), error: error.message });
 }
 
 export async function poll(target: Target, store: Store, intervalMs: number, stop: AbortSignal) {
@@ -169,27 +195,23 @@ function noteFailure(store: Store, target: Target, intervalMs: number, error: un
 export async function runArchiver({
   intervalSeconds,
   dbPath,
-  catalog,
+  catalog: initialCatalog,
   heartbeatUrl,
   peers = [],
   parquetDir,
   afterDays = DEFAULT_AFTER_DAYS,
   api3Url = BASE_URL,
   signal,
+  discoverCatalog = false,
+  catalogOrigin,
 }: ArchiverOptions) {
   if (signal?.aborted) return;
   const intervalMs = intervalSeconds * 1000;
-  const targets: Target[] = catalog.airnodes.flatMap(({ alias, airnode, signedApiUrl }) => {
-    return ENDPOINTS.flatMap((endpoint) => {
-      return SOURCES.map((source) => {
-        const baseUrl = source === 'api3' ? api3Url : signedApiUrl;
-        return { alias, airnode, endpoint, source, baseUrl, failures: 0, retryAt: 0, feeds: null };
-      });
-    });
-  });
-  // One request at a time, spread evenly across the interval, so the API sees a steady trickle.
-  const gapMs = intervalMs / targets.length;
   const store = openStore(dbPath);
+  if (!store.catalogRevision() || !discoverCatalog) store.saveCatalog(initialCatalog.input, 'local');
+  const currentCatalog = () => store.catalog(initialCatalog);
+  let catalog = currentCatalog();
+  let targets = reconcileTargets(catalog, [], api3Url);
 
   // The first signal cancels the request in flight and the wait before the next one; a second exits at once.
   // Each save is one SQLite transaction, so even a forced exit leaves no half-written records.
@@ -221,42 +243,57 @@ export async function runArchiver({
   });
   // Peer repair runs beside polling, never inside it, so a slow or unreachable peer can't hold up archiving. It stops
   // with the archiver and is waited for before the database closes.
-  const repairing = peers.length > 0 ? runRepairs({ store, catalog, peers, intervalMs, signal: stop.signal }) : null;
+  const repairing =
+    peers.length > 0 ? runRepairs({ store, catalog, currentCatalog, peers, intervalMs, signal: stop.signal }) : null;
+  const discovering = discoverCatalog
+    ? runCatalogUpdates({
+        ...catalogOrigin,
+        revision: store.catalogRevision,
+        apply: store.saveCatalog,
+        signal: stop.signal,
+      })
+    : null;
   // Moving closed days to Parquet runs beside polling too, on its own connection, in small transactions.
   const moving = parquetDir ? runMoves({ dbPath, dir: parquetDir, afterDays, signal: stop.signal }) : null;
   while (!stop.signal.aborted) {
+    catalog = currentCatalog();
+    targets = reconcileTargets(catalog, targets, api3Url);
+    // One request at a time, spread evenly across the interval, including after the target count changes.
+    const gapMs = intervalMs / Math.max(1, targets.length);
     const cycleStartedAt = Date.now();
     let saved = 0;
     let rejected = 0;
     let failed = 0;
     let backingOff = 0;
     let succeeded = 0;
+    // An empty catalogue is a valid retirement of every provider, not a busy loop.
+    if (targets.length === 0) {
+      const [stopped] = await go(() => sleep(intervalMs, undefined, { signal: stop.signal }));
+      if (stopped) break;
+    }
     for (const target of targets) {
       if (stop.signal.aborted) break;
       const startedAt = performance.now();
       if (target.retryAt > startedAt) {
         backingOff += 1;
       } else {
-        try {
-          const result = await poll(target, store, intervalMs, stop.signal);
-          if (result) {
-            succeeded += 1;
-            saved += result.saved;
-            rejected += result.rejected;
-          } else {
-            failed += 1;
-          }
-        } catch (error) {
+        const [error, result] = await go(() => poll(target, store, intervalMs, stop.signal));
+        if (error) {
           if (stop.signal.aborted) break;
           failed += 1;
           noteFailure(store, target, intervalMs, error);
+        } else if (result) {
+          succeeded += 1;
+          saved += result.saved;
+          rejected += result.rejected;
+        } else {
+          failed += 1;
         }
       }
-      try {
-        await sleep(Math.max(0, gapMs - (performance.now() - startedAt)), undefined, { signal: stop.signal });
-      } catch {
-        break;
-      }
+      const [stopped] = await go(() => {
+        return sleep(Math.max(0, gapMs - (performance.now() - startedAt)), undefined, { signal: stop.signal });
+      });
+      if (stopped) break;
     }
     log.info(stop.signal.aborted ? 'cycle interrupted' : 'cycle done', {
       saved,
@@ -270,6 +307,7 @@ export async function runArchiver({
   }
   await repairing;
   await moving;
+  await discovering;
   store.close();
   signal?.removeEventListener('abort', onAbort);
   for (const { name, handler } of handlers) process.off(name, handler);

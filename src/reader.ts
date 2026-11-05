@@ -1,6 +1,7 @@
 import { Database } from 'bun:sqlite';
 import { type Address, bytesToHex, type Hex, hexToBytes } from 'viem';
 import type { FeedSource } from './catalog.ts';
+import { catalogReader } from './catalog-updates.ts';
 import { openParquet, type StoredRow } from './parquet.ts';
 import { decodePrice } from './price.ts';
 import type { SignedDatum } from './signed-data.ts';
@@ -181,7 +182,11 @@ export function openReader(path: string, { parquetDir }: ReaderOptions = {}) {
         return mergeRows(newest, fromFiles).map((row) => toPrice(source, row));
       })
     );
-    return perSource.flat();
+    const records = perSource.flat();
+    const newest = new Map<string, number>();
+    for (const record of records)
+      newest.set(record.provider, Math.max(newest.get(record.provider) ?? 0, Number(record.timestamp)));
+    return records.filter((record) => Number(record.timestamp) === newest.get(record.provider));
   }
 
   // Every record of the sources signed in [from, to] (unix seconds), oldest first, with everything needed to
@@ -221,7 +226,18 @@ export function openReader(path: string, { parquetDir }: ReaderOptions = {}) {
         return points.length > 0 ? [{ provider: source.provider, points }] : [];
       })
     );
-    return perSource.flat();
+    const byProvider = new Map<string, Map<number, PricePoint>>();
+    for (const { provider, points } of perSource.flat()) {
+      const held = byProvider.get(provider) ?? new Map<number, PricePoint>();
+      for (const point of points) {
+        const slot = Math.floor(point.timestamp / bucket);
+        if (point.timestamp > (held.get(slot)?.timestamp ?? -1)) held.set(slot, point);
+      }
+      byProvider.set(provider, held);
+    }
+    return [...byProvider].map(([provider, points]) => {
+      return { provider, points: [...points.values()].sort((a, b) => a.timestamp - b.timestamp).slice(-maxPoints) };
+    });
   }
 
   // Earliest record of any source, in unix seconds, or null when the archive has none.
@@ -368,8 +384,14 @@ export function openReader(path: string, { parquetDir }: ReaderOptions = {}) {
   // endpoint), in unix seconds, for the explorer to shade. A stretch stays shaded until every provider is covered,
   // by this archive's own polls or by what peers filled. Time before an airnode's first poll is unknown, not a gap.
   function gaps(sources: readonly FeedSource[], endpoint: string, from: number, to: number): Gap[] {
-    const airnodes = [...new Set(sources.map(({ airnode }) => airnode.toLowerCase() as Address))];
-    return union(airnodes.flatMap((airnode) => missing(airnode, endpoint, from, to, false, false)));
+    const ends = new Map<Address, number>();
+    for (const source of sources) {
+      const airnode = source.airnode.toLowerCase() as Address;
+      ends.set(airnode, Math.max(ends.get(airnode) ?? 0, Math.min(to, source.retiredAt ?? to)));
+    }
+    return union(
+      [...ends].flatMap(([airnode, end]) => (end < from ? [] : missing(airnode, endpoint, from, end, false, false)))
+    );
   }
 
   // What this archive lacks for one airnode and endpoint in [from, to], told to a peer asking for records so it can
@@ -379,6 +401,7 @@ export function openReader(path: string, { parquetDir }: ReaderOptions = {}) {
   };
 
   return {
+    catalog: catalogReader(db),
     // Moved days' files, for serving them as downloads.
     parquetFiles: parquet.files,
     parquetPath: parquet.pathOf,

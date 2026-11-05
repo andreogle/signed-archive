@@ -19,18 +19,19 @@ bun run dev                    # archiver + explorer, restarting on file changes
 bun run dev -- --interval 120  # flags override env vars
 ```
 
-| Flag                    | Env var                 | Default               | Notes                                                       |
-| ----------------------- | ----------------------- | --------------------- | ----------------------------------------------------------- |
-| `--interval <seconds>`  | `POLL_INTERVAL_SECONDS` | `60`                  | Minimum 15. Requests are spread evenly.                     |
-| `--db <path>`           | `DB_PATH`               | `data/archive.sqlite` |                                                             |
-| `--log-level <level>`   | `LOG_LEVEL`             | `info`                | `debug`, `info`, `warn` or `error`.                         |
-| `--serve [on]`          | `SERVE`                 | off                   | `archive` only: also serve the explorer. `true` or `false`. |
-| `--heartbeat-url <url>` | `HEARTBEAT_URL`         | none                  | `archive` only: ping after each cycle.                      |
-| `--host <host>`         | `HOST`                  | `127.0.0.1`           | Explorer address.                                           |
-| `--port <port>`         | `PORT`                  | `3000`                | Explorer port.                                              |
+| Flag                         | Env var                 | Default                  | Notes                                                             |
+| ---------------------------- | ----------------------- | ------------------------ | ----------------------------------------------------------------- |
+| `--interval <seconds>`       | `POLL_INTERVAL_SECONDS` | `60`                     | Minimum 15. Requests are spread evenly.                           |
+| `--db <path>`                | `DB_PATH`               | `data/archive.sqlite`    |                                                                   |
+| `--log-level <level>`        | `LOG_LEVEL`             | `info`                   | `debug`, `info`, `warn` or `error`.                               |
+| `--serve [on]`               | `SERVE`                 | off                      | `archive` only: also serve the explorer. `true` or `false`.       |
+| `--heartbeat-url <url>`      | `HEARTBEAT_URL`         | none                     | `archive` only: ping after each cycle.                            |
+| `--catalog-auto-update [on]` | `CATALOG_AUTO_UPDATE`   | on in the shipped config | Discover API3 catalogue changes hourly. Disable for custom lists. |
+| `--host <host>`              | `HOST`                  | `127.0.0.1`              | Explorer address.                                                 |
+| `--port <port>`              | `PORT`                  | `3000`                   | Explorer port.                                                    |
 
 **Config files.** Settings live in `signed-archive.yaml` (committed, and shipped in the Docker image), or any copy
-passed with `--config <path>` / `CONFIG`. What to archive lives in two generated files it names under `catalog`:
+passed with `--config <path>` / `CONFIG`. The initial catalogue lives in two generated files named under `catalog`:
 `config/airnodes.yaml` and `config/feeds.yaml`. Paths in the file, `db` included, are relative to the settings file, so
 it names the same archive from any working directory (a flag or env var path is relative to the working directory). A flag beats an env var, which
 beats the file, which beats the default, and a misspelled key is an error. Peers are set only in the file. The
@@ -60,7 +61,7 @@ last updated.
 - **Data**: `/data/manifest.json` lists the moved days' Parquet files with their SHA-256, and `/data/<name>` serves each
   one (see [Parquet files](#parquet-files)).
 
-Feed names come from `config/feeds.yaml`. The page fetches the airnode and feed lists from
+Feed names come from the archive's catalogue snapshots (initially `config/feeds.yaml`). The page refreshes the mappings from
 `/api/catalog` and checks every record against them in the browser.
 
 See [IDEAS.md](IDEAS.md) for where the project could go next.
@@ -117,8 +118,28 @@ archiver and leaves a gap.
 
 `config/airnodes.yaml` and `config/feeds.yaml` are generated from API3's provider list in `@api3/api-integrations`
 (mock providers excluded). After bumping that package, run `bun run airnodes` and commit the result; `bun run check`
-fails while they are stale. To archive a different set, point `catalog.airnodes` / `catalog.feeds` in the settings file
-at your own copies; no rebuild is needed.
+fails while they are stale. These files bootstrap a new archive; they are not rewritten at runtime.
+
+The shipped configuration enables `catalog.autoUpdate`. At startup and hourly, the archiver checks
+[API3's published integration data](https://github.com/api3dao/api-integrations-data). It pins all provider JSON files
+to one Git revision, validates the complete snapshot, and derives template IDs locally without downloading executable
+code or loading the integrations package. This trusts API3's repository for provider identities and feed names, just
+as the generated catalogue trusts API3's package; every signed record is still independently verified.
+
+Additions enter the next polling cycle. Address and Signed API URL changes replace only the affected targets; other
+targets keep their backoff. Removed providers stop being polled. Discovery runs beside polling, with timeouts, bounded
+responses, retry backoff and rate-limit handling. Invalid or incomplete updates leave the last valid catalogue in use.
+
+Each accepted snapshot is kept in SQLite and included in backups. Restarts use the persisted catalogue. The explorer,
+MCP and peer repair follow it without restarting; browser mappings refresh every 30 seconds. Retired feed and signer
+mappings remain available for historical queries and signature checks, including records in Parquet. Latest historical
+queries still return last-known observations with their original timestamps; MCP `check_price` uses only current feed
+membership. Provider rotations are combined into one chart series and one provider vote. Retirement does not shade an
+endless outage after the observed removal. Snapshots record when we learned a change, not its exact upstream effective
+time, and cannot reconstruct mappings removed before this archive began retaining snapshots.
+
+For a custom set, set `catalog.autoUpdate: false` (or `CATALOG_AUTO_UPDATE=false`) and point `catalog.airnodes` /
+`catalog.feeds` at your files. With discovery disabled, startup uses those files and retains earlier mappings for history.
 
 ## Being polite
 

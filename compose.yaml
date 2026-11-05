@@ -27,8 +27,8 @@ services:
       HEARTBEAT_URL: ${HEARTBEAT_URL:-}
     volumes:
       - archive:/data
-      # The image ships signed-archive.yaml and config/ from this repo. To change settings, peers or the lists without
-      # rebuilding, mount your own copies over them (do the same for the explorer if its settings differ):
+      # The image's config enables hourly API3 catalogue discovery; snapshots in /data are shared with the explorer.
+      # To use custom lists, disable catalog.autoUpdate and mount your own settings and bootstrap files:
       # - ./signed-archive.yaml:/app/signed-archive.yaml:ro
       # - ./config:/app/config:ro
     # Unhealthy when no request was recorded for 5 minutes. Docker reports this but does not restart on it,

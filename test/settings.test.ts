@@ -28,6 +28,8 @@ health:
 parquet:
   dir: /data/parquet
   afterDays: 3
+catalog:
+  autoUpdate: true
 peers:
   - https://archive.example.org
   - https://archive.example.org
@@ -40,6 +42,7 @@ peers:
       serve: { host: '0.0.0.0', port: 8080 },
       health: { maxAge: 600 },
       parquet: { dir: '/data/parquet', afterDays: 3 },
+      catalog: { autoUpdate: true },
     });
     expect(settings.archive?.heartbeatUrl?.host).toBe('hc-ping.com');
     // Duplicates collapse, so a peer is never asked twice.

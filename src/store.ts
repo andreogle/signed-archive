@@ -2,6 +2,8 @@ import { Database } from 'bun:sqlite';
 import { copyFileSync, existsSync, mkdirSync, rmSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { type Address, hexToBytes } from 'viem';
+import type { CatalogInput } from './catalog.ts';
+import { CATALOG_SNAPSHOTS, catalogReader, saveCatalog } from './catalog-updates.ts';
 import type { Endpoint, Source } from './config.ts';
 import type { SignedDatum } from './signed-data.ts';
 
@@ -216,6 +218,7 @@ export function openStore(path: string) {
   db.run(REPAIR_WINDOWS);
   db.run('CREATE INDEX IF NOT EXISTS repair_windows_due ON repair_windows (status, retry_at)');
   db.run(PEER_COVERAGE);
+  db.run(CATALOG_SNAPSHOTS);
   // A new column only: existing polls keep their rows and read as API3's.
   if (!hasColumn(db, 'polls', 'source')) db.run("ALTER TABLE polls ADD COLUMN source TEXT NOT NULL DEFAULT 'api3'");
   db.run('CREATE INDEX IF NOT EXISTS polls_by_time ON polls (fetched_at)');
@@ -417,6 +420,11 @@ export function openStore(path: string) {
   };
 
   return {
+    catalog: catalogReader(db),
+    catalogRevision: () =>
+      db.query<{ revision: string }, []>('SELECT revision FROM catalog_snapshots ORDER BY id DESC LIMIT 1').get()
+        ?.revision,
+    saveCatalog: (input: CatalogInput, revision: string) => saveCatalog(db, input, revision),
     save,
     add,
     has,
