@@ -7,6 +7,7 @@ This file holds what is specific to this project and the invariants that must ne
 ## Critical invariants (never skip)
 
 **The archive is evidence**
+
 - Store records exactly as signed: `airnode`, `templateId`, `timestamp`, `encodedValue`, `signature`. Never normalise, round or re-encode a signed field, or the signature stops verifying
 - Only store a record whose signature recovers to the airnode it was fetched for (`hasValidSignature` in `src/signed-data.ts`, the same EIP-191 check `Api3ServerV1` does, including OpenZeppelin's refusal of high `s` and `v` other than 27/28, which viem alone would accept). Count and log anything else as rejected
 - The primary key includes the value, so two different values signed for the same feed and timestamp both survive. That pair is the equivocation evidence the archive exists to catch: never "fix" it with an upsert or a key without the value
@@ -19,23 +20,28 @@ This file holds what is specific to this project and the invariants that must ne
 - Repair runs beside polling (`runRepairs`), never awaited inside the poll loop, one request every few seconds, and stops with the archiver. The gap threshold never drops below `GAP_SECONDS`, whatever the current polling interval, or every ordinary pause in older history reads as an outage. Peer responses are bounded (bytes, records), redirects refused, duplicates dropped before signature checks
 
 **Be polite to the Signed API**
+
 - One request at a time, spread evenly across the poll interval. Never fetch in parallel or in bursts. Each provider is polled on two hosts (API3's Signed API and its own `signedApiUrl` from the config file); a failing host backs off on its own without slowing the other
 - Keep the `POLL_INTERVAL_SECONDS` floor (15 s). Feeds are re-signed every few seconds whether or not the price moved, so polling faster buys rows, not data
 - A failed target backs off exponentially (capped at 30 min) and honours `Retry-After`. Never retry in a tight loop
 - Every request has a timeout and our `User-Agent`
 
 **Untrusted input**
+
 - Everything from the network is untrusted. Parse it through `toSignedDatum` (exact shape, exact hex lengths) before use, and drop what doesn't match
 
 **Time**
+
 - Signed `timestamp` is unix seconds, set by the signer. `fetched_at` is unix milliseconds, set by us. Never mix the two units in a column or a comparison without converting
 
 **Logging**
+
 - Log through `log` in `src/logger.ts`, never `console`. Lines go to stderr as `14:15:23.917 [info] cycle done saved=2116 rejected=0`: local time, level, message, then logfmt fields. Stdout is for command output only
 - The message is a short, fixed, lowercase phrase (`fetch failed`, `cycle done`); everything variable goes in fields, never interpolated into the message. Reuse field names: `provider`, `endpoint`, `status`, `error`, `retryInSeconds`, counts like `saved` and `rejected`
 - `debug` is per request, `info` is per cycle or lifecycle, `warn` is something to look at (failed fetch, rejected records), `error` is fatal
 
 **TypeScript style**
+
 - Multi-line arrow functions use braces and an explicit `return`, never a multi-line implicit return. If the body fits on one line (120 cols), collapse it to a one-line implicit return
 - Code comments state the rule or the reason, never the history of the change
 - Catch errors with `go` (async) or `goSync` from `src/result.ts`, not `try`/`catch`: `const [error, value] = await go(() => ...)`, then handle `error` first. It keeps `Error` instances (so `instanceof` checks still work) and wraps anything else. `try`/`finally` for cleanup stays. An abortable sleep is `const [stopped] = await go(() => sleep(ms, undefined, { signal }))`: pass the signal to `sleep` itself, not to `go`, so the timer is cancelled too
@@ -66,16 +72,19 @@ This file holds what is specific to this project and the invariants that must ne
 ## Patterns and gotchas
 
 **Signed API**
+
 - With `catalog.autoUpdate`, `src/catalog-updates.ts` discovers API3's published JSON in the background, pinned to one Git revision. Validate the whole snapshot before appending it to `catalog_snapshots`; failed updates keep the last valid catalogue. Only current airnodes are polling targets, but old signer/template mappings remain queryable and verifiable. Readers/MCP/repair follow persisted snapshots; never replace this with an in-memory-only reload or import peer catalogues as trusted metadata.
 - `/public/<airnode>` serves base data delayed ~15 s; `/public-oev/<airnode>` serves fresher data already under the OEV template ID (`keccak256(templateId)`). Both verify with the same scheme
 - The API's `/airnodes` route is disabled. Settings live in `signed-archive.yaml`; what to archive lives in `config/airnodes.yaml` and `config/feeds.yaml`, which the settings file names under `catalog` (paths relative to it) and `bun run airnodes` generates from `@api3/api-integrations`. Never edit the generated files by hand; `bun run check` fails if they're stale (e.g. after a Dependabot bump of that package). The lists reach code only through a `Catalog` (`src/catalog.ts`), passed in, never module-level state. Addresses and template IDs stay quoted: YAML may read an unquoted `0x...` as a number
 - Responses carry `Cache-Control: max-age=1`; a fresh fetch per cycle is expected
 
 **Bun and SQLite**
+
 - `bun:sqlite` is opened with `strict: true`: SQL uses `$name` placeholders, bound objects use plain `name` keys
 - WAL mode is on. Copy the database with SQLite's backup (`VACUUM INTO`), never by copying the file while the archiver runs. The archive is the SQLite file and its Parquet directory together: `backup` copies both, checking each file against its registered hash
 
 **Explorer (`web/`)**
+
 - `serve` (or `archive --serve`) opens the database read-only and serves `web/index.html` through Bun's HTML bundler; there is no separate frontend build. `src/reader.ts` is the only read path, and it reads SQLite and the Parquet files together, each record once. Every reader query that touches records is async (hyparquet is), so its callers await it
 - Records shown in the explorer are checked in the browser: `catalog.isFeedRecord` (signer and template belong to the feed) and `hasValidSignature`. The page builds its catalog from `/api/catalog`, served by the same server as the page's code, so it is trusted exactly as far as the page is. A valid signature alone only proves who signed. Never replace either check with a server-side "valid" flag: the page must not have to trust the server's answers
 - The same goes for numbers: wherever the explorer presents a value as checked (the moment panel and the proof), it decodes prices from `encodedValue` and computes the median over verified records with `src/price.ts`, never the server's `price` or `median` strings. `src/price.ts` stays free of Bun and Node imports so it bundles for the browser. The chart and feed list are unverified overviews
@@ -85,12 +94,14 @@ This file holds what is specific to this project and the invariants that must ne
 - Route components that call `getRouteApi` declare their return type (`JSX.Element`), or the router's registered types collapse to `any` through the import cycle
 
 **MCP (`src/mcp.ts`)**
+
 - One handler, two transports: `signed-archive mcp` (stdio, one JSON-RPC message per line) and `POST /mcp` on the explorer (stateless Streamable HTTP, JSON answers, 202 for notifications). No MCP SDK dependency; the protocol surface is `initialize`, `ping`, `tools/list` and `tools/call`
 - Under stdio, stdout carries protocol messages only. Logs already go to stderr; never write anything else to stdout
 - Tools are read-only and go through the reader and catalog like the API. A bad argument is a tool result with `isError: true` and a message the agent can act on, never a JSON-RPC error; unexpected failures are logged
 - Answers that present a price as verified carry the raw signed fields, so an agent or its owner can re-check them without trusting the server
 
 **Dependencies**
+
 - Runtime dependencies are `viem` (signature recovery, hashing, hex helpers) and `commander` (CLI), plus React, TanStack Router and TanStack Query for the explorer in `web/`. Reach for Bun's built-ins and the standard library before adding another
 - `bunfig.toml` refuses package versions published less than 3 days ago (`minimumReleaseAge`). Don't bypass it to grab a fresh release
 - `@api3/api-integrations` is a dev dependency only: it is large (the whole Airnode stack) and `UNLICENSED`. Only `scripts/airnodes.ts` imports it; runtime code reads the list files it writes. Its blocked postinstall stays blocked
