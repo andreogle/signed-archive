@@ -745,6 +745,8 @@ feeds:
     "ncfx": "0x2d84b0d1df2fba6ebcfc8e0b4e424ea9148a561563fd874d4300d4ebafaaf196"
     "nodary": "0x59bcf7ba04f4a26efcba196d20c2ce7b61a50b6aa54d99f6c7583050578ab224"
     "shiftmarkets": "0x87f8be99cce25d1f0bfd53ac58d8aff12391bc75762b48710c1ff8b6cccb818c"
+  "TTWO/USD":
+    "nodary": "0xd7410a5d83be0761b1af1555b72b75e7369687e77d2c7631980916a1ef2c399c"
   "TUSD/USD":
     "blocksize": "0x8a3f5a1382cb85e4b1d08ca440266b8a99714b28e7ac4f86e03c3a3a7299cf02"
     "coingecko": "0x647d9e313c9e1c31839d70bf70dd9a511aa5b3a69ec186dc35e4c6d7bfaa9844"
