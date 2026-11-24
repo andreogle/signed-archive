@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # Keep in step with mise.toml, so the image runs the Bun version that CI and development use.
-ARG BUN_VERSION=1.4.4
+ARG BUN_VERSION=1.4.5
 
 FROM oven/bun:${BUN_VERSION} AS build
 WORKDIR /src
